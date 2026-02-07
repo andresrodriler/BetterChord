@@ -205,3 +205,102 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ============================================================
+# BetterChord Project Specific
+# ============================================================
+
+# Audio files (large training/test data - don't commit to git)
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+data/training_data/**/*.wav
+data/training_data/**/*.mp3
+data/test_data/**/*.wav
+data/test_data/**/*.mp3
+
+# Trained models (large files - store separately or use Git LFS)
+models/*.pth
+models/*.pt
+models/*.pkl
+models/*.h5
+*.pth
+*.pt
+
+# Database files (may contain large amounts of data)
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite
+
+# Spectrograms and visualizations (generated files)
+*.png
+*.jpg
+*.jpeg
+spectrograms/
+visualizations/
+plots/
+
+# Checkpoint files from training
+checkpoints/
+*.ckpt
+
+# TensorBoard logs
+runs/
+logs/
+tensorboard/
+
+# Dataset preprocessed cache
+.cache/
+cached_data/
+
+# Temporary audio processing files
+temp/
+tmp/
+*.tmp
+
+# Mac OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux files
+*~
+
+# Audio editor project files
+*.aup3
+*.aup
+*.rpp
+*.flp
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Experiment results
+experiments/
+results/
+outputs/
+
+# Personal notes
+notes.txt
+TODO.txt
+SCRATCH.md
