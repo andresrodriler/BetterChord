@@ -29,6 +29,7 @@ git clone https://github.com/YOUR_USERNAME/BetterChord.git
 cd BetterChord
 
 ## Project Structure
+```
 BetterChord/
 ├── betterchord/           # Main package
 │   ├── audio_processing.py   # Librosa audio stuff
@@ -41,3 +42,4 @@ BetterChord/
 ├── models/                # Saved trained models
 ├── scripts/               # Helper scripts
 ├── main.py               # Main
+```
