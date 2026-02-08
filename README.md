@@ -16,17 +16,37 @@ Just a ML-powered guitar chord recognition using CNN and music theory.
 - Song reccommendations based on output chord for practice
 - Reveals what notes make output chord for user to understand music theory
 
-## Stack
+## Prerequisites
 - Python 3.8+
+- Git
+- ffmpeg (⚠️ To use M4A/MP3 and other formats)
+
+
+## Stack
 - PyTorch 2.10.0 - Deep learning framework
-- Librosa 0.11.0 - Audio analysis
-- NumPy 2.3.5 - Numerical computing
+- Librosa 0.11.0 - Audio analysis (⚠️ Only works with WAV/FLAC without ffmpeg)
+- NumPy 2.3.5 - Number computation
 - SQLite - Chord/Song database
+
+## Install ffmpeg ⚠️ (Highly recommended)
+
+**Mac:**
+```bash
+brew install ffmpeg
+```
+
+**Windows:**
+Download from https://ffmpeg.org/download.html
+
+**Linux:**
+```bash
+sudo apt-get install ffmpeg
+```
 
 
 ## Installation
-git clone https://github.com/YOUR_USERNAME/BetterChord.git
-cd BetterChord
+- git clone https://github.com/YOUR_USERNAME/BetterChord.git
+- cd BetterChord
 
 ## Project Structure
 ```
