@@ -19,7 +19,7 @@ def find_chord_position_time(y, sr):
 
     if len(onset_frames) == 0:
         warnings.warn("No onsets detected. Using beginning of file. (This may lead to inaccurate chord detection, you actually strum?)")
-        onset_time = 0.25  # Default to 0.1 seconds
+        onset_time = 0.25  # Default to 0.25 seconds
     else:
 
         # Convert all onsets to times
@@ -38,7 +38,7 @@ def find_chord_position_time(y, sr):
     start_time = 0.0
     end_time = 0.0
     
-    start_time = max(0, onset_time - 0.25) # Start 0.1 before onset for safety
+    start_time = max(0, onset_time - 0.25) # Start 0.25 before onset for safety
     end_time = min(len(y) / sr, onset_time + 2.5)
 
     return start_time, end_time

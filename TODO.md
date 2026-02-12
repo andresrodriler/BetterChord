@@ -9,3 +9,6 @@
    - Idea is to in audio processing if they dont have it, to show pop uop (similar to audacity) where it says
    - they are using an unsupported audio format (like mp4) sinnce they domt have ffmpeg, and to give directions
    - or pointer of where to go to download quick
+- Either user drags audio file into box to input audio, chooses it via prompt (puts them in finder or something), or record their guitar with a play button right there
+- For ML, download
+ - Hugging Face DB, Data -> Train, Each chord variation, download 1 - 6, 10 - 15, 19 - 24
