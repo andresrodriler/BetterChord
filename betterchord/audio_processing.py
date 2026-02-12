@@ -62,3 +62,25 @@ def load_audio(file_path, sr=22050):
     print(f"Audio loaded from {file_path}. Sample rate: {sr}, At: {start_time:.2f}s - {end_time:.2f}s")
     return y_full, sr
 
+def create_spectrogram(y, sr, n_mels=128):
+    # To create spectrogram for anaylsis on ML and music theory algoririthm
+    # y = File path
+    # sr = Sample Rate
+    # n_mels: Number of mel frequency bands
+
+    # Create a mel spectrogram
+    My_Spec = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, n_fft=2048, hop_length=512)
+
+    # convert mel spectrogram to decibels
+    My_Spec_dB = librosa.power_to_db(My_Spec, ref=np.max)
+
+    My_Spec_dB_mean = np.mean(My_Spec_dB)
+    My_Spec_dB_std = np.std(My_Spec_dB)
+
+    # Calculate normalized spectrogram for CNN input. Edge case for std being 0
+    if My_Spec_dB_std > 0:
+        My_Spec_normalized = (My_Spec_dB - My_Spec_dB_mean) / My_Spec_dB_std
+    else:
+        My_Spec_normalized = My_Spec_dB - My_Spec_dB_mean
+
+    return My_Spec_normalized
