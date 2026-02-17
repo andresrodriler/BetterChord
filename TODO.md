@@ -12,3 +12,4 @@
 - Either user drags audio file into box to input audio, chooses it via prompt (puts them in finder or something), or record their guitar with a play button right there
 - For ML, download
  - Hugging Face DB, Data -> Train, Each chord variation, download 1 - 6, 10 - 15, 19 - 24
+ - Readme or documentation should go over possible chord outputs from CNN since there are set neuron outputs

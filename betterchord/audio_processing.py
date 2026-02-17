@@ -45,7 +45,7 @@ def find_chord_position_time(y, sr):
 
 
 
-def load_audio(file_path, sr=22050):
+def load_audio(file_path, sr=22050, target_duration=2.75):
     # Load audio file
     # file_path: Path to the audio file
     # sr: Sample rate to load the audio at (default is 22050)
@@ -58,6 +58,10 @@ def load_audio(file_path, sr=22050):
 
     # Cut the audio signal to the chord section
     y_full = y_full[int(start_time * sr):int(end_time * sr)]
+
+    # Fix loaded audio length to be exactly 2.75 seconds (for consistent spectrogram input size, only for ones who need it)
+    if len(y_full) < int(target_duration * sr):
+        y_full = librosa.util.fix_length(y_full, size=int(target_duration * sr))
 
     print(f"Audio loaded from {file_path}. Sample rate: {sr}, At: {start_time:.2f}s - {end_time:.2f}s")
     return y_full, sr
