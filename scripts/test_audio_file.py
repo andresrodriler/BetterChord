@@ -1,5 +1,5 @@
 import sys
-from betterchord.audio_processing import load_audio, find_chord_position_time
+from betterchord.audio_processing import load_audio, find_chord_position_time, create_spectrogram
 import os
 
 def test_audio_file(file_path):
@@ -10,6 +10,10 @@ def test_audio_file(file_path):
     try:
         print("\n Loading audio...")
         y, sr = load_audio(file_path)
+        print(f" Size of loaded audio array: {len(y)} samples")
+        print(f" Size of sr: {sr} Hz")
+
+        spec = create_spectrogram(y, sr)
         
         # Show info about the loaded audio
         duration = len(y) / sr
@@ -20,6 +24,7 @@ def test_audio_file(file_path):
         print(f"  Sample rate: {sr} Hz")
         print(f"  Total samples: {len(y):,}")
         print(f"  Max amplitude: {max_amplitude:.3f}")
+        print(f"  Spectrogram shape: {spec.shape}")
 
         if max_amplitude < 0.001:
             print("Did you record anything?")
@@ -31,6 +36,7 @@ def test_audio_file(file_path):
     except Exception as e:
         print(f"\nError loading audio: {e}")
         return False
+    
     
 
 if __name__ == "__main__":

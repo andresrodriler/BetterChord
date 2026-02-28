@@ -1,8 +1,3 @@
-"""
-Audio Processing Module
-This is to handle all audio parsing and analysis and stuff using librosa
-"""
-
 import librosa
 import numpy as np
 import warnings
@@ -63,28 +58,29 @@ def load_audio(file_path, sr=22050, target_duration=2.75):
     if len(y_full) < int(target_duration * sr):
         y_full = librosa.util.fix_length(y_full, size=int(target_duration * sr))
 
-    print(f"Audio loaded from {file_path}. Sample rate: {sr}, At: {start_time:.2f}s - {end_time:.2f}s")
     return y_full, sr
 
-def create_spectrogram(y, sr, n_mels=128):
+def create_spectrogram(y, sr, n_bins=84, hop_length=512):
     # To create spectrogram for anaylsis on ML and music theory algoririthm
     # y = File path
     # sr = Sample Rate
     # n_mels: Number of mel frequency bands
+    # hop_length:  Hop length for CQT
 
-    # Create a mel spectrogram
-    My_Spec = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, n_fft=2048, hop_length=512)
+    # Create a SQT spectrogram
+    My_SQT_Spec = librosa.cqt(y=y, sr=sr, n_bins=n_bins, hop_length=hop_length)
 
     # convert mel spectrogram to decibels
-    My_Spec_dB = librosa.power_to_db(My_Spec, ref=np.max)
+    cqt_mag = np.abs(My_SQT_Spec)
+    cqt_db  = librosa.amplitude_to_db(cqt_mag, ref=np.max)
 
-    My_Spec_dB_mean = np.mean(My_Spec_dB)
-    My_Spec_dB_std = np.std(My_Spec_dB)
+    mean  = np.mean(cqt_db)
+    std = np.std(cqt_db)
 
     # Calculate normalized spectrogram for CNN input. Edge case for std being 0
-    if My_Spec_dB_std > 0:
-        My_Spec_normalized = (My_Spec_dB - My_Spec_dB_mean) / My_Spec_dB_std
+    if std  > 0:
+        cqt_normalized = (cqt_db - mean) / std
     else:
-        My_Spec_normalized = My_Spec_dB - My_Spec_dB_mean
+        cqt_normalized = cqt_db - mean
 
-    return My_Spec_normalized
+    return cqt_normalized
