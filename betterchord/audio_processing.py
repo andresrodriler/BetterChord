@@ -1,6 +1,16 @@
 import librosa
 import numpy as np
 import warnings
+import os
+
+# spec_data lives in data along with training_data and test_data
+SPEC_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'spec_data')
+
+# Noise bank lives in data/noise_bank/processed
+NOISE_BANK_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'noise_bank', 'processed')
+
+# Noise bank cache - loaded once into memory on first use
+_noise_bank = None
 
 def find_chord_position_time(y, sr):
     # This is a function to find in what section of the audio clip the chord is being played
@@ -84,3 +94,96 @@ def create_spectrogram(y, sr, n_bins=84, hop_length=512):
         cqt_normalized = cqt_db - mean
 
     return cqt_normalized
+
+def load_or_cache_spectrogram(file_path):
+    # This is a function that loads spectrograms from cache if it exists, otherwise computes it and saves it
+    # Cache lives in data/spec_data
+
+    data_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+    file_norm = os.path.normpath(file_path)
+
+    # Get path from data/training_data or data/test_data
+    rel_path = os.path.relpath(file_norm, data_dir)
+
+    # Build the cache path eg spec_data/training_data/Am/HF_Am_1.npy
+    cache_path = os.path.join(SPEC_CACHE_DIR, os.path.splitext(rel_path)[0] + '.npy')
+
+    # load from cache if it exists
+    if os.path.exists(cache_path):
+        return np.load(cache_path)
+    
+    # If cache miss, compute spectrogram from scratch and save to cache
+    y, sr = load_audio(file_path)
+    spectrogram = create_spectrogram(y, sr)
+
+    # Create cache directory (spec_data) if needed and save it
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    np.save(cache_path, spectrogram)
+
+    return spectrogram
+
+def load_noise_bank():
+    # Load all noise npy into memory once
+
+    global _noise_bank
+
+    if _noise_bank is not None:
+        return _noise_bank
+ 
+    if not os.path.exists(NOISE_BANK_DIR):
+        _noise_bank = []
+        return _noise_bank
+    
+    noise_files = sorted([f for f in os.listdir(NOISE_BANK_DIR) if f.endswith('.npy')])
+    _noise_bank = [np.load(os.path.join(NOISE_BANK_DIR, f)) for f in noise_files]
+    return _noise_bank
+
+def apply_noise_augmentation(spectrogram):
+    # Mix a random noise slice from the noise bank into the spectrogram.
+    # Returns augmented spectrogram same shape as input.
+
+    noise_bank = load_noise_bank()
+    if not noise_bank:
+        return spectrogram # No noise bank, return clean
+    
+    # Pick a random noise type from bank
+    noise_array = noise_bank[np.random.randint(len(noise_bank))]
+
+    # Pick a random slice matching spectrogram width of chord spectrogram
+    spec_width = spectrogram.shape[1]
+    noise_width = noise_array.shape[1]
+
+    if noise_width <= spec_width:
+        # Noise is shorter, tile it to fit
+        repeats = (spec_width // noise_width) + 1
+        noise_full = np.tile(noise_array, (1, repeats))
+        noise_slice = noise_full[:, :spec_width]
+    else:
+        # Pick random start point for noice slice
+        max_start = noise_width - spec_width
+        start = np.random.randint(0, max_start)
+        noise_slice = noise_array[:, start:start + spec_width]
+
+    # Determine SNR level using a 20/60/20 distrubution
+    roll = np.random.rand()
+    if roll < 0.20:
+        # Heavy noise (SNR 10-15dB)
+        snr_db = np.random.uniform(10, 15)
+    elif roll < 0.80:
+        # Moderate noise (SNR 20-35dB)
+        snr_db = np.random.uniform(20, 35)
+    else:
+        # Light noise (SNR 40-50dB)
+        snr_db = np.random.uniform(40, 50)
+    
+    # Scale noise to achieve target SNR
+    # SNR = 10 * log10(signal_power / noise_power)
+    signal_power = np.mean(spectrogram ** 2)
+    noise_power = np.mean(noise_slice ** 2)
+
+    if noise_power > 0 and signal_power > 0:
+        target_noise_power = signal_power / (10 ** (snr_db / 10))
+        scale              = np.sqrt(target_noise_power / noise_power)
+        noise_slice        = noise_slice * scale
+ 
+    return spectrogram + noise_slice

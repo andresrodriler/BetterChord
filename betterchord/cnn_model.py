@@ -37,9 +37,10 @@ class ChordCNN(nn.Module):
         # Dropout layer
         self.dropout = nn.Dropout(0.4)
 
-        # This point on, fully connected layers split into two "paths"
+        # This point on, fully connected layers split into three "paths"
             # 1) For detecting which 12 notes are present within 12 vector array
             # 2) For detecting which of the 12 notes is the root
+            # 3) For detecting the bass note
 
         # Note Path (mult-label), using BCEWithLogitsLoss during training
         self.note_fc1 = nn.Linear(self.flat_size, 256)
@@ -50,6 +51,11 @@ class ChordCNN(nn.Module):
         self.root_fc1 = nn.Linear(self.flat_size, 256)
         self.root_fc2 = nn.Linear(256, 128)
         self.root_fc3 = nn.Linear(128, chromatic_notes)
+
+        # Bass Path (single-label), using CrossEntropyLoss during training
+        self.bass_fc1 = nn.Linear(self.flat_size, 256)
+        self.bass_fc2 = nn.Linear(256, 128)
+        self.bass_fc3 = nn.Linear(128, chromatic_notes)
 
 
     def forward(self, x):
@@ -64,9 +70,10 @@ class ChordCNN(nn.Module):
         # Flatten
         x = x.view(x.size(0), -1)
 
-        # This point on, fully connected layers split into two "paths"
+        # This point on, fully connected layers split into three "paths"
             # 1) For detecting whcih 12 notes are present within 12 vector array
             # 2) For detecting which of the 12 notes is the root
+            # 3) For detecting the bass note
 
         # Note Path (mult-label), dropout for it and input from final conv layer 2
         note_x = self.dropout(F.relu(self.note_fc1(x)))
@@ -78,4 +85,10 @@ class ChordCNN(nn.Module):
         root_x = self.dropout(F.relu(self.root_fc2(root_x)))
         root_out = self.root_fc3(root_x)  # raw logits → CrossEntropyLoss
 
-        return note_out, root_out
+        # Bass Path (single-label), dropout for it and input from final conv layer 2
+        bass_x = self.dropout(F.relu(self.bass_fc1(x)))
+        bass_x = self.dropout(F.relu(self.bass_fc2(bass_x)))
+        bass_out = self.bass_fc3(bass_x)  # raw logits → CrossEntropyLoss
+
+        return note_out, root_out, bass_out
+
