@@ -306,3 +306,20 @@ outputs/
 notes.txt
 TODO.txt
 SCRATCH.md
+
+# Sample data exports -- excluded due to sensitive info, not just size
+data/song_data/songs_10rows.csv
+data/voicing_data/voicings10row.csv
+
+# Cached spectrograms -- regenerable from training_data/test_data via
+# audio_processing.py, not meant to be tracked
+data/spec_data/
+
+# Cached dataset normalization stats -- regenerable
+data/dataset_stats.npz
+
+# Noise bank -- both raw downloads and processed cache
+data/noise_bank/
+
+# Personal test recordings -- not meant for the public repo
+data/betterchord_mytesting/

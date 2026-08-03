@@ -12,21 +12,84 @@ NOTE_CLASSES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
 OPEN_STRINGS = [40, 45, 50, 55, 59, 64] # This is for our synth chord wav files
 
 # Check if its a self file (My own actual guitar recordings)
+# SELFAC handled separately via is_selfac_file
 def is_self_file(fname):
-    return fname.startswith("SELF_")
+    return fname.startswith("SELF_") and not fname.startswith("SELFAC_")
 
 # Check if its a synth file (My own synth generated recordings)
 def is_synth_file(fname):
     return fname.startswith("SYNTH_")
 
-# Check if its an IDMT file (MIDI generated synthetic recording)
+# Check if its an IDMT file (MIDI generated synthetic recording, outsourced from IDMT data)
 def is_idmt_file(fname):
     return fname.startswith("IDMT_")
 
+# Check if its a selfac file (my own acoustic recordings)
+def is_selfac_file(fname):
+    return fname.startswith("SELFAC_")
+
 # Check if file should receive noise augmentation during training
-# Only synthetic sources get augmented - real guitar recordings are left clean
+# Only synthetic sources get augmented, real guitar recordings are left clean
 def should_augment(fname):
     return is_synth_file(fname) or is_idmt_file(fname)
+
+def apply_distortion_augmentation(spectrogram):
+    # Simulate recording distortion/saturation on the spectrogram
+    # Teaches the model that distorted versions of chords are still chords
+    # Applied randomly with varying intensity to SYNTH/IDMT files only
+    # Works in the normalized spectrogram domain, shifts and compresses energy
+    roll = np.random.rand()
+    if roll < 0.3:
+        # Soft saturation, compress high energy bins slightly
+        threshold = np.random.uniform(1.5, 2.5)
+        spectrogram = np.tanh(spectrogram / threshold) * threshold
+    elif roll < 0.6:
+        # Hard clipping simulation, clip at random level above normal
+        clip_level = np.random.uniform(1.8, 2.8)
+        spectrogram = np.clip(spectrogram, -clip_level, clip_level)
+    # else: no distortion (40% of the time)
+    return spectrogram
+
+
+def apply_eq_augmentation(spectrogram):
+    # Simulate random EQ variations across frequency bins
+    # Different guitars, pickups, amp tone knobs, mic placement all create
+    # different tonal balance, teaches the model to ignore those differences
+    # Applied as a smooth random gain curve across the 84 frequency bins
+    n_bins = spectrogram.shape[0]
+
+    roll = np.random.rand()
+    if roll < 0.5:
+        # Random tilt - boost lows cut highs or vice versa (simulates tone knob)
+        tilt    = np.random.uniform(-0.3, 0.3)
+        gains   = np.linspace(1.0 + tilt, 1.0 - tilt, n_bins)
+        spectrogram = spectrogram * gains[:, np.newaxis]
+    elif roll < 0.8:
+        # Random mid boost/cut (simulates mid EQ or pickup resonance)
+        center  = np.random.randint(20, 60)
+        width   = np.random.randint(10, 25)
+        gain    = np.random.uniform(-0.4, 0.4)
+        gains   = np.ones(n_bins)
+        for b in range(n_bins):
+            gains[b] += gain * np.exp(-0.5 * ((b - center) / width) ** 2)
+        spectrogram = spectrogram * gains[:, np.newaxis]
+    # else: no EQ (20% of the time)
+    return spectrogram
+
+
+def apply_spec_augment(spec, freq_mask_max=15, time_mask_max=20, num_freq_masks=2, num_time_masks=2):
+    spec = spec.copy()
+    n_freq, n_time = spec.shape
+    for _ in range(num_freq_masks):
+        f  = np.random.randint(0, freq_mask_max)
+        f0 = np.random.randint(0, max(1, n_freq - f))
+        spec[f0:f0 + f, :] = 0
+    for _ in range(num_time_masks):
+        t  = np.random.randint(0, time_mask_max)
+        t0 = np.random.randint(0, max(1, n_time - t))
+        spec[:, t0:t0 + t] = 0
+    return spec
+
 
 # Get tabs from self file names
 def tab_from_self_filename(fname):
@@ -133,14 +196,14 @@ class ChordDataset(Dataset):
             if "/" in chord_lookup:
                 chord_lookup = chord_lookup.split("/")[0]
 
-            # Get root index from chord folder name - same for all files in folder
+            # Get root index from chord folder name, same for all files in the folder
             root_idx = get_root_index(chord_lookup)
             if root_idx is None:
                 self.skipped.append(chord)
                 continue
 
             # Used for HF, IDMT, GADA files that have no tab info
-            # For new chord classes only SYNTH files exist - fallback_binary may be None
+            # For new chord classes only SYNTH files exist, fallback_binary may be None
             # We still process the folder since SYNTH files use tab-based labels
             fallback_binary = chord_to_binary(chord_lookup)
 
@@ -150,7 +213,7 @@ class ChordDataset(Dataset):
                 if not fname.endswith('.wav'):
                     continue
  
-                if is_self_file(fname):
+                if is_self_file(fname) or is_selfac_file(fname):
                     # SELF recording: use tab from filename for accurate labels
                     tab = tab_from_self_filename(fname)
                     if tab is None:
@@ -219,6 +282,12 @@ class ChordDataset(Dataset):
         # Apply noise augmentation if eligible
         if self.augment and self.augment_flags[idx]:
             spectrogram = apply_noise_augmentation(spectrogram)
+            spectrogram = apply_distortion_augmentation(spectrogram)
+
+        # Apply EQ augmentation and SpecAugment on all training samples
+        if self.augment:
+            spectrogram = apply_eq_augmentation(spectrogram)
+            spectrogram = apply_spec_augment(spectrogram)
 
         # Convert to tensor and add channel dimension
         spec_tensor = torch.tensor(spectrogram, dtype=torch.float32).unsqueeze(0)

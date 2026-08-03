@@ -1,65 +1,167 @@
-# BetterChord
-Just a ML-powered guitar chord recognition using CNN and music theory.
+# BetterChord 🎸
 
-## Guitar Emoji
-🎸
+ML-powered guitar chord recognition with 92.96% test set accuracy, built on a CNN + a music theory engine.
+Record or upload a single strum, and BetterChord identifies the chord,
+shows you real fretboard voicings, breaks down the theory behind it, and
+finds real songs that use it.
 
-## Overview
-- Uses two main libraries
-- Librosa mainly to turn audio files into spectrograms to look at pitches to see what notes are used in chord audio
-- Pytorch for ML and based on whats given by Librosa can recognize common chord patters
-- Combines these two for max accuracy since PyTorch recognizes common chords, and for more rare/augmented (no pun intended) librosa can use music thoery to figure it out, and combines those two to see most likely played chord in audio file
+## Status
+
+This is an active passion project, not a finished product. The core
+pipeline (audio → chord → voicings/theory/songs) works end to end and is
+verified against real audio. There's no live web app yet. Right now
+everything runs via the command line. A FastAPI backend + React frontend
+are actively in progress. See [TODO.md](TODO.md) for the current roadmap.
 
 ## Features
-- Single guitar strum chord recogniztion
-- Multiple voicing suggestions for output chord
-- Song reccommendations based on output chord for practice
-- Reveals what notes make output chord for user to understand music theory
+
+- **Chord identification from a single audio recording** — works from a
+  real guitar strum. Recommend anyone to strum their guitar clearly, 
+  with a pick, and loud. Standard tuning (make sure its tuned well!)
+- **Multiple real fretboard voicings** for the identified chord
+- **Music theory breakdown** — the actual notes/intervals that make up
+  the chord, in plain language
+- **Song recommendations** — real songs that use the identified chord,
+  pulled from a database of tens of thousands of tracks
+- **Guide-tone explanations** — when a closely related chord's songs get
+  pulled in alongside your search (e.g. `C13` also surfaces `C7add13`),
+  there's an actual explanation of *why*, written for someone who
+  doesn't already know music theory
+
+## How it works
+
+1. **Librosa** turns the recorded audio into a CQT spectrogram.
+2. A **PyTorch CNN** takes that spectrogram and predicts three things:
+   which of the 12 chromatic notes are present, the root, and the bass.
+   It predicts raw notes, not a fixed set of chord classes. This means
+   it can theoretically identify any chord whose interval pattern is
+   known to the system, not just chords it was explicitly trained on.
+3. A **rule-based music theory engine** takes those note predictions and
+   determines the actual chord name by matching against a canonical
+   interval registry.
+4. That registry is the core of the project: the project's three data
+   sources (the chord naming engine, a database of scraped fretboard
+   voicings, and a database of real songs and their chords) used to
+   independently disagree about how to name and group chords. A shared
+   registry now reconciles all three by comparing actual interval
+   content rather than trusting names/strings. This closed dozens of real
+   coverage gaps and fixing several silent-wrong-answer bugs along the
+   way.
+
+## Tech stack
+
+- **PyTorch** — CNN for note/root/bass prediction
+- **Librosa** — audio analysis and spectrogram generation
+- **NumPy / pandas** — numerical processing
+- **SQLite** — chord voicing and song databases
+- *(In progress)* **FastAPI** + **React** — web backend/frontend
+
+## Project structure
+
+```
+BetterChord/
+├── main.py                               # inference: audio -> chord -> theory/voicings/songs
+├── requirements-gpu.txt                  # local dev, CUDA GPU
+├── requirements-cpu.txt                  # CPU-only / deployment
+├── LICENSE
+├── TODO.md
+├── betterchord/
+│   ├── config/                           # live-serving modules
+│   │   ├── chord_parser.py
+│   │   ├── interval_calculator.py
+│   │   ├── music_theory.py
+│   │   ├── chord_info.py
+│   │   ├── voicings.py
+│   │   └── songs.py
+│   ├── training_scripts/                 # CNN training pipeline (not used at runtime)
+│   │   ├── audio_processing.py
+│   │   ├── cnn_model.py
+│   │   ├── chord_to_notes.py
+│   │   ├── database.py
+│   │   ├── train.py
+│   │   └── chord_cnn.pth
+│   └── data_scripts/                     # registry/maintenance pipeline, rerun with data changes/updates
+│       ├── registry_builder.py
+│       ├── guide_tone_grouping.py
+│       └── build_normalized_columns.py
+└── data/                                 
+    ├── voicing_data/voicings.db          # voicing data
+    ├── song_data/betterchord_songs.db    # song data
+    ├── training_data                     # raw audio training data
+    ├── test_data                         # raw audio test data
+    ├── spec_data                         # spectrogram cached data of training/test data
+    ├── noise_bank                        # noise bank audio data, stamped on synth data
+    └── registry
+        ├── quality_registry.json         # source truth of all chord qualities, and their intervals
+        └── guide_tone_groups.json        # source truth of all ambiguous qualities, grouped 
+```
 
 ## Prerequisites
+
 - Python 3.8+
 - Git
-- ffmpeg (⚠️ To use M4A/MP3 and other formats)
+- ffmpeg (⚠️ needed for M4A/MP3 and other non-WAV/FLAC formats)
 
+**Install ffmpeg:**
 
-## Stack
-- PyTorch 2.10.0 - Deep learning framework
-- Librosa 0.11.0 - Audio analysis (⚠️ Only works with WAV/FLAC without ffmpeg)
-- NumPy 2.3.5 - Number computation
-- SQLite - Chord/Song database
-
-## Install ffmpeg ⚠️ (Highly recommended)
-
-**Mac:**
+Mac:
 ```bash
 brew install ffmpeg
 ```
 
-**Windows:**
-Download from https://ffmpeg.org/download.html
+Windows: download from https://ffmpeg.org/download.html
 
-**Linux:**
+Linux:
 ```bash
 sudo apt-get install ffmpeg
 ```
 
-
 ## Installation
-- git clone https://github.com/YOUR_USERNAME/BetterChord.git
-- cd BetterChord
 
-## Project Structure
+```bash
+git clone https://github.com/YOUR_USERNAME/BetterChord.git
+cd BetterChord
 ```
-BetterChord/
-├── betterchord/           # Main package
-│   ├── audio_processing.py   # Librosa audio stuff
-│   ├── cnn_model.py          # PyTorch CNN model
-│   ├── music_theory.py       # Chord construction logic?
-│   └── database.py           # SQLite DB
-├── data/
-│   ├── training_data/     # Training audio samples
-│   └── test_data/         # Test audio files
-├── models/                # Saved trained models
-├── scripts/               # Helper scripts
-├── main.py               # Main
+
+Then install dependencies depending on your machine:
+
+**If you have a CUDA GPU** (recommended for training, optional for inference):
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements-gpu.txt
 ```
+
+**CPU-only:**
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-cpu.txt
+```
+
+**Note:** the training/voicing/song data isn't included directly in this
+repo. See [TODO.md](TODO.md) for the current plan on making that
+available separately.
+
+## Usage
+
+There's no live app yet — for now, run the full pipeline directly:
+
+```bash
+python main.py <filename>
+```
+
+This identifies the chord from the given audio file and prints the
+identified chord, its theory breakdown, a few real fretboard voicings,
+and a few real songs that use it.
+
+## Roadmap
+
+See [TODO.md](TODO.md) for the full, up-to-date list. Short version:
+wrapping the pipeline in a FastAPI backend, building a React frontend for
+in-browser recording, and deploying both so this is usable as an actual
+website rather than a CLI tool.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+# Guitar Emoji!!! 🎸🎸🎸
