@@ -172,8 +172,12 @@ def _rows_to_dicts(rows):
 
 
 def _sort_by_type(voicings):
-    # Sort voicings by type priority: Must know, other, capo
-    return sorted(voicings, key=lambda v: TYPE_PRIORITY.get(v["type"], 99))
+    # Sort voicings by type priority (Must Know, Other, Capo), then by
+    # base_fret ascending within each type group -- was `rank` before, but
+    # frontend now renders every voicing as its own diagram grouped by
+    # type/section, so ordering low-to-high on the fretboard within a
+    # section reads better than the old rank order.
+    return sorted(voicings, key=lambda v: (TYPE_PRIORITY.get(v["type"], 99), v["base_fret"]))
 
 
 def _get_voicings_literal(conn, chord_name):
