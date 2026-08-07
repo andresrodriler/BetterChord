@@ -137,3 +137,173 @@ def compute_intervals(q):
         required.discard(7)
 
     return sorted(full), sorted(required)
+
+
+# ---------------------------------------------------------------------------
+# guide_tone_formula() -- a labeled, structural breakdown of a chord's real
+# formula (root/third-or-sus/fifth/seventh/extensions), each tone named
+# using this app's real voicings.db interval-string vocabulary. Phase 3
+# Part 5/6, 3rd and 4th follow-up sessions.
+#
+# BUGFIX (4th follow-up session): the first version of this function (3rd
+# follow-up) looked up labels from a flat SEMITONE SET alone -- e.g.
+# "semitone 9 present -> must be dim7". That's wrong: semitone 9 means
+# "dim7" ONLY when it came from an actual dim7 chord's SEVENTH step, but
+# the exact same semitone 9 also shows up from a totally unrelated
+# chord's 13th-extension step (a 13th's natural pitch class IS semitone 9
+# -- confirmed real symptom: Cm13/C13/Cmaj13 all showed a nonsense "dim7"
+# swatch, none of them are diminished chords at all). Semitone 6 (b5 vs
+# #11) and 8 (#5 vs b13) have the identical ambiguity -- confirmed by
+# testing "7#11" directly: full=[0,4,6,7,10], where 6 AND 7 are BOTH
+# present simultaneously (an unaltered 5th plus a separate #11 color
+# tone) -- a flat "if 6 in full: fifth=b5" check would have wrongly
+# flagged this dominant-with-#11 chord's fifth as diminished.
+# Root cause: compute_intervals() legitimately flattens every tone into
+# one set once it's done, discarding WHICH STEP (base triad / seventh /
+# extension / alteration) produced each semitone -- that information is
+# exactly what's needed to resolve the ambiguity, and it only exists
+# while compute_intervals() is still walking those steps.
+# Fix: this function walks the SAME structured quality fields (q) and the
+# SAME lookup tables compute_intervals() itself uses (BASE_INTERVALS,
+# SEVENTH_INTERVAL, ALTERATION_MAP, ADD_INTERVAL) -- no new theory, no
+# duplicated rules -- but records a LABEL at each step instead of only
+# merging into a flat set, so a seventh-step tone can never be confused
+# with an extension-step tone that happens to share a semitone number.
+# `full_intervals` (compute_intervals()'s own final output) is used only
+# as a cross-check for root/plain-5th presence; every other tone below is
+# isolated by construction, not inferred from the flat set.
+# ---------------------------------------------------------------------------
+
+_SEVENTH_LABEL = {"7": "b7", "maj7": "maj7", "dim7": "dim7"}
+
+# Extension-region semitone -> label, used only for tagging the SPECIFIC
+# semitone an "add"/alteration step targets -- never applied to a bare
+# flat semitone set (that's the exact mistake being fixed here).
+_EXT_SEMITONE_LABEL = {1: "b9", 2: "9", 3: "#9", 5: "11", 6: "#11", 9: "13", 10: "#13"}
+
+# ADD_INTERVAL's own keys already encode the user's real naming intent
+# distinctly (e.g. "add4" vs "add11" resolve to the SAME semitone, 5, but
+# mean different things to a player -- "add4" conventionally names the
+# tone "4", "add11" conventionally names it "11") -- labeled directly from
+# the add's own key rather than reverse-derived from its target semitone,
+# same anti-ambiguity principle as the rest of this function.
+_ADD_LABEL = {
+    "add2": "9", "add9": "9",
+    "add4": "4", "add11": "11",
+    "add6": "6", "add13": "13",
+    "addb5": "b5", "add#5": "#5",
+    "addb9": "b9", "add#9": "#9",
+    "addb11": "b11", "add#11": "#11",
+    "addb13": "b13", "add#13": "#13",
+}
+
+
+def guide_tone_formula(q, full_intervals):
+    """Structural, labeled breakdown of a chord's real formula:
+      { root: "1",
+        third: "m3"|"3"|None,      # None when this is a sus chord (see `sus`)
+        sus:   ["sus2"]|["sus4"]|["sus2","sus4"]|[],
+        fifth: "b5"|"5"|"#5"|None,
+        seventh: "b7"|"maj7"|"dim7"|None,
+        extensions: ["9","#11","13",...] }   # ordered, de-duplicated
+
+    `third`/`sus` are mutually exclusive by construction -- a chord's
+    formula can never show both, they occupy the same structural slot.
+    A bucket/list is empty/None when that slot has no tone in THIS
+    chord's formula at all (e.g. a plain triad's `extensions` is `[]`,
+    an augmented triad's `seventh` is `None`) -- distinct from a specific
+    VOICING merely omitting a tone the formula does have (that's the
+    frontend's separate per-voicing omitted-tones check).
+
+    `q` is the parsed quality dict from chord_parser.parse_quality() --
+    the same one already passed to compute_intervals(); `full_intervals`
+    is that call's own first return value, used only as a light
+    cross-check below.
+    """
+    base = q["base"] if q["base"] in BASE_INTERVALS else "maj"
+    present = set(full_intervals)
+
+    # -- third / sus --
+    third = None
+    sus = []
+    if base in ("sus2", "sus4", "sus2sus4"):
+        if base in ("sus2", "sus2sus4"):
+            sus.append("sus2")
+        if base in ("sus4", "sus2sus4"):
+            sus.append("sus4")
+    elif not q.get("no3"):
+        if 3 in present:
+            third = "m3"
+        elif 4 in present:
+            third = "3"
+
+    # -- fifth: determined structurally (base identity + an explicit b5/
+    # #5/b6 alteration TOKEN), not by semitone presence alone -- a #11
+    # alteration also lands on semitone 6 without touching the fifth at
+    # all (confirmed via "7#11" above), so presence-only detection would
+    # misfire exactly like the dim7 bug did. --
+    fifth = None
+    if not q.get("no5"):
+        if base == "dim":
+            fifth = "b5"
+        elif base == "aug":
+            fifth = "#5"
+        elif 7 in present or base in ("maj", "min", "sus2", "sus4", "sus2sus4", "5"):
+            fifth = "5"
+        if "b5" in q["alterations"]:
+            fifth = "b5"
+        elif q["alterations"] & {"#5", "b6"}:
+            fifth = "#5"
+
+    # -- seventh: read q["seventh"] directly -- "7"/"maj7"/"dim7" is
+    # unambiguous by construction, never reverse-derived from a semitone
+    # that could also mean an extension (the actual dim7/13 bug). --
+    seventh = _SEVENTH_LABEL.get(q["seventh"]) if q["seventh"] else None
+
+    # -- extensions: ext / six / sixnine / adds / alterations that don't
+    # target the fifth (those are already handled above). Each
+    # contributes a named tone; order preserved, de-duplicated. --
+    extensions = []
+
+    def add_ext(label):
+        if label and label not in extensions:
+            extensions.append(label)
+
+    if q["ext"] == "9":
+        add_ext("9")
+    elif q["ext"] == "11":
+        add_ext("9")   # implied by the 11th, omittable in practice -- still
+        add_ext("11")  # part of the chord's real formula (see compute_intervals)
+    elif q["ext"] == "13":
+        add_ext("9")   # implied
+        add_ext("11")  # implied
+        add_ext("13")
+
+    if q["six"]:
+        add_ext("6")
+    if q["sixnine"]:
+        add_ext("9")
+        add_ext("6")
+
+    for a in q["adds"]:
+        add_ext(_ADD_LABEL.get(a))
+
+    for alt in q["alterations"]:
+        if alt in ("b5", "#5", "b6"):
+            continue  # already resolved into `fifth` above, not an extension
+        if alt not in ALTERATION_MAP:
+            continue
+        new_iv, natural_iv = ALTERATION_MAP[alt]
+        natural_label = _EXT_SEMITONE_LABEL.get(natural_iv)
+        if natural_label in extensions:
+            extensions.remove(natural_label)
+        add_ext(_EXT_SEMITONE_LABEL.get(new_iv, alt))
+
+    return {
+        "root": "1",
+        "third": third,
+        "sus": sus,
+        "fifth": fifth,
+        "seventh": seventh,
+        "extensions": extensions,
+    }

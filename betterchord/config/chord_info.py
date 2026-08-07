@@ -60,12 +60,31 @@ _B5_QUALITIES = {
 # Qualities where interval 8 is b13 (degree 6 flat) not #5 (degree 5 sharp)
 _B13_QUALITIES = {'7(#5,b9)', '7(#5,#9)', 'aug13'}
 
+# Qualities where interval 9 is a genuinely DIMINISHED (double-flatted)
+# seventh -- degree 7 lowered twice -- not the natural 6th degree
+# _INTERVAL_DEGREE_BASE defaults interval 9 to. Real bug, found via
+# voicings.py's closing verification pass (Phase 3 Part 5/6): a
+# fully-diminished-7th chord stacks four minor thirds (root-b3-b5-bb7),
+# so its 7th is conventionally spelled as the ROOT's 7th-degree LETTER
+# flattened twice (e.g. F's -> Ebb), never as its 6th-degree letter
+# (D) -- both are the same pitch (9 semitones up), but only one is the
+# letter a diminished-7th chord is actually built from. Confirmed this
+# was a pre-existing gap in THIS function specifically (not something
+# voicings.py's own fix introduced): get_chord_info('Fdim7') already
+# showed "D" labeled "13 (thirteenth)" before this fix, for the exact
+# same underlying reason -- interval 9 had no dim7-aware override here,
+# same class of ambiguity _B5_QUALITIES/_B13_QUALITIES above already
+# solve for interval 6/8, just never extended to interval 9.
+_BB7_QUALITIES = {'dim7'}
+
 
 def _get_degree(interval, quality):
     if interval == 6 and quality in _B5_QUALITIES:
         return (5, -1)
     if interval == 8 and quality in _B13_QUALITIES:
         return (6, -1)
+    if interval == 9 and quality in _BB7_QUALITIES:
+        return (7, -2)
     return _INTERVAL_DEGREE_BASE[interval]
 
 
@@ -177,6 +196,10 @@ INTERVAL_LABEL_OVERRIDES = {
         "13b9":     ("13",  "thirteenth"),
         "13#9":     ("13",  "thirteenth"),
         "13b9#11":  ("13",  "thirteenth"),
+        # Paired with _BB7_QUALITIES above -- the note is now correctly
+        # spelled "Ebb"-style (double-flatted 7th degree); the label
+        # needs to match, not still say "13 (thirteenth)" next to it.
+        "dim7":     ("dim7", "diminished seventh"),
     },
 }
 

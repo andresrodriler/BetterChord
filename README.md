@@ -57,7 +57,6 @@ are actively in progress. See [TODO.md](TODO.md) for the current roadmap.
 - *(In progress)* **FastAPI** + **React** — web backend/frontend
 
 ## Project structure
-
 ```
 BetterChord/
 ├── main.py                               # inference: audio -> chord -> theory/voicings/songs
