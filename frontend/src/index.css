@@ -1,0 +1,265 @@
+:root {
+  /* --- Palette --------------------------------------------------------
+     Rustic-modern direction, adopted in place of the earlier navy/sienna
+     "device chassis" scheme -- warm charcoal-brown + brass hardware +
+     a cyan "scan" accent reserved specifically for machine-detected/live
+     states, rather than one accent doing double duty for both "primary
+     button" and "the app just identified something." Brown/brass is
+     also the more literal metaphor for a guitar app than navy ever was
+     (wood + tuning-peg hardware, not synth chassis). A 3-step depth
+     ladder, same idea as before:
+       --brown-950  page background
+       --brown-900  chassis / card surfaces
+       --brown-800  recessed surfaces -- inputs, dropzone, the fretboard
+                    diagram's backing well
+     Contrast-checked below.
+  ------------------------------------------------------------------- */
+  --brown-950: #1c1712;
+  --brown-900: #241d16;
+  --brown-800: #2d2419;
+  --brown-700: #3a2f23;
+
+  --brass: #c89b5c; /* primary accent -- CTAs, primary buttons, borders */
+  --brass-dim: rgba(200, 155, 92, 0.16);
+  --brass-border: rgba(200, 155, 92, 0.45);
+
+  --scan: #6fe3d6; /* "machine detected/live" accent -- chord readouts, confidence
+                       badges, recording-armed pulses -- deliberately separate from
+                       brass so "the app identified this" never looks like a themed
+                       button */
+  --scan-dim: rgba(111, 227, 214, 0.14);
+  --scan-border: rgba(111, 227, 214, 0.45);
+
+  --moss: #8faf9b; /* readable sage -- eyebrow labels, "OR" dividers, secondary text.
+                       Lightened from the reference concept's #5C7A63, which measured
+                       only 3.7:1 on this background -- fine for icons/borders, not
+                       for text at typical UI sizes. */
+  --moss-deep: #5c7a63; /* the true reference moss -- decorative use only (bullet
+                            marks, thin border tints), never body text */
+
+  --parchment: #f2ead9; /* headings / high-emphasis text */
+  --muted: #a99c87; /* body copy -- dimmed parchment */
+
+  --record-red: #d92b2b; /* recording-equipment convention: red = live/recording,
+                             independent of the accent palette on purpose --
+                             decorative-scale only (dots/buttons), not text */
+  --error: #e2685b; /* readable warm red for error status text -- lighter than
+                        --record-red specifically so it clears 4.5:1 at 14px */
+
+  /* Contrast checked against --brown-950 (WCAG relative luminance):
+       --parchment  14.9:1  (headings, AAA)
+       --scan       11.6:1  (readouts/badges, AAA)
+       --brass       7.0:1  (buttons/labels, AAA)
+       --moss        7.4:1  (eyebrow labels/secondary text, AAA)
+       --muted       6.6:1  (dimmed body copy, AA+)
+       --error       5.4:1  (error status text, AA)
+     --moss-deep (3.7:1) and --record-red (3.7:1) stay decorative-only
+     (icons, dots, borders) -- never used for small body text. */
+
+  /* --- Interval-colored finger dots (Phase 3 Part 5/6) --------------------
+     Each fretboard dot's fill depends on the interval it plays; a paired
+     text color is picked per fill (not one blanket dark color for all
+     five) since the fills range from light (root/5th) to genuinely dark
+     (7th). Text-on-fill contrast is checked against the FILL color, not
+     against --brown-950 -- that's the relevant background for text
+     painted directly on top of a dot.
+       --interval-root  #d9895c  (root, interval "1") -- new token, a
+                         warmer/redder cousin of --brass so root dots read
+                         as distinct from 5th dots at a glance.
+       --interval-3rd   = --moss    (3rd, interval "3")
+       --interval-5th   = --brass   (5th, interval "5")
+       --interval-7th   = --moss-deep (7th family: "7", "b7", etc.)
+       --interval-ext   = --muted   (anything else -- 9/11/13/extensions,
+                         or any interval string not matched above)
+
+     Per-fill text color + contrast, actually computed (WCAG relative
+     luminance formula run against each real pair below, not eyeballed --
+     checked against the FILL, not the page background, since that's what
+     the digit is actually sitting on):
+       on --interval-root (#d9895c): --brown-950 text  -> 6.51:1  (AA)
+       on --interval-3rd  (#8faf9b): --brown-950 text  -> 7.43:1  (AAA)
+       on --interval-5th  (#c89b5c): --brown-950 text  -> 7.03:1  (AAA)
+       on --interval-7th  (#5c7a63): --brown-950 text  -> 3.74:1  FAILS AA;
+                         --parchment text -> 3.97:1  still fails AA (moss-
+                         deep is too dark for parchment/dark text alike --
+                         checked directly, not assumed from the palette's
+                         page-background contrast table, which measures a
+                         different pair). Landed on pure white text
+                         (#ffffff) -> 4.75:1, clears AA. The one dot that
+                         flips to light text; the other four stay dark-on-
+                         light.
+       on --interval-ext  (#a99c87): --brown-950 text  -> 6.60:1  (AA+)
+     Four of five clear AA at minimum, three clear AAA; --interval-7th
+     needed its text color corrected from the originally-proposed
+     parchment to plain white after actually computing the ratio. */
+  --interval-root: #d9895c;
+  --interval-root-text: var(--brown-950);
+  --interval-root-border: #b5673d; /* deeper shade of --interval-root, for the dot's stroke */
+  --interval-root-glow: rgba(217, 137, 92, 0.55);
+
+  --interval-3rd: var(--moss);
+  --interval-3rd-text: var(--brown-950);
+  --interval-3rd-border: #6f9382; /* deeper shade of --moss */
+  --interval-3rd-glow: rgba(143, 175, 155, 0.55);
+
+  --interval-5th: var(--brass);
+  --interval-5th-text: var(--brown-950);
+  --interval-5th-border: #a67c3e; /* deeper shade of --brass */
+  --interval-5th-glow: rgba(200, 155, 92, 0.55);
+
+  --interval-7th: var(--moss-deep);
+  --interval-7th-text: #ffffff;
+  --interval-7th-border: #3f5548; /* deeper shade of --moss-deep */
+  --interval-7th-glow: rgba(92, 122, 99, 0.6);
+
+  --interval-ext: var(--muted);
+  --interval-ext-text: var(--brown-950);
+  --interval-ext-border: #85795f; /* deeper shade of --muted */
+  --interval-ext-glow: rgba(169, 156, 135, 0.5);
+
+  /* Extension-tone tints (Phase 3 Part 5/6, 5th follow-up) -- 9th/11th/13th
+     previously all shared the exact same --interval-ext fill, making them
+     visually indistinguishable from each other on an extended-chord
+     voicing (confirmed via a real C11 screenshot). Per the task's explicit
+     instruction, these are NOT 3 new unrelated hues -- they're 3 lightness
+     steps of --muted's own hue (37 deg, ~16.5% saturation in HSL), so the
+     three read as one cohesive "extension" family while staying
+     individually distinguishable. --interval-ext-11 is --muted itself
+     (the middle step); -9 is the lighter tint, -13 the darker shade.
+     Anything else that falls into the ext bucket (b9/#9/#11/b13/#13, a
+     plain 6th, a non-sus "4", etc.) keeps the original --interval-ext
+     token above, unchanged -- only bare "9"/"11"/"13" get their own tint.
+     Contrast, actually computed against each fill (not assumed from the
+     base --muted numbers, since these are different colors):
+       9th  (#c8bfb2) vs brown-950 text -> 9.78:1  (AAA)
+       11th (#a99c87) vs brown-950 text -> 6.60:1  (AA+, same as before --
+             this IS --muted)
+       13th (#776a55) vs brown-950 text -> 3.37:1  FAILS AA -- flips to
+             white text -> 5.28:1 (AA), same "dark fill needs light text"
+             pattern as --interval-7th above. */
+  --interval-ext-9: #c8bfb2;
+  --interval-ext-9-text: var(--brown-950);
+  --interval-ext-9-border: #a69882;
+  --interval-ext-9-glow: rgba(200, 191, 178, 0.5);
+
+  --interval-ext-11: var(--muted);
+  --interval-ext-11-text: var(--brown-950);
+  --interval-ext-11-border: #85795f;
+  --interval-ext-11-glow: rgba(169, 156, 135, 0.5);
+
+  --interval-ext-13: #776a55;
+  --interval-ext-13-text: #ffffff;
+  --interval-ext-13-border: #474033;
+  --interval-ext-13-glow: rgba(119, 106, 85, 0.55);
+
+  --border: var(--brown-700);
+  --shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Fraunces', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, 'SFMono-Regular', monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: dark;
+  color: var(--muted);
+  background: var(--brown-950);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--parchment);
+}
+
+h1 {
+  font-size: 46px;
+  letter-spacing: -0.5px;
+  margin: 0 0 12px;
+  @media (max-width: 1024px) {
+    font-size: 32px;
+  }
+}
+
+h2 {
+  font-size: 15px;
+  font-family: var(--mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  color: var(--moss);
+  margin: 0 0 14px;
+  @media (max-width: 1024px) {
+    font-size: 13px;
+  }
+}
+
+h3 {
+  font-size: 14px;
+  font-family: var(--mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+}
+
+a {
+  color: var(--brass);
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+code,
+.mono {
+  font-family: var(--mono);
+}
+
+button {
+  font: inherit;
+}
+
+input,
+button {
+  color-scheme: dark;
+}

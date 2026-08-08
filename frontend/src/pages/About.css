@@ -1,0 +1,40 @@
+.about-page {
+  max-width: 720px;
+  margin: 0 auto;
+  gap: 20px;
+}
+
+.about-block {
+  text-align: left;
+}
+
+.about-block p {
+  font-size: 16px;
+}
+
+.about-block p + p {
+  margin-top: 12px;
+}
+
+.about-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.about-stack__label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 4px;
+}
+
+.about-github-link {
+  display: inline-block;
+  margin-top: 14px;
+  text-decoration: none;
+}

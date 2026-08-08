@@ -17,3 +17,5 @@ matplotlib==3.10.8
 soundfile==0.13.1
 scikit-learn==1.8.0
 audioread>=3.0.0
+fastapi
+uvicorn

@@ -1,0 +1,173 @@
+.capture-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--brown-900);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  text-align: left;
+}
+
+/* -- Upload: the largest, most prominent piece of the box -- */
+.capture-panel__dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  padding: 44px 24px;
+  border: 2px dashed var(--brown-700);
+  border-radius: var(--radius);
+  background: var(--brown-800);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.capture-panel__dropzone:hover {
+  border-color: var(--brass-border);
+}
+
+.capture-panel__dropzone:focus-visible {
+  outline: none;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px var(--brass-dim);
+}
+
+.capture-panel__dropzone--dragging {
+  border-color: var(--brass);
+  border-style: solid;
+  background: var(--brass-dim);
+  box-shadow: 0 0 0 3px var(--brass-dim);
+  animation: dropzone-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes dropzone-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--brass-dim);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(200, 155, 92, 0.08);
+  }
+}
+
+.capture-panel__dropzone-icon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.capture-panel__headline {
+  font-family: var(--heading);
+  font-weight: 500;
+  font-size: 21px;
+  color: var(--parchment);
+  margin: 0 0 8px;
+}
+
+.capture-panel__primary-text {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 0;
+}
+
+.capture-panel__secondary-text {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.capture-panel__formats {
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* -- "OR" rule between the three ways in -- */
+.capture-panel__or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.capture-panel__or::before,
+.capture-panel__or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.capture-panel__or span {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--moss);
+}
+
+/* -- Size variants: same structure everywhere, proportions only differ. -- */
+
+/* default: Home -- full-size, the page's primary focus */
+.capture-panel--default {
+  padding: 24px;
+}
+
+/* compact: inside CaptureModal's "choose a different source" panel */
+.capture-panel--compact {
+  padding: 18px;
+  gap: 14px;
+}
+
+.capture-panel--compact .capture-panel__dropzone {
+  padding: 26px 16px;
+}
+
+.capture-panel--compact .capture-panel__dropzone-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.capture-panel--compact .capture-panel__headline {
+  font-size: 18px;
+}
+
+/* mini: Results -- present but deliberately de-emphasized, nestled below
+   the chord/voicings/songs content that page is actually about */
+.capture-panel--mini {
+  padding: 16px;
+  gap: 12px;
+}
+
+.capture-panel--mini .capture-panel__dropzone {
+  padding: 18px 16px;
+}
+
+.capture-panel--mini .capture-panel__dropzone-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.capture-panel--mini .capture-panel__headline {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.capture-panel--mini .capture-panel__primary-text {
+  font-size: 13px;
+}
+
+.capture-panel--mini .capture-panel__secondary-text,
+.capture-panel--mini .capture-panel__formats {
+  display: none;
+}
+
+.capture-panel--mini .record-btn--block {
+  padding: 10px 16px;
+  font-size: 12px;
+}

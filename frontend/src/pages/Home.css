@@ -1,0 +1,45 @@
+.home-hero {
+  text-align: center;
+  gap: 8px;
+  max-width: 620px;
+  margin: 0 auto 8px;
+}
+
+.home-hero p {
+  font-size: 17px;
+  @media (max-width: 700px) {
+    font-size: 15px;
+  }
+}
+
+.home-teasers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-teaser {
+  display: block;
+  text-align: left;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.05s ease;
+}
+
+.home-teaser:hover {
+  border-color: var(--brass-border);
+}
+
+.home-teaser h3 {
+  color: var(--brass);
+  margin-bottom: 6px;
+}
+
+.home-teaser p {
+  font-size: 14px;
+  margin: 0;
+}
+

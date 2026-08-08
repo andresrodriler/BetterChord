@@ -7,20 +7,26 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# Anchored to the repo root (leading /) -- bare `lib/`/`build/`/etc, without
+# the leading slash, matches a directory of that name ANYWHERE in the tree,
+# which was silently swallowing frontend/src/lib/ (a real source directory,
+# not a Python build artifact) -- confirmed via `git check-ignore -v`, not
+# assumed. These names are all Python packaging/venv build-output
+# conventions, meant for the project root only.
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -237,6 +243,7 @@ models/*.h5
 *.sqlite
 *.sqlite3
 data/*.db
+data/song_data/backups/
 data/*.sqlite
 
 # Spectrograms and visualizations (generated files)
@@ -293,6 +300,10 @@ $RECYCLE.BIN/
 # IDE specific
 .idea/
 .vscode/
+
+# Claude Code local settings/permissions -- machine-specific paths and
+# personal tool-permission grants, not shareable project config
+.claude/
 *.swp
 *.swo
 *~
@@ -307,9 +318,19 @@ notes.txt
 TODO.txt
 SCRATCH.md
 
+# CLAUDE.md -- personal/local project-notes file for Claude Code sessions,
+# not meant to be committed (established convention on this branch before
+# this note existed -- see the remote's own "Delete CLAUDE.md" commit).
+# TODO.md and STRUCTURE.md are NOT covered by this -- those are meant to
+# be committed; CLAUDE.md is the one deliberate exception.
+CLAUDE.md
+
 # Sample data exports -- excluded due to sensitive info, not just size
 data/song_data/songs_10rows.csv
 data/voicing_data/voicings10row.csv
+
+# Full voicings DB dump -- personal/regenerable, not meant for the public repo
+data/voicing_data/voicings.sql
 
 # Cached spectrograms -- regenerable from training_data/test_data via
 # audio_processing.py, not meant to be tracked
@@ -323,3 +344,9 @@ data/noise_bank/
 
 # Personal test recordings -- not meant for the public repo
 data/betterchord_mytesting/
+
+# Frontend (Vite/React) -- node_modules and build output, not source
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local

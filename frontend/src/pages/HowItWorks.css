@@ -1,0 +1,62 @@
+.how-it-works-page {
+  max-width: 720px;
+  margin: 0 auto;
+  gap: 8px;
+}
+
+.how-it-works-intro {
+  font-size: 17px;
+  margin-bottom: 20px;
+}
+
+/* Simple labeled flow: numbered nodes connected by a line, one per
+   pipeline stage -- deliberately basic (per the task's "doesn't need to
+   be fancy"), just enough to read as a pipeline at a glance before the
+   detailed blocks below. */
+.how-it-works-flow {
+  display: flex;
+  align-items: center;
+  padding: 4px 4px 24px;
+  overflow-x: auto;
+}
+
+.how-it-works-flow__stage {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.how-it-works-flow__node {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--brown-800);
+  border: 1px solid var(--scan-border);
+}
+
+.how-it-works-flow__connector {
+  flex: 1;
+  height: 1px;
+  background: var(--brown-700);
+  min-width: 16px;
+}
+
+.how-it-works-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.how-it-works-block {
+  text-align: left;
+}
+
+.how-it-works-block p {
+  font-size: 15px;
+}

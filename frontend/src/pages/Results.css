@@ -1,0 +1,280 @@
+.results-header {
+  gap: 4px;
+}
+
+.results-header h1 {
+  margin-bottom: 4px;
+}
+
+.results-header__enharmonic-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--moss);
+}
+
+.results-grid {
+  display: grid;
+  /* minmax(0, 1fr), not plain 1fr -- plain 1fr columns still respect
+     their content's intrinsic min-width, so the Voicings column (full of
+     wide-ish diagram cards) was winning more than half the row even
+     though both tracks were nominally "1fr". minmax(0, ...) removes that
+     implicit auto-minimum, forcing a genuine 50/50 split regardless of
+     what's inside each column -- confirmed via real screenshot at
+     1400px: both panels measure the same width. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  @media (max-width: 780px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Handedness toggle moved here from the global app header (Phase 3 Part 2
+   follow-up fix #5) -- top-right of the "VOICINGS" panel header, next to
+   the label it actually affects. The underlying preference is still the
+   same global FretboardPrefsContext. */
+.voicings-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voicings-panel__header h2 {
+  margin-bottom: 0;
+}
+
+.voicing-list,
+.song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  /* Capped and internally scrollable -- some chords have 30+ songs (or,
+     for voicings, 25+ across three types), and an uncapped list used to
+     stretch the whole page to match it, burying everything below
+     (including the mini CapturePanel) at the bottom of a mile-long
+     scroll. */
+  overflow-y: auto;
+  padding-right: 4px; /* keeps the scrollbar from overlapping item text */
+  scrollbar-width: thin;
+  scrollbar-color: var(--brown-700) transparent;
+}
+
+.song-list {
+  max-height: 520px;
+}
+
+/* Voicing items are now full fretboard diagrams (~330-360px tall each,
+   Phase 3 Part 2), not single-line text rows -- the old shared 520px cap
+   (tuned for text rows) only fit ~1.5 diagrams, which read as broken/cut
+   off rather than intentionally scrollable. Sized instead to comfortably
+   fit the full "Must Know" section for a typical chord (usually 2-5
+   voicings) before scrolling into Other/Capo -- confirmed against a real
+   chord ("A": 3 Must Know / 16 Other / 6 Capo) where 520px showed barely
+   one voicing but 1100px shows all 3 Must Know diagrams plus the start
+   of Other, a reasonable amount of content before scroll kicks in.
+   Deliberately no longer shares a single cap with .song-list -- forcing
+   both to the same number stopped making sense once one list's items
+   became ~6x taller than the other's; each is now sized for its own
+   content instead. */
+.voicing-list {
+  max-height: 1100px;
+}
+
+.voicing-list::-webkit-scrollbar,
+.song-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.voicing-list::-webkit-scrollbar-thumb,
+.song-list::-webkit-scrollbar-thumb {
+  background: var(--brown-700);
+  border-radius: 4px;
+}
+
+/* Guide-tone explanation callouts (Phase 3 Part 3/6) -- sits above the
+   combined song list, explaining why fuzzy matching pulled in an extra
+   spelling. Recessed-well treatment (like .panel--recessed) plus a
+   moss-colored left border so it reads as "explanatory aside" distinct
+   from the song rows below, without inventing a new visual language.
+   Multiple entries stack as separate blocks (gap), never merged into one
+   paragraph. */
+.related-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.related-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-left: 3px solid var(--moss);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.related-note .readout {
+  font-size: 13px;
+}
+
+/* Card background/border/radius/layout now live entirely in SongCard.css
+   (Phase 4 follow-up) -- SongCard.jsx's root element is a real <li>, so a
+   bare `.song-list li` rule here would still match it and fight its own
+   internal layout (this is exactly what broke the cards last session: a
+   leftover `display: flex; align-items: baseline` here collapsed
+   SongCard's column layout). If a future non-card `<li>` is ever added
+   directly under `.song-list`, scope its rule the same way SongCard.css
+   already scopes its own (`.song-list .song-card`), don't add a bare
+   `.song-list li` rule back. */
+
+/* Two voicings per row instead of one column (Phase 3 Part 2 follow-up)
+   -- horizontal-orientation diagrams are wider than tall now, so a single
+   column left a lot of unused width in the panel. Section headers span
+   both columns via grid-column: 1 / -1 (see .voicing-list__section
+   below) so a header always starts a fresh row regardless of where the
+   previous type group's item count left off. */
+.voicing-list {
+  display: grid;
+  /* Same minmax(0, 1fr) reasoning as .results-grid above -- now that
+     FretboardDiagram sizes itself off the grid cell's real width (CSS
+     aspect-ratio, not a fixed pixel value), each cell's own intrinsic
+     min-width is small, but minmax(0, ...) keeps the two columns
+     genuinely equal regardless. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Each voicing now renders its own fretboard diagram (FretboardDiagram
+   already supplies its own recessed panel/background), so the list item
+   itself is just a layout wrapper, not a bordered row like song-list.
+   align-items: stretch (not center) so the diagram fills the full width
+   of its grid cell -- FretboardDiagram's own responsive sizing depends
+   on that width being real, not shrink-wrapped to content. */
+.voicing-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* Section header row (Must Know / Other / Capo) -- a separate <li> sibling
+   of .voicing-list__item (not nested inside one), so grid-column: 1 / -1
+   actually spans both columns of the grid instead of just filling one
+   cell. Extends the app's existing small-uppercase-monospace h2 treatment
+   with a centered divider line on each side, rather than inventing new
+   typography. */
+/* Phase 3 Part 5/6 follow-up: legend + section headers stack as two
+   sticky bars pinned to the TOP of .voicing-list's own internal scroll
+   (that list already has its own overflow-y: auto -- this is deliberately
+   NOT page-scroll sticky). Both need an opaque background matching the
+   panel (--brown-900) since voicing cards scroll underneath them; without
+   it the diagrams behind would show through. Legend pins to the very top
+   (z-index 3, highest -- it should never be covered), the current
+   section's header pins directly beneath it (top offset = the legend
+   bar's own fixed height, z-index 2 -- above the scrolling cards but
+   below the legend). LEGEND_HEIGHT is enforced via explicit height below
+   rather than left to content, specifically so the section header's
+   `top` offset is a reliable, hardcoded number instead of guessed. */
+.voicing-list__legend-row {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  background: var(--brown-900);
+  border-bottom: 1px solid var(--brown-700);
+  margin-bottom: 4px;
+}
+
+.voicing-list__section-row {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 40px; /* directly beneath .voicing-list__legend-row's fixed 40px height */
+  z-index: 2;
+  background: var(--brown-900);
+}
+
+.voicing-list__section {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.voicing-list__section::before,
+.voicing-list__section::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* The legend row is now the list's real first child, so the first
+   section header is the one immediately following it -- not
+   :first-child anymore. */
+.voicing-list__legend-row + .voicing-list__section-row .voicing-list__section {
+  margin-top: 0;
+}
+
+/* Phase 3 Part 5/6: replaces the old equal-weight "base fret N" / "capo N"
+   pill pair (.voicing-list__tags, removed -- base fret is gone entirely,
+   redundant with the diagram's own "Nfr" label). This chip is smaller and
+   more integrated than a full .tag pill, deliberately less prominent, and
+   only rendered for Capo-type voicings (see Results.jsx's gating, matching
+   FretboardDiagram.jsx's existing capo-line condition). Full base-fret/
+   capo detail now lives in the click-to-expand VoicingModal instead. */
+.voicing-list__capo-chip {
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--moss);
+  padding: 1px 8px;
+}
+
+.song-title {
+  color: var(--parchment);
+  font-weight: 600;
+}
+
+/* Phase 4 follow-up: invisible marker row at the end of the currently-
+   rendered song batch -- IntersectionObserver (Results.jsx) watches this
+   to load the next batch as the user scrolls near it. flex-shrink: 0 for
+   the same reason SongCard.css needs it (see that file's comment) --
+   without it, a near-empty 1px row is still a flex item subject to the
+   same shrink-to-fit-in-max-height math. */
+.song-list__sentinel {
+  flex-shrink: 0;
+  height: 1px;
+}
+
+/* Deliberately de-emphasized: nestled below the voicings/songs content
+   that this page is actually about, not competing with it for attention.
+   Constrained width + centered rather than spanning the full page like
+   Home's version. */
+.results-capture {
+  margin-top: 40px;
+  max-width: 460px;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.results-capture h2 {
+  margin-bottom: 12px;
+}
+
+.results-capture .capture-panel {
+  text-align: left;
+}

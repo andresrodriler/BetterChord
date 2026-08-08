@@ -103,6 +103,63 @@ def resolve_query(chord_query, intervalset_to_canonical):
     return parsed["root"], canonical_quality, parsed["bass"]
 
 
+def transpose_chord_down(chord_string, semitones, intervalset_to_canonical):
+    """Transposes a chord string DOWN by `semitones`, e.g. for computing the
+    shape a guitarist actually frets under a capo (the real sounding pitch
+    is `chord_string`; the shape is `chord_string` transposed down by the
+    capo fret). Built from existing primitives per CLAUDE.md's core rule --
+    never hand-rolls string slicing on the chord name: parse_chord() for
+    structured root/bass, CHROMATIC for the shift, compute_intervals() +
+    the registry's interval-set map to recover the quality's canonical
+    NAME (parse_chord() only returns quality as a structured dict, not a
+    string, so this is the same registry lookup resolve_query() already
+    uses elsewhere in this file), then format_chord() to rebuild. Returns
+    None if `chord_string` doesn't parse or its quality isn't a registry
+    quality (shouldn't happen for a chord_string built from this file's
+    own root/canonical_quality, but stay defensive rather than crash).
+    """
+    parsed = cp.parse_chord(chord_string)
+    if not parsed["parsed"]:
+        return None
+
+    root_idx = cp.CHROMATIC.index(parsed["root"])
+    new_root = cp.CHROMATIC[(root_idx - semitones) % 12]
+
+    new_bass = None
+    if parsed["bass"]:
+        bass_idx = cp.CHROMATIC.index(parsed["bass"])
+        new_bass = cp.CHROMATIC[(bass_idx - semitones) % 12]
+
+    full, _required = compute_intervals(parsed["quality"])
+    quality_name = intervalset_to_canonical.get(frozenset(full))
+    if quality_name is None:
+        return None
+
+    return cp.format_chord(new_root, quality_name, new_bass)
+
+
+def find_raw_chord(all_chords_json, normalized_all_chords_json, target):
+    """Looks up the pre-normalization token UG actually shows for `target`.
+    `all_chords`/`normalized_all_chords` are parallel arrays (same length/
+    order per song -- build_normalized_columns.py normalizes each raw
+    token in place) -- find the first index where the normalized array
+    equals `target` and return the raw token at that same index, or None
+    if it's identical to `target` (no real difference to report) or the
+    columns don't parse/don't contain a match (defensive -- shouldn't
+    happen since `target` was matched via normalized_unique_chords in the
+    caller's own SQL WHERE clause, but never crash on a real scrape
+    inconsistency)."""
+    try:
+        all_chords = json.loads(all_chords_json)
+        normalized_all_chords = json.loads(normalized_all_chords_json)
+    except (TypeError, ValueError):
+        return None
+    for raw, norm in zip(all_chords, normalized_all_chords):
+        if norm == target:
+            return raw if raw != target else None
+    return None
+
+
 def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=None, strict=False):
     db_path = db_path or DEFAULT_DB_PATH
     registry_path = registry_path or DEFAULT_REGISTRY_PATH
@@ -128,12 +185,49 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
     for q in search_qualities:
         target = cp.format_chord(root, q)
         cur.execute(
-            "SELECT title, artist, normalized_unique_chords FROM songs "
-            "WHERE normalized_unique_chords LIKE ?",
+            "SELECT title, artist, normalized_unique_chords, spotify_track_id, "
+            "album_image_url, artist_image_url, youtube_video_id, youtube_confidence, "
+            "ug_url, ug_key, ug_capo, ug_capo_source, ug_tuning_name, ug_tuning_value, "
+            "ug_votes, artist_genres, all_chords, normalized_all_chords "
+            "FROM songs WHERE normalized_unique_chords LIKE ?",
             (f'%"{target}"%',)
         )
         rows = cur.fetchall()
-        results_by_quality[target] = [{"title": r[0], "artist": r[1]} for r in rows]
+        songs_list = [
+            {
+                "title": r[0],
+                "artist": r[1],
+                "spotify_track_id": r[3],
+                "album_image_url": r[4],
+                "artist_image_url": r[5],
+                "youtube_video_id": r[6],
+                "youtube_confidence": r[7],
+                "ug_url": r[8],
+                "ug_key": r[9],
+                "ug_capo": r[10],
+                "ug_capo_source": r[11],
+                "ug_tuning_name": r[12],
+                "ug_tuning_value": r[13],
+                "ug_votes": r[14],
+                "artist_genres": r[15],
+                # Both explain why the chord name shown here can differ from
+                # what's literally printed on the UG tab -- two genuinely
+                # separate reasons, see songs.py's helpers for how each is
+                # computed. Only ever set for THIS one matched/output chord
+                # (`target`), not the song's full chord list.
+                "raw_chord": find_raw_chord(r[16], r[17], target),
+                "capo_shape": transpose_chord_down(target, r[10], intervalset_to_canonical) if r[10] and r[10] > 0 else None,
+            }
+            for r in rows
+        ]
+        # Most-voted first. Real data has zero NULL ug_votes rows today
+        # (checked directly against betterchord_songs.db, not assumed), but
+        # sort defensively anyway: a missing value sorts to the very end,
+        # below even a real 0-vote song, rather than crashing or -- worse --
+        # silently sorting alongside/above real low-vote songs as if it
+        # were itself a legitimate 0.
+        songs_list.sort(key=lambda s: s["ug_votes"] if s["ug_votes"] is not None else -1, reverse=True)
+        results_by_quality[target] = songs_list
 
     conn.close()
 

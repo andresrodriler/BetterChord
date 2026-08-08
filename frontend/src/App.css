@@ -1,0 +1,456 @@
+/* Shared layout + component styles across Home, Results and the capture
+   modal. Page-specific layout (grid/spacing unique to one page) lives in
+   that page's own stylesheet; this file is the rustic-modern chassis
+   system: the outer frame, panels, buttons, inputs, badges and the
+   record button that every page reuses. */
+
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-inline: 1px solid var(--border);
+  background:
+    /* faint schematic grid, echoing the "diagram/instrument readout" feel
+       without the animated diagrams themselves */
+    linear-gradient(var(--brown-900) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, var(--brown-900) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(180deg, rgba(200, 155, 92, 0.05), transparent 320px),
+    var(--brown-950);
+}
+
+/* -- Chassis header: sticky top strip, like a device's brand plate --
+   position: sticky (not fixed) so it stays part of #root's own flex
+   flow -- no compensating top-padding needed elsewhere, and it still
+   respects #root's 1126px max-width/centering instead of spanning the
+   full viewport. Needs its own opaque background + z-index since
+   .app-shell's schematic-grid background would otherwise show through
+   scrolled content underneath. */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--brown-950);
+  @media (max-width: 700px) {
+    padding: 14px 20px;
+    gap: 10px;
+  }
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  @media (max-width: 700px) {
+    gap: 12px;
+  }
+}
+
+.app-nav__link {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  @media (max-width: 700px) {
+    font-size: 11px;
+  }
+}
+
+.app-nav__link:hover {
+  color: var(--parchment);
+}
+
+.app-nav__link.active {
+  color: var(--brass);
+}
+
+.brand {
+  font-family: var(--heading);
+  font-weight: 500;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+  color: var(--parchment);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brand__accent {
+  color: var(--brass);
+  font-style: italic;
+}
+
+.brand::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--scan);
+  box-shadow: 0 0 8px 1px var(--scan-border);
+}
+
+/* Site-wide handedness toggle -- pill treatment matching .tag/.badge, but
+   interactive. Uses the brass accent (not scan) when active: brass is the
+   app's "active control/primary" color, scan is reserved specifically for
+   detection states, and this toggle isn't announcing anything BetterChord
+   detected. */
+.handedness-toggle {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.handedness-toggle:hover {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+.handedness-toggle[aria-pressed='true'] {
+  color: var(--brown-950);
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 32px 64px;
+  gap: 40px;
+  @media (max-width: 700px) {
+    padding: 28px 18px 48px;
+    gap: 28px;
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* -- Panel: the base "device face" surface used for cards/wells -- */
+.panel {
+  background: var(--brown-900);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  @media (max-width: 700px) {
+    padding: 18px;
+  }
+}
+
+.panel--recessed {
+  background: var(--brown-800);
+  box-shadow: var(--shadow-inset);
+  border-color: var(--brown-700);
+}
+
+/* FretboardDiagram's wrapper -- fills whatever width its container
+   (a grid cell, currently) gives it, rather than a fixed pixel size, so
+   it never needs re-tuning when panel/column proportions change. The
+   actual aspect-ratio sizing is on the inner ref'd div (inline style, see
+   FretboardDiagram.jsx) -- this class just makes sure the panel itself
+   doesn't shrink-wrap back down to content width. */
+.fretboard-diagram {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* -- Buttons -- */
+.btn {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--parchment);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.05s ease, background 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--brass-border);
+  background: var(--brown-700);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: var(--brown-950);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #d9af74;
+  border-color: #d9af74;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--brown-700);
+  color: var(--muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--parchment);
+}
+
+.btn-close {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.btn-close:hover:not(:disabled) {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+/* -- Record button: circular, red, hardware-transport convention --
+   stays red on purpose, independent of the brass/scan accent pair, so
+   "recording is live" never reads as just another themed button. -- */
+.record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--parchment);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 10px 20px 10px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.record-btn:hover:not(:disabled) {
+  border-color: var(--record-red);
+}
+
+.record-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.record-btn__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--record-red);
+  box-shadow: 0 0 0 3px rgba(217, 43, 43, 0.2);
+  flex-shrink: 0;
+}
+
+.record-btn--live .record-btn__dot,
+.record-btn--armed .record-btn__dot {
+  animation: pulse-record 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(217, 43, 43, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(217, 43, 43, 0.08);
+  }
+}
+
+.record-btn--live {
+  border-color: var(--record-red);
+  background: rgba(217, 43, 43, 0.12);
+}
+
+/* Large "Start Recording" call to action in the ready screen */
+.record-btn--big {
+  font-size: 16px;
+  padding: 18px 34px 18px 22px;
+}
+
+.record-btn--big .record-btn__dot {
+  width: 18px;
+  height: 18px;
+}
+
+/* Full-width record button used by CapturePanel's third section -- same
+   pill treatment, stretched edge-to-edge, icon instead of the dot so it
+   reads as a distinct affordance from the live/armed status pill. */
+.record-btn--block {
+  width: 100%;
+  justify-content: center;
+  padding: 14px 20px;
+  font-size: 14px;
+}
+
+/* -- Inputs -- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.field-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.text-input {
+  font: 16px/1 var(--sans);
+  color: var(--parchment);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-inset);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.text-input:focus {
+  border-color: var(--brass-border);
+}
+
+.text-input::placeholder {
+  color: #6b5d4b;
+}
+
+.file-input {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* -- Readout: monospace "device display" treatment for chord names --
+   uses the scan/cyan accent specifically, since a chord name here is
+   always something BetterChord identified, not a static label. -- */
+.readout {
+  font-family: var(--mono);
+  color: var(--scan);
+  text-shadow: 0 0 18px var(--scan-dim);
+}
+
+/* -- Badge: small pill for confidence / status callouts -- same scan
+   accent as .readout, since it's announcing a detection too. -- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  color: var(--parchment);
+  background: var(--scan-dim);
+  border: 1px solid var(--scan-border);
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--scan);
+}
+
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.status-text {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.status-text--warn {
+  color: var(--brass);
+}
+
+.status-text--error {
+  color: var(--error);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: none;
+  margin: 0;
+}
+
+/* Screen-reader-only: keeps an accessible name/label in the a11y tree
+   without duplicating text a sighted user already sees nearby. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

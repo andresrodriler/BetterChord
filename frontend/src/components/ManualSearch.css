@@ -1,0 +1,82 @@
+.manual-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manual-search__row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.manual-search__field-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+}
+
+.manual-search__icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  opacity: 0.55;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.manual-search__input.text-input {
+  width: 100%;
+  padding-left: 40px;
+}
+
+.manual-search__suggestions-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--brown-800);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* Pinned header row inside the panel -- visually distinct from the
+   clickable rows below it (dimmer, no hover state, small type) so it
+   never reads as a selectable option. */
+.manual-search__enharmonic-note {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--moss);
+  background: var(--brown-900);
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.manual-search__suggestions {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.manual-search__suggestion {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--parchment);
+  cursor: pointer;
+}
+
+.manual-search__suggestion--active,
+.manual-search__suggestion:hover {
+  background: var(--brass-dim);
+  color: var(--scan);
+}

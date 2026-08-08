@@ -1,0 +1,160 @@
+/* Phase 4: replaces the old plain .song-list <li> text row. Kept minimal --
+   proving the data + interaction works, not a final visual pass (see
+   CLAUDE.md's Phase 4 scope). Reuses existing tokens/.tag treatment rather
+   than inventing new ones. */
+/* Higher specificity than Results.css's .song-list li (class+element) so
+   the card's own layout (padding lives on .song-card__summary/__detail
+   instead) actually wins regardless of CSS import order. */
+.song-list .song-card {
+  display: block;
+  /* .song-list is a flex column with max-height + overflow-y: auto (see
+     Results.css). A flex item's automatic min-height resolves to 0 when
+     its own overflow isn't 'visible' (CSS Flexbox min-height:auto rule) --
+     `overflow: hidden` just below (needed to clip the card's rounded
+     corners) triggers exactly that. At high item counts (real, confirmed
+     bug: chord "Dm", 5269 songs) the flex-shrink algorithm has nothing to
+     stop it once that floor is 0, so every card gets crushed toward ~2px
+     to force-fit inside max-height -- confirmed via direct measurement
+     before this fix (every sampled card, from index 0 to 1000+, measured
+     the same ~2px). flex-shrink: 0 opts every card out of that shrinking
+     entirely, regardless of how many songs are in the list. */
+  flex-shrink: 0;
+  padding: 0;
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.song-card__summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Phase 4 follow-up: wraps the thumb so useAlbumThumb's IntersectionObserver
+   has a stable element to watch regardless of whether the current render
+   shows the real <img> or the placeholder box -- sizing lives here now,
+   the inner elements just fill it. */
+.song-card__thumb-wrapper {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.song-card__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--brown-700);
+}
+
+.song-card__thumb--placeholder {
+  border: 1px solid var(--brown-700);
+}
+
+.song-card__summary-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.song-card__artist {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.song-card__chevron {
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.song-card__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 14px;
+}
+
+/* Phase 4 follow-up: fills the empty space that used to sit next to a lone
+   artist image -- genre/key/capo chips now sit beside it instead of below.
+   Row layout so the image and chips share the same line at normal card
+   width; chips wrap onto their own line via flex-wrap if the card is
+   narrow or a song has several chips at once. */
+.song-card__artist-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.song-card__artist-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--brown-700);
+  flex-shrink: 0;
+}
+
+.song-card__artist-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.song-card__spotify,
+.song-card__youtube {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--brown-700);
+  display: block;
+}
+
+.song-card__ug-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Phase 4 follow-up: explains a real discrepancy between the chord name
+   shown here and what's literally on the UG tab (capo shape and/or root/
+   quality normalization -- see songs.py). Same recessed-aside treatment
+   Results.css already uses for .related-note (moss left border, --brown-800
+   well) rather than inventing a new visual language for "explanatory
+   callout". */
+.song-card__why-differs {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-left: 3px solid var(--moss);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.song-card__why-differs .readout {
+  font-size: 13px;
+}
+
+.song-card__ug-link {
+  color: var(--scan);
+  font-size: 13px;
+  width: fit-content;
+}

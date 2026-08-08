@@ -20,6 +20,13 @@
 
 **Data**
 - If someone does want to download the github repo, it has everything needed except the data used. Next step for someone to be able to completely replicate my model from scratch with my repo is posting my data (training/test data, voicing data, song data, essentially everything data related) on something like Kaggle. I can then link it in my github to instruct that there is the data for my project (Need to be careful on how its posted, concerns with copyright).
+- Separately from the raw data: decide whether to publish chord_cnn.pth
+  (the trained model weights) so people can use the current model
+  without retraining. Lower technical risk than publishing raw data, but
+  legal status of publishing weights trained on external datasets
+  (HF/IDMT/GADA) is unresolved -- check each dataset's actual license
+  terms for model-weight redistribution before deciding. See CLAUDE.md's
+  Phase 7 entry for full reasoning.
 
 **UX**
 - ffmpeg missing popup -- if a user doesn't have ffmpeg locally, show something like Audacity's "unsupported format" popup with a quick pointer on where to grab it, instead of just failing. (This is a real, confirmed failure mode, not theoretical -- hit this exact thing testing Phase 1 before ffmpeg was installed)
@@ -48,9 +55,29 @@
   rendering is proven in Phase 2~~ -- done, see CLAUDE.md's Phase 3
   Part 2/6 entry. Follow-up polish (interval-colored dots, in-dot
   interval labels, omitted-interval notes, dropping the redundant
-  base-fret/capo pills) is formally scoped as **Phase 3 Part 5/6**,
-  not started. Site chrome (persistent header, About/How-it-works/
-  GitHub pages) is formally scoped as **Phase 3 Part 6/6**, not started.
+  base-fret/capo pills) -- done, see CLAUDE.md's Phase 3 Part 5/6 entry.
+  Site chrome (persistent header, About/How-it-works/GitHub pages) --
+  done, see CLAUDE.md's Phase 3 Part 6/6 entry. **Phase 3 is fully closed.**
+
+**Phase 4 rich media (done)**
+- Album art, artist image, Spotify embed playback, YouTube embed
+  (confidence-gated), UG capo/key/tuning display, plus several follow-up
+  passes: a real crushed-card CSS bug fix, a 4-item polish batch (Spotify
+  embed white space, high-volume load performance via incremental
+  rendering, genre/key/capo chips, UG-vote-count sorting), a Deezer
+  album-art placeholder-routing investigation + retry/fallback hook, 12
+  stale Mac DeMarco YouTube link corrections, and a capo-shape/
+  enharmonic-normalization "why does this differ from UG?" transparency
+  note. See CLAUDE.md's Phase 4 entry for full detail (multiple real
+  bugs found and fixed along the way, not just the initial build).
+  **Phase 4 is fully closed.**
+- Deferred on purpose, not forgotten: a "chords used in this song" list/
+  dropdown (showing every chord a song uses, not just the one matched/
+  searched chord) -- discussed during Phase 4 but explicitly out of
+  scope for the capo-shape/normalization transparency note above. Real,
+  intended future item; not yet scoped (which chords, what UI, whether
+  it reuses `all_chords`/`normalized_all_chords` the same way the
+  transparency note does).
 
 
 - Whether someone uploads a file or records live, show them feedback on
