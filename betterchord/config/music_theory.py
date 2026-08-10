@@ -278,16 +278,22 @@ def score_quality(active_intervals, quality, note_probs, root_idx):
         prob = note_probs[note_idx]
         iw  = INTERVAL_WEIGHTS.get(interval, 1.0)
 
+        # Required notes get an extra multiplier -- this same effective
+        # weight (iw * rw) must be used for BOTH the numerator (score) and
+        # the denominator (total_weight), otherwise total_weight undercounts
+        # relative to what score can actually accumulate, letting raw_score
+        # exceed 1.0. (Real bug, produced e.g. confidence=1.024 -- see
+        # CLAUDE.md Phase 5 Part 1/6.)
+        rw = 1.5 if interval in required_notes else 1.0
+        w  = iw * rw
+
         if interval in quality_notes:
-            # Required notes get an extra multiplier
-            rw     = 1.5 if interval in required_notes else 1.0
-            w      = iw * rw
             score += prob * w
         else:
             # Penalize unexpected active notes (wrong notes for this quality)
-            score += (1.0 - prob) * iw
+            score += (1.0 - prob) * w
 
-        total_weight += iw
+        total_weight += w
 
     raw_score = score / total_weight
 

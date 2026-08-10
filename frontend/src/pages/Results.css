@@ -123,6 +123,83 @@
   font-size: 13px;
 }
 
+/* Phase 5 Part 1/6 follow-up: educational notes (searched_quality_note +
+   related_notes) live behind this collapsed-by-default toggle instead of
+   stacking as more banners. Deliberately a plain text disclosure, NOT
+   another bordered box -- the whole point is not recreating the same
+   visual clutter one level down. */
+.educational-notes-wrap {
+  margin-top: 16px;
+}
+
+.educational-notes__toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.educational-notes__toggle:hover {
+  color: var(--parchment);
+}
+
+.educational-notes__caret {
+  display: inline-block;
+  width: 0.9em;
+  color: var(--moss);
+}
+
+.educational-notes {
+  margin-top: 8px;
+}
+
+/* 2+ educational notes render as tight one-line bullets instead of full
+   .related-note prose boxes -- same content, less reading, once expanded. */
+.educational-notes__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.educational-notes__item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding-left: 14px;
+  position: relative;
+}
+
+.educational-notes__item::before {
+  content: '·';
+  position: absolute;
+  left: 2px;
+  color: var(--moss);
+}
+
+.educational-notes__item .readout {
+  font-size: 13px;
+}
+
+/* Phase 5 Part 1/6: genuine-no-songs quality fallback -- reuses
+   .voicing-list__section for each root's header (same "small uppercase
+   label" treatment already used for Must Know/Other/Capo) and .song-list
+   for each group's mini list, no new visual language. */
+.quality-fallback-group {
+  margin-top: 12px;
+}
+
+.quality-fallback-group .voicing-list__section {
+  margin-bottom: 6px;
+}
+
 /* Card background/border/radius/layout now live entirely in SongCard.css
    (Phase 4 follow-up) -- SongCard.jsx's root element is a real <li>, so a
    bare `.song-list li` rule here would still match it and fight its own

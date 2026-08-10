@@ -26,7 +26,7 @@
   legal status of publishing weights trained on external datasets
   (HF/IDMT/GADA) is unresolved -- check each dataset's actual license
   terms for model-weight redistribution before deciding. See CLAUDE.md's
-  Phase 7 entry for full reasoning.
+  Phase 8 entry for full reasoning.
 
 **UX**
 - ffmpeg missing popup -- if a user doesn't have ffmpeg locally, show something like Audacity's "unsupported format" popup with a quick pointer on where to grab it, instead of just failing. (This is a real, confirmed failure mode, not theoretical -- hit this exact thing testing Phase 1 before ffmpeg was installed)
@@ -35,6 +35,28 @@
 - Wire the guide-tone explanation text into the actual UI (bold the two chord names, currently just returned as plain text + a list of what to bold) -- formally scoped as **Phase 3 Part 3/6**, see CLAUDE.md's Phase 3 entry, not started (This is now done with Phase 3 part 3/6)
 - Make the model even better, more data (biggest thing that can help), tweaking the model a bit, messing with CNN layers, etc.
 - No handling yet for denied mic permission (fails silently, no on-page feedback) or cleanup if a user navigates away mid-recording (mic stream could stay open) -- fine for the Phase 1 test page, worth real handling once Phase 2 builds the actual UI
+- **Surface `voicings.py`'s dormant `fallback`/`translated`/`displayed`/
+  `translated_from` fields, and `chord_info.py`'s dormant chord-info data
+  (interval breakdown, per-quality "feeling" description, related
+  chords), in the actual UI.** Both are real, already-computed, correct
+  data that never reaches the frontend today -- not a gap in the
+  backend, a gap in exposing it. `voicings.py`'s fields are returned by
+  `GET /voicings/{chord}` but zero frontend code references them
+  (confirmed via a full `frontend/src` grep). `chord_info.py`'s
+  `get_chord_info()` is only ever called from `main.py`'s
+  `identify_from_audio()` (feeds `/identify`'s `info` field for the
+  audio-ID path only), and `CaptureContext.jsx`'s `handleContinue()`
+  discards `result.info` entirely before navigating to Results -- there
+  is no endpoint at all exposing chord-info data for the manual-search
+  path. This substantially overlaps the "More in depth information on
+  outputted chord" / "chord info" Dump Notes items (the "feeling of
+  chord" ask is already answered by `QUALITY_DESCRIPTIONS`, e.g.
+  `"7": "Dominant seventh — tense, wants to resolve..."`). **Identified
+  during Phase 5 Part 2/7's Step 0 "extra notes" investigation** --
+  deliberately kept OUT of Part 2/7's own scope (that part only unifies
+  wording for already-VISIBLE notes; this is new UI for currently-
+  invisible data, a different-sized task) -- not yet scoped to any
+  phase. See CLAUDE.md's Phase 5 Part 2/7 entry for the full writeup.
 
 **Phase 3 UI polish (deferred from Phase 2 on purpose)**
 - ~~Real-time autocomplete on the manual chord search input~~ -- done,

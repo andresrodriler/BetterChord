@@ -34,6 +34,70 @@ import './Results.css'
 // mounting 5269 cards up front to ~150.
 const SONG_BATCH_SIZE = 150
 
+// Shared by every note rendered in the Songs panel (related_notes,
+// searched_quality_note, the inversion/quality fallback notes) -- splits on
+// backtick pairs and gives odd-indexed (chord-name) segments the existing
+// `.readout` treatment, same convention already used for related_notes.
+function renderBacktickedText(text) {
+  return text.split('`').map((part, j) =>
+    j % 2 === 1 ? (
+      <span className="readout" key={j}>{part}</span>
+    ) : (
+      part
+    )
+  )
+}
+
+// Phase 5 Part 1/6 follow-up (real screenshot review): the Songs panel can
+// show up to 2 kinds of note --
+//   STRUCTURAL (inversion_fallback_used, quality_fallback_used) -- tell the
+//     user what they're actually looking at, stay as visible banners.
+//   EDUCATIONAL (searched_quality_note, related_notes) -- explain WHY, not
+//     WHAT -- moved behind a single collapsed-by-default toggle so they
+//     don't stack as 2-3 bordered boxes above every result that has either.
+// Built once per songs.data response, not inline in JSX, since both the
+// toggle label and the expanded content need the same derived list.
+function buildEducationalNotes(songsData) {
+  const notes = []
+  if (songsData.searched_quality_note) {
+    notes.push({
+      kind: 'equivalence',
+      labelChord: songsData.primary_chord,
+      full: songsData.searched_quality_note,
+      short: `\`${songsData.query}\` = \`${songsData.primary_chord}\` (same notes, different name)`,
+    })
+  }
+  for (const note of songsData.related_notes || []) {
+    notes.push({
+      kind: 'related',
+      labelChord: note.chord,
+      full: note.text,
+      // Phase 5 Part 1/6 stale-chord-reference audit: this claims a note
+      // is "also shown here" alongside the chord actually below -- must
+      // reference resolved_primary_chord (post any inversion fallback),
+      // not primary_chord (frozen bass-inclusive, can go stale the same
+      // way songs.py's searched_quality_note did -- see that fix).
+      short: `\`${note.chord}\` also shown here -- same notes as \`${songsData.resolved_primary_chord}\`, just missing a tone or two`,
+    })
+  }
+  return notes
+}
+
+// "Why Eaug7?" (equivalence only) / "Why E7b13 songs too?" (related only) /
+// a combined form when both kinds are present -- always names the actual
+// chord/quality involved rather than a generic "why these results?".
+function educationalToggleLabel(educationalNotes) {
+  const equiv = educationalNotes.find((n) => n.kind === 'equivalence')
+  const related = educationalNotes.filter((n) => n.kind === 'related')
+
+  const relatedPhrase = related.length > 0 ? `${related.map((n) => n.labelChord).join(' & ')} songs too` : null
+
+  if (equiv && relatedPhrase) return `Why ${equiv.labelChord} & ${relatedPhrase}?`
+  if (equiv) return `Why ${equiv.labelChord}?`
+  if (relatedPhrase) return `Why ${relatedPhrase}?`
+  return null
+}
+
 function HandednessToggle() {
   const { leftHanded, toggleHandedness } = useFretboardPrefs()
   return (
@@ -58,11 +122,13 @@ function Results() {
   const [rootAliases, setRootAliases] = useState(null) // null = not loaded yet
   const [expandedVoicing, setExpandedVoicing] = useState(null) // Phase 3 Part 5/6 click-to-expand
   const [visibleSongCount, setVisibleSongCount] = useState(SONG_BATCH_SIZE) // Phase 4 follow-up: incremental song-list render
+  const [showEducationalNotes, setShowEducationalNotes] = useState(false) // Phase 5 Part 1/6 follow-up: collapsed by default
 
   useEffect(() => {
     setVoicings(null)
     setSongs(null)
     setVisibleSongCount(SONG_BATCH_SIZE)
+    setShowEducationalNotes(false)
     getVoicings(chordName).then(setVoicings)
     getSongs(chordName).then(setSongs)
   }, [chordName])
@@ -207,28 +273,100 @@ function Results() {
           <h2>Songs</h2>
           {songs === null && <p className="status-text">Loading songs...</p>}
           {songs && !songs.ok && <p className="status-text status-text--error">{songs.data.error}</p>}
-          {songs && songs.ok && songs.data.related_notes?.length > 0 && (
+          {/* Phase 5 Part 1/6 follow-up: makes an inversion fallback
+              explicit instead of silently showing root-position songs as
+              if they matched the searched inversion (Dump Notes: "Fall
+              back clearness") -- STRUCTURAL, stays a visible banner. */}
+          {songs && songs.ok && songs.data.inversion_fallback_used && (
             <div className="related-notes">
-              {songs.data.related_notes.map((note, i) => (
-                <p className="related-note" key={i}>
-                  {note.text.split('`').map((part, j) =>
-                    j % 2 === 1 ? (
-                      <span className="readout" key={j}>{part}</span>
-                    ) : (
-                      part
-                    )
-                  )}
-                </p>
-              ))}
+              <p className="related-note">
+                {renderBacktickedText(
+                  `No songs are tagged with the exact inversion \`${songs.data.primary_chord}\`. ` +
+                    `Showing songs for the root-position chord \`${songs.data.root_position_chord}\` instead.`
+                )}
+              </p>
             </div>
           )}
-          {songs && songs.ok && (
+          {songs && songs.ok && (() => {
+            // EDUCATIONAL notes (searched_quality_note + related_notes) --
+            // explain WHY these results look the way they do, not WHAT the
+            // user is looking at, so they sit behind a collapsed-by-default
+            // toggle rather than stacking as more banners (real screenshot
+            // feedback: up to 3 bordered boxes above the song list at once).
+            const educationalNotes = buildEducationalNotes(songs.data)
+            if (educationalNotes.length === 0) return null
+            const label = educationalToggleLabel(educationalNotes)
+            return (
+              <div className="educational-notes-wrap">
+                <button
+                  type="button"
+                  className="educational-notes__toggle"
+                  aria-expanded={showEducationalNotes}
+                  onClick={() => setShowEducationalNotes((v) => !v)}
+                >
+                  <span className="educational-notes__caret">{showEducationalNotes ? '▾' : '▸'}</span> {label}
+                </button>
+                {showEducationalNotes && (
+                  <div className="related-notes educational-notes">
+                    {educationalNotes.length === 1 ? (
+                      <p className="related-note">{renderBacktickedText(educationalNotes[0].full)}</p>
+                    ) : (
+                      <ul className="educational-notes__list">
+                        {educationalNotes.map((note, i) => (
+                          <li className="educational-notes__item" key={i}>
+                            {renderBacktickedText(note.short)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+          {songs && songs.ok && songs.data.total_songs > 0 && (
             <ul className="song-list" ref={songListRef}>
               {visibleSongs.map(({ key, song, spelling }) => (
                 <SongCard key={key} song={song} spelling={spelling} />
               ))}
               {hasMoreSongs && <li ref={songSentinelRef} className="song-list__sentinel" aria-hidden="true" />}
             </ul>
+          )}
+          {/* Phase 5 Part 1/6: genuine-no-songs fallback (Dump Notes: "If
+              genuine no songs exist") -- kept visually/structurally
+              separate from the real song list above, since these songs are
+              for a DIFFERENT root, only sharing the same chord quality
+              (same fretted shape, different position). */}
+          {songs && songs.ok && songs.data.quality_fallback_used && (
+            <div className="related-notes">
+              <p className="related-note">
+                {renderBacktickedText(
+                  // Phase 5 Part 1/6 stale-chord-reference audit: by the
+                  // time this fires, an inversion fallback may have ALREADY
+                  // tried root-position and also found zero -- naming
+                  // primary_chord (frozen, bass-inclusive) here would claim
+                  // "exactly X" for a spelling the inversion banner above
+                  // already said wasn't searched anymore. resolved_primary_chord
+                  // is whatever was actually, finally searched.
+                  `No songs found tagged exactly \`${songs.data.resolved_primary_chord}\`. Since a ` +
+                    `\`${songs.data.resolved_quality}\`-quality chord is the same shape ` +
+                    `wherever it's played, here are songs using that same quality on other roots:`
+                )}
+              </p>
+              {songs.data.quality_fallback_songs.map((entry) => (
+                <div key={entry.chord} className="quality-fallback-group">
+                  <h3 className="voicing-list__section">{entry.chord}</h3>
+                  <ul className="song-list">
+                    {entry.songs.slice(0, 5).map((song, i) => (
+                      <SongCard key={`${entry.chord}-${i}`} song={song} spelling={entry.chord} />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+          {songs && songs.ok && songs.data.total_songs === 0 && !songs.data.quality_fallback_used && (
+            <p className="status-text">No songs found for this chord.</p>
           )}
         </div>
       </div>

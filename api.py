@@ -177,7 +177,12 @@ async def songs(chord_name: str):
     if "error" in result:
         result["error"] = f"{chord_name!r} parses fine but matches no known quality in the registry."
         return JSONResponse(status_code=404, content=result)
-    if result.get("total_songs", 0) == 0:
+    # Real bug fix (Phase 5 Part 1/6): total_songs==0 alone used to always
+    # mean a 404, but get_songs() can now populate quality_fallback_songs
+    # for that exact case -- same-quality songs on other roots, genuinely
+    # useful data, not "nothing found." Only 404 when there's truly nothing
+    # to show at all (no exact-root songs AND no quality fallback either).
+    if result.get("total_songs", 0) == 0 and not result.get("quality_fallback_used"):
         result["error"] = f"{chord_name!r} is a real chord, but no song data is available for it yet."
         return JSONResponse(status_code=404, content=result)
     return result

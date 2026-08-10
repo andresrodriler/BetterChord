@@ -416,4 +416,10 @@ def parse_chord(raw_token):
         "bass": bass,
         "quality": quality,
         "had_junk_chars": had_junk_chars,
+        # The literal, as-typed quality substring (e.g. "7#5"), before any
+        # alias/canonical-name resolution -- additive field, purely for
+        # callers that need to know what spelling the user actually typed
+        # vs. the canonical quality name it resolves to (see songs.py's
+        # resolve_query()/get_songs() "searched_quality" field).
+        "quality_blob": quality_blob,
     }

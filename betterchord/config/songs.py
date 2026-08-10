@@ -94,13 +94,30 @@ def _load(db_path, registry_path, guide_tone_path):
 
 
 def resolve_query(chord_query, intervalset_to_canonical):
-    """Parse a user's search string into (root, canonical_quality, bass)."""
+    """Parse a user's search string into (root, canonical_quality, bass,
+    quality_blob). `quality_blob` is the literal as-typed quality substring
+    (e.g. "7#5"), returned alongside the resolved canonical name (e.g.
+    "aug7") so callers can tell when a search used an alias/alternate
+    spelling for the same underlying quality -- see get_songs()'s
+    `searched_quality_note`."""
     parsed = cp.parse_chord(chord_query)
     if not parsed["parsed"]:
-        return None, None, None
+        return None, None, None, None
     full, required = compute_intervals(parsed["quality"])
     canonical_quality = intervalset_to_canonical.get(frozenset(full))
-    return parsed["root"], canonical_quality, parsed["bass"]
+    return parsed["root"], canonical_quality, parsed["bass"], parsed.get("quality_blob")
+
+
+def _quality_spelling_differs(quality_blob, canonical_quality):
+    """True when the user's literally-typed quality spelling isn't the
+    same string as the canonical quality name it resolved to (e.g. typing
+    "7#5", which resolves to canonical "aug7") -- paren-insensitive, since
+    format_chord() wraps bare-accidental qualities in parens purely for
+    round-trip parsing safety, not a real spelling difference."""
+    if not quality_blob or not canonical_quality:
+        return False
+    norm = lambda s: s.replace("(", "").replace(")", "").lower()
+    return norm(quality_blob) != norm(canonical_quality)
 
 
 def transpose_chord_down(chord_string, semitones, intervalset_to_canonical):
@@ -167,7 +184,7 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
 
     registry, guide_tones, intervalset_to_canonical = _load(db_path, registry_path, guide_tone_path)
 
-    root, canonical_quality, bass = resolve_query(chord_query, intervalset_to_canonical)
+    root, canonical_quality, bass, quality_blob = resolve_query(chord_query, intervalset_to_canonical)
     if root is None:
         return {"error": f"Could not parse {chord_query!r} as a chord."}
     if canonical_quality is None:
@@ -181,9 +198,7 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    results_by_quality = {}
-    for q in search_qualities:
-        target = cp.format_chord(root, q)
+    def _query_songs(target):
         cur.execute(
             "SELECT title, artist, normalized_unique_chords, spotify_track_id, "
             "album_image_url, artist_image_url, youtube_video_id, youtube_confidence, "
@@ -192,7 +207,9 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
             "FROM songs WHERE normalized_unique_chords LIKE ?",
             (f'%"{target}"%',)
         )
-        rows = cur.fetchall()
+        return cur.fetchall()
+
+    def _rows_to_songs(rows, target):
         songs_list = [
             {
                 "title": r[0],
@@ -227,22 +244,173 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
         # silently sorting alongside/above real low-vote songs as if it
         # were itself a legitimate 0.
         songs_list.sort(key=lambda s: s["ug_votes"] if s["ug_votes"] is not None else -1, reverse=True)
-        results_by_quality[target] = songs_list
+        return songs_list
+
+    # Real bug fix: resolve_query() correctly parses out a slash chord's
+    # bass note, but the search itself previously never used it -- "C/E"
+    # silently searched the db for plain "C" the whole time, even though
+    # normalized_unique_chords really does store bass-inclusive tokens like
+    # "C13/E". Only the PRIMARY quality (search_qualities[0], i.e.
+    # canonical_quality itself) gets bass-aware search -- related/guide-tone
+    # qualities keep searching bass-less, that's a separate concern.
+    inversion_fallback_used = False
+    # The chord spelling actually resolved/searched for the PRIMARY quality,
+    # post any inversion fallback -- i.e. exactly the key used for it in
+    # results_by_quality below. This is the single source of truth for "what
+    # is actually being shown", and every note that claims to describe what's
+    # displayed must reference THIS, not the pre-fallback `primary_chord`
+    # (bass-inclusive, frozen at the top of this function) -- see the
+    # stale-chord-reference audit in the searched_quality_note/
+    # quality_fallback note construction below.
+    resolved_primary_chord = None
+    # Per-related-quality song count, so related_notes (built below) can
+    # skip claiming "songs tagged X are also shown here" for a related
+    # quality that genuinely has zero songs for this root -- same class of
+    # staleness bug as the primary-chord one above, just for the guide-tone
+    # note instead.
+    related_song_counts = {}
+
+    results_by_quality = {}
+    for q in search_qualities:
+        is_primary = (q == canonical_quality)
+
+        if is_primary and bass:
+            target = cp.format_chord(root, q, bass)
+            rows = _query_songs(target)
+            if not rows:
+                # No songs tagged with the exact inversion -- fall back to
+                # the bass-less (root-position) spelling for this quality,
+                # and flag it so callers/UI can make the fallback explicit
+                # rather than silently showing root-position songs as if
+                # they matched the inversion.
+                inversion_fallback_used = True
+                target = cp.format_chord(root, q)
+                rows = _query_songs(target)
+        else:
+            target = cp.format_chord(root, q)
+            rows = _query_songs(target)
+
+        results_by_quality[target] = _rows_to_songs(rows, target)
+        if is_primary:
+            resolved_primary_chord = target
+        else:
+            related_song_counts[q] = len(rows)
+
+    total_songs = sum(len(v) for v in results_by_quality.values())
+
+    # Genuine-no-songs fallback: if NOTHING was found for this root at all
+    # (not even via fuzzy guide-tone relatives), fall back to searching for
+    # the same quality on OTHER roots -- a song in a different key using
+    # the identical quality is still the same fretted shape (just moved),
+    # which is real, useful information rather than a plain "no songs"
+    # dead end. Kept in a clearly separate field (never merged into
+    # results_by_spelling) so the UI can't present these as if they matched
+    # the searched root (Dump Notes: "If genuine no songs exist").
+    quality_fallback_used = False
+    quality_fallback_songs = []
+    if total_songs == 0:
+        for other_root in cp.CHROMATIC:
+            if other_root == root:
+                continue  # already searched above with zero results
+            other_target = cp.format_chord(other_root, canonical_quality)
+            other_rows = _query_songs(other_target)
+            if other_rows:
+                quality_fallback_songs.append({
+                    "root": other_root,
+                    "chord": other_target,
+                    "songs": _rows_to_songs(other_rows, other_target),
+                })
+        quality_fallback_used = bool(quality_fallback_songs)
 
     conn.close()
 
-    related_notes = [build_related_note(root, canonical_quality, rq, registry) for rq in related]
+    # Real, confirmed staleness bug (audit pass, Phase 5 Part 1/6 follow-up):
+    # a related_note used to be built unconditionally for every guide-tone
+    # relative, regardless of whether that related quality actually had any
+    # real songs for this root -- e.g. "F#-5" claims "Songs tagged `F#add#11`
+    # are also shown here" even when there are genuinely zero F#add#11 songs
+    # (confirmed via real data). Only build a note for a related quality that
+    # actually contributed real songs.
+    related_notes = [
+        build_related_note(root, canonical_quality, rq, registry)
+        for rq in related
+        if related_song_counts.get(rq, 0) > 0
+    ]
+
+    # Real, reported confusion (Dump Notes: "E7#5 investigate bug?"): a
+    # search like "E7#5" resolves to the registry's canonical quality name
+    # "aug7" -- so when THAT quality also has a guide-tone relative
+    # (E7b13), related_notes' text talks about "Eaug7"/"E7b13" without ever
+    # mentioning "E7#5", which is what the user actually typed/sees as the
+    # page title. This isn't a bug in the guide-tone grouping itself (aug7
+    # and 7b13 genuinely are interchangeable, same as the message says) --
+    # it's a missing explanation for the FIRST, separate substitution (typed
+    # spelling -> canonical quality name) that happens before guide-tone
+    # matching even runs. Surfaced here, mirroring the existing root-alias
+    # caption pattern (ManualSearch's enharmonicCaption/resultsEnharmonicCaption),
+    # so the UI can show "Searched as E7#5 -- shown here as Eaug7" ahead of
+    # the related_notes text, instead of leaving the reader to guess how
+    # the two are connected.
+    # Reworded per real screenshot feedback (Phase 5 Part 1/6 follow-up):
+    # the original wording ("BetterChord treats this as...") read like an
+    # app-specific convention rather than a music fact. Leads with the
+    # actual fact (two names, identical notes) and only secondarily
+    # mentions that's why one of them is what's shown.
+    #
+    # Real stale-chord-reference bug (audit pass, Phase 5 Part 1/6
+    # follow-up): the closing "so it's shown as X below" clause used to
+    # reference `canonical_chord` (bass-inclusive, e.g. "Eaug7/Bb")
+    # unconditionally -- but when an inversion fallback ALSO fired (no
+    # songs for the exact inversion), what's actually shown below is
+    # `resolved_primary_chord` (root-position "Eaug7"), not the
+    # bass-inclusive spelling. The middle "that's the same chord as X"
+    # clause is left referencing `canonical_chord` on purpose -- that's a
+    # pure naming-equivalence fact (independent of whether songs exist for
+    # either spelling) and stays true with the bass attached either way;
+    # only the "what's actually below" claim needs the resolved chord.
+    searched_quality_note = None
+    if _quality_spelling_differs(quality_blob, canonical_quality):
+        canonical_chord = cp.format_chord(root, canonical_quality, bass)
+        searched_quality_note = (
+            f"You searched `{chord_query}` -- that's the same chord as "
+            f"`{canonical_chord}` (identical notes, just a different name), "
+            f"so it's shown as `{resolved_primary_chord}` below."
+        )
 
     return {
         "query": chord_query,
         "resolved_root": root,
         "resolved_quality": canonical_quality,
-        "primary_chord": cp.format_chord(root, canonical_quality),
+        "primary_chord": cp.format_chord(root, canonical_quality, bass),
+        # Always the bass-less/root-position spelling, regardless of
+        # whether an inversion was searched -- exposed so the UI can name
+        # exactly what a fallback landed on (see inversion_fallback_used)
+        # without re-deriving it client-side.
+        "root_position_chord": cp.format_chord(root, canonical_quality),
+        # The chord spelling ACTUALLY searched/shown for the primary
+        # quality, post any inversion fallback -- equals `primary_chord`
+        # when no fallback was needed, `root_position_chord` when it was.
+        # Single source of truth for "what's actually below" (Phase 5
+        # Part 1/6 stale-chord-reference audit) -- use this, not
+        # `primary_chord`, whenever a note needs to name what's displayed.
+        "resolved_primary_chord": resolved_primary_chord,
+        "searched_quality_note": searched_quality_note,
         "mode": "strict" if strict else "fuzzy",
         "related_qualities_included": related,
         "related_notes": related_notes,
         "results_by_spelling": results_by_quality,
-        "total_songs": sum(len(v) for v in results_by_quality.values()),
+        "total_songs": total_songs,
+        # True only when the query had a bass note AND no songs were tagged
+        # with the exact bass-inclusive spelling, so the primary quality's
+        # results silently fell back to root-position songs. Lets the UI
+        # make that fallback explicit instead of implying an inversion
+        # match that isn't real (Dump Notes: "Fall back clearness").
+        "inversion_fallback_used": inversion_fallback_used,
+        # True only when total_songs is 0 even after strict/fuzzy matching
+        # -- see quality_fallback_songs for same-quality songs on other
+        # roots (Dump Notes: "If genuine no songs exist").
+        "quality_fallback_used": quality_fallback_used,
+        "quality_fallback_songs": quality_fallback_songs,
     }
 
 
