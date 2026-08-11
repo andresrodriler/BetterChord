@@ -44,12 +44,45 @@ def article_for(root):
     return "an" if root in VOWEL_SOUND_ROOTS else "a"
 
 
-def build_related_note(root, primary_quality, related_quality, registry):
-    """Builds the beginner-friendly explanation for why `related_quality`'s
-    songs are being shown alongside a search for `primary_quality`. Always
-    explains from the bigger (superset) chord toward the smaller (subset)
-    chord, regardless of which one the user actually searched for, since
-    that's the direction the "commonly omits X" framing is factually true in."""
+def build_related_note(root, primary_quality, related_quality, registry, bass=None, has_songs=True):
+    """Builds the beginner-friendly explanation for why `related_quality`
+    overlaps with a search for `primary_quality`. Always explains from the
+    bigger (superset) chord toward the smaller (subset) chord, regardless of
+    which one the user actually searched for, since that's the direction the
+    "commonly omits X" framing is factually true in.
+
+    Phase 5 Part 2/7 style pass: reworded from 4 sentences down to 1 and
+    reordered to cause-before-effect (NOTE_STYLE_GUIDE.md's ordering rule
+    for EDUCATIONAL notes -- this one explains WHY, so the reason leads and
+    the "also shown here" fact follows, not the reverse). Previously led
+    with the effect ("Songs tagged X are also shown here.") and only
+    explained why over the following 3 sentences -- same information, now
+    one sentence, reason first. Terminology: "same notes" (plural, with an
+    explicit "missing a tone" qualifier), reserved specifically for this
+    subset relationship -- never "same chord", which is reserved for a true
+    full-equivalence note (see searched_quality_note below).
+
+    `bass` (Phase 5 Part 2/7 closing round, Task 2 -- bass-display fix):
+    DISPLAY-ONLY. Included in the chord strings this function builds for
+    `text`/`chord`/`emphasize`, so a combined root+bass+quality search (e.g.
+    `G#7#5/D`) shows the bass consistently in BOTH Similar Chords entries --
+    previously the synonym entry (built from /chord-info, always
+    bass-inclusive) and this overlap entry (bass-less) disagreed with no
+    explanation, a real, confirmed inconsistency. This does NOT touch what
+    actually gets searched for songs -- get_songs()'s own overlap-relative
+    search stays deliberately bass-less (guide-tone relatives are never
+    searched bass-inclusive, a separate, already-documented design decision
+    unrelated to this fix) -- only what the NOTE calls the chord changes,
+    never what got looked up.
+
+    `has_songs` (Task 3 -- theory/songs decoupling): whether real song data
+    actually backs this relationship for this root. The theory sentence (the
+    bigger chord's extra tone is commonly left out...) is a standing music
+    fact, true regardless of whether any song happens to be tagged with the
+    result -- so it's always included. The trailing "-- so songs tagged X
+    are shown here too" clause is the only conditional part, appended only
+    when `has_songs` is True; when False, the sentence ends after the theory
+    fact instead of implying song data that isn't there."""
     primary_full = set(registry[primary_quality]["interval_set"])
     related_full = set(registry[related_quality]["interval_set"])
 
@@ -58,29 +91,28 @@ def build_related_note(root, primary_quality, related_quality, registry):
     else:
         bigger_q, smaller_q = related_quality, primary_quality
 
-    bigger_chord = cp.format_chord(root, bigger_q)
-    smaller_chord = cp.format_chord(root, smaller_q)
-    related_chord = cp.format_chord(root, related_quality)
+    bigger_chord = cp.format_chord(root, bigger_q, bass)
+    smaller_chord = cp.format_chord(root, smaller_q, bass)
+    related_chord = cp.format_chord(root, related_quality, bass)
 
     extra = sorted(set(registry[bigger_q]["interval_set"]) - set(registry[smaller_q]["interval_set"]))
     names = [INTERVAL_NAMES.get(i, f"interval {i}") for i in extra]
     phrase = names[0] if len(names) == 1 else " and ".join(names)
     is_are = "is" if len(names) == 1 else "are"
-    it_them = "it" if len(names) == 1 else "them"
 
-    text = (
-        f"Songs tagged `{related_chord}` are also shown here. "
+    theory = (
         f"{article_for(root).capitalize()} `{bigger_chord}` chord's {phrase} "
-        f"{is_are} commonly left out by guitarists. "
-        f"Without {it_them}, it's the same notes as `{smaller_chord}`. "
-        f"Thus, both are often interchangeable."
+        f"{is_are} commonly left out by guitarists, leaving the same notes as "
+        f"`{smaller_chord}`"
     )
+    text = f"{theory} -- so songs tagged `{related_chord}` are shown here too." if has_songs else f"{theory}."
 
     return {
         "quality": related_quality,
         "chord": related_chord,
         "text": text,
         "emphasize": [bigger_chord, smaller_chord],
+        "has_songs": has_songs,
     }
 
 
@@ -118,6 +150,41 @@ def _quality_spelling_differs(quality_blob, canonical_quality):
         return False
     norm = lambda s: s.replace("(", "").replace(")", "").lower()
     return norm(quality_blob) != norm(canonical_quality)
+
+
+def _ambiguity_note(quality_blob):
+    """Phase 5 Part 2/7 follow-up (Task 4): a genuinely AMBIGUOUS shorthand
+    the raw search used, that chord_parser.py had to default -- e.g. bare
+    "sus" (no explicit "2"/"4") always resolves to sus4. Must run against
+    the RAW, as-typed `quality_blob` from THIS search specifically --
+    unlike the alt-spelling facts exposed via /chord-info, which describe
+    the resolved chord itself and are path-independent, this is only ever
+    knowable at search time (by the time a chord reaches /chord-info, it's
+    already fully canonical -- "sus" would already read "sus4" -- so that
+    endpoint structurally can't detect this after the fact; confirmed by
+    tracing the data flow before picking where to compute this).
+
+    Real, confirmed-by-testing finding, not assumed: this does NOT reuse
+    WORD_ALIASES' `\\bsus\\b(?!\\d)` entry -- that only fires for a bare
+    standalone "sus" search (e.g. "Csus") where a real word boundary
+    exists before "sus". A compound blob like "maj7sus" has no boundary
+    between the digit "7" and "s", so WORD_ALIASES never matches it at
+    all -- tested directly against real parser output before picking a
+    mechanism, not assumed from the table's own comment. The actual
+    resolution for compound blobs happens entirely inside
+    parse_quality()'s alteration-scanning loop, via `ALT_PATTERN`'s own
+    bare `sus` alternative -- reusing THAT pattern (hoisted to module
+    level specifically for this) covers both cases correctly, one
+    mechanism instead of two hand-picked ones that could drift apart.
+    Names the ambiguous TOKEN itself (e.g. "sus"), not the whole quality
+    blob (e.g. "maj7sus"), so the note stays short and points at exactly
+    the part that was ambiguous."""
+    if not quality_blob:
+        return None
+    for match in cp.ALT_PATTERN.finditer(quality_blob):
+        if match.group(0) == "sus":
+            return f"`{match.group(0)}` was interpreted as `sus4`."
+    return None
 
 
 def transpose_chord_down(chord_string, semitones, intervalset_to_canonical):
@@ -326,15 +393,27 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
 
     # Real, confirmed staleness bug (audit pass, Phase 5 Part 1/6 follow-up):
     # a related_note used to be built unconditionally for every guide-tone
-    # relative, regardless of whether that related quality actually had any
-    # real songs for this root -- e.g. "F#-5" claims "Songs tagged `F#add#11`
-    # are also shown here" even when there are genuinely zero F#add#11 songs
-    # (confirmed via real data). Only build a note for a related quality that
-    # actually contributed real songs.
+    # relative regardless of real song backing -- e.g. "F#-5" claimed "Songs
+    # tagged `F#add#11` are also shown here" even when there were genuinely
+    # zero F#add#11 songs. Fixed AT THE TIME by only building a note when
+    # `related_song_counts.get(rq, 0) > 0` -- but that fix went too far: it
+    # suppressed the entire THEORY explanation too, not just the songs
+    # claim, so a real, always-true overlap relationship (the guide-tone
+    # grouping itself, independent of any particular root's song data)
+    # silently disappeared whenever a root's related quality had zero songs.
+    # Chord-theory content must never be gated by song-data availability --
+    # split (Phase 5 Part 2/7 closing round, Task 3): a note is now built for
+    # EVERY real overlap relationship in `related` (the registry/guide-tone
+    # fact, not song-dependent), with `has_songs` telling build_related_note
+    # whether to append the conditional songs clause. Verified against a
+    # real zero-song case (root G, canonical quality "11", related "7add11"
+    # -- G7add11 has genuinely zero literal songs of its own): the theory
+    # sentence still renders, just without the trailing songs clause.
     related_notes = [
-        build_related_note(root, canonical_quality, rq, registry)
+        build_related_note(
+            root, canonical_quality, rq, registry, bass=bass, has_songs=related_song_counts.get(rq, 0) > 0
+        )
         for rq in related
-        if related_song_counts.get(rq, 0) > 0
     ]
 
     # Real, reported confusion (Dump Notes: "E7#5 investigate bug?"): a
@@ -368,13 +447,20 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
     # pure naming-equivalence fact (independent of whether songs exist for
     # either spelling) and stays true with the bass attached either way;
     # only the "what's actually below" claim needs the resolved chord.
+    # Phase 5 Part 2/7 style pass: unified on the fixed "shown here as X"
+    # idiom (was "so it's shown as X below" -- the "below" was redundant
+    # once every other family says "here", and this is the only family that
+    # didn't) and dropped one of the two dashes for readability (comma
+    # clause, then a single em-dash-equivalent " -- " before the effect).
+    # Cause-before-effect ordering (the equivalence fact, then what it
+    # caused) is unchanged -- this family already matched the rule.
     searched_quality_note = None
     if _quality_spelling_differs(quality_blob, canonical_quality):
         canonical_chord = cp.format_chord(root, canonical_quality, bass)
         searched_quality_note = (
-            f"You searched `{chord_query}` -- that's the same chord as "
-            f"`{canonical_chord}` (identical notes, just a different name), "
-            f"so it's shown as `{resolved_primary_chord}` below."
+            f"You searched `{chord_query}`, which is the same chord as "
+            f"`{canonical_chord}` (identical notes, just a different name) -- "
+            f"shown here as `{resolved_primary_chord}`."
         )
 
     return {
@@ -395,6 +481,10 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
         # `primary_chord`, whenever a note needs to name what's displayed.
         "resolved_primary_chord": resolved_primary_chord,
         "searched_quality_note": searched_quality_note,
+        # Task 4 (Phase 5 Part 2/7 follow-up): see _ambiguity_note()'s own
+        # docstring for why this has to be computed here (from the raw,
+        # as-searched quality_blob) rather than at /chord-info.
+        "ambiguity_note": _ambiguity_note(quality_blob),
         "mode": "strict" if strict else "fuzzy",
         "related_qualities_included": related,
         "related_notes": related_notes,

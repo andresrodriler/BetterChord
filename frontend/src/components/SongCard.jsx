@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import ChordName from './ChordName'
 import { useAlbumThumb } from '../lib/useAlbumThumb'
 import './SongCard.css'
 
@@ -111,11 +112,17 @@ function SongCard({ song, spelling }) {
               empty note. */}
           {(capoShape || rawChord) && (
             <p className="song-card__why-differs">
+              {/* Cause-before-effect (NOTE_STYLE_GUIDE.md): the capo fact
+                  leads, "shown here as X" follows -- same idiom as every
+                  other note family that renames a single result. Uses the
+                  shared ChordName atom (Phase 5 Part 2/7) instead of a
+                  hand-rolled span -- same visual result as before, one
+                  fewer place the readout treatment could drift. */}
               {capoShape && (
-                <>Capo on fret {ugCapo} -- shown here as <span className="readout">{spelling}</span>, played as the <span className="readout">{capoShape}</span> shape. </>
+                <>Capo on fret {ugCapo} -- shown here as <ChordName>{spelling}</ChordName>, played as the <ChordName>{capoShape}</ChordName> shape. </>
               )}
               {rawChord && (
-                <>UG tags this chord as <span className="readout">{rawChord}</span>.</>
+                <>UG tags <ChordName>{spelling}</ChordName> as <ChordName>{rawChord}</ChordName>.</>
               )}
             </p>
           )}

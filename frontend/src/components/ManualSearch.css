@@ -58,6 +58,14 @@
   cursor: default;
 }
 
+/* Phase 5 Part 2/7: chord names in this caption now get the same .readout
+   treatment every other note family uses -- matches .related-note .readout's
+   pattern of pinning the nested readout's font-size to its own container's,
+   rather than inheriting .readout's unset default. */
+.manual-search__enharmonic-note .readout {
+  font-size: 12px;
+}
+
 .manual-search__suggestions {
   margin: 0;
   padding: 4px;

@@ -3,6 +3,7 @@
 #
 # Imports QUALITY_INTERVALS and CHROMATIC from music_theory.py to avoid duplicating the interval definitions that already live there.
 
+import re
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
@@ -246,10 +247,10 @@ QUALITY_DESCRIPTIONS = {
     "9sus4":    "Nine suspended four — floating, unresolved. Common in modern production.",
     "7b9":      "Seven flat-nine — dark, Spanish-flavored tension. Flamenco and jazz.",
     "7#9":      "Seven sharp-nine — the 'Hendrix chord.' Rock and funk staple.",
-    "7(b5,b9)": "Altered dominant — maximum tension, multiple chromatic alterations.",
-    "7(b5,#9)": "Altered dominant — tritone and sharp-nine clash. Very tense.",
-    "7(#5,b9)": "Altered dominant — augmented fifth meets flat-nine. Film score tension.",
-    "7(#5,#9)": "Altered dominant — augmented fifth meets sharp-nine. Full alteration.",
+    "7b5b9":    "Altered dominant — maximum tension, multiple chromatic alterations.",
+    "7b5#9":    "Altered dominant — tritone and sharp-nine clash. Very tense.",
+    "7#5b9":    "Altered dominant — augmented fifth meets flat-nine. Film score tension.",
+    "7#5#9":    "Altered dominant — augmented fifth meets sharp-nine. Full alteration.",
     "maj11":    "Major eleventh — lush and orchestral. Rare on guitar.",
     "m11":      "Minor eleventh — Dorian mode in a chord. Modal jazz sound.",
     "7#11":     "Dominant seven sharp-eleven — Lydian dominant. Bright, tense, and modern.",
@@ -267,6 +268,56 @@ QUALITY_DESCRIPTIONS = {
     "13b9":     "Thirteen flat-nine — Spanish/Phrygian dominant flavor. Dark and rich.",
     "13#9":     "Thirteen sharp-nine — Hendrix-adjacent, fully extended. Funky and tense.",
     "13b9#11":  "Thirteen flat-nine sharp-eleven — the most altered dominant possible.",
+
+    # Phase 5 Part 2/7 follow-up audit (see frontend/CHORD_INFO_AUDIT.md):
+    # 39 real registry qualities had no entry here at all -- 4 of those were
+    # actually already "covered" above under a dead parenthesized key
+    # (e.g. "7(#5,#9)") that no real chord string is ever spelled as; those
+    # were respelled in place to their real registry keys just above. These
+    # are the remaining 35, written from each quality's real interval
+    # content (checked directly against music_theory.QUALITY_INTERVALS/the
+    # registry, not guessed from the name alone). 6 of the original 39
+    # (7b9b13, dim7b13, m7b13, m7no5, susb9, plus 7#5 which isn't even a
+    # registry quality) still can't actually be returned by
+    # get_chord_info() today -- it bails before reaching this dict, since
+    # music_theory.QUALITY_INTERVALS doesn't define their intervals at all.
+    # Described anyway so the text is ready once that deeper gap is closed;
+    # see the audit doc for why that fix is out of this pass's scope.
+    "#9":         "Sharp-nine add — a major triad clashing against its own sharp ninth (the Hendrix-chord color), no seventh.",
+    "11":         "Dominant eleventh — the full 9-11-b7 stack with the third left in, an unusually dense, clashing voicing.",
+    "6add11":     "Sixth chord with an added eleventh — colors the mellow 6th sound with a fourth-degree tension.",
+    "6sus2":      "Suspended-second sixth — open and ambiguous, combining the 6th's warmth with sus2's missing third.",
+    "6sus4":      "Suspended-fourth sixth — combines sus4's unresolved pull with the 6th's mellow color.",
+    "7add11":     "Dominant seventh with an added eleventh (no ninth) — a bluesy seventh colored by the fourth-degree tension.",
+    "7add13":     "Dominant seventh with an added thirteenth (no ninth/eleventh) — the guide-tone partner of a full dominant 13, voiced leaner.",
+    "7b13":       "Dominant seventh with a flat thirteenth — the guide-tone partner of an augmented seventh (aug7), spelled by the extended-chord convention instead of the altered-triad one.",
+    "7b9b13":     "Altered dominant with a flat ninth and flat thirteenth — dark, Spanish/Phrygian-tinged tension stacked on the dominant seventh.",
+    "9#11":       "Dominant nine sharp-eleven — Lydian-dominant color with the ninth added, bright and modern.",
+    "9add13":     "Dominant nine with an added thirteenth (no eleventh) — the guide-tone partner of a full dominant 13 chord.",
+    "9b13":       "Dominant nine flat-thirteen — the ninth's color stacked on a dark, altered flat-thirteen.",
+    "add#11":     "Major triad with an added sharp eleventh — a bright Lydian color with no seventh at all.",
+    "add4add9":   "Major triad with both a ninth and a fourth added — a dense, open cluster color, no seventh.",
+    "add9#11":    "Major triad with an added ninth and sharp eleventh — bright Lydian shimmer without a seventh.",
+    "addb13":     "Major triad with an added flat thirteenth — a major chord colored by a dark, out-of-key sixth-degree tension.",
+    "b9":         "Major triad with an added flat ninth (no seventh) — a jarring, dissonant splash rarely used outside modern/experimental voicings.",
+    "dim7b13":    "Diminished triad with an added flat thirteenth — an unusual, highly dissonant tension chord, rare in real voicings.",
+    "m7add11":    "Minor seventh with an added eleventh (no ninth) — a leaner version of a full minor eleventh chord.",
+    "m7add13":    "Minor seventh with an added thirteenth (no ninth/eleventh) — the guide-tone partner of a full minor 13 chord.",
+    "m7b13":      "Minor seventh with a flat thirteenth — an unusual altered color rarely seen outside advanced jazz voicings.",
+    "m7no5":      "Minor seventh with the fifth omitted — a lean three-note voicing built purely from the minor seventh's guide tones.",
+    "m9#5":       "Minor nine sharp-five — a rare, chromatic minor chord blending the ninth's color with an augmented fifth.",
+    "maj7#9":     "Major seventh sharp-nine — an unusual, dense pairing of the major seventh's sophistication with the sharp ninth's bite.",
+    "maj7add11":  "Major seventh with an added eleventh (no ninth) — colors the smooth major-seventh sound with a fourth-degree tension.",
+    "maj7add13":  "Major seventh with an added thirteenth (no ninth/eleventh) — the guide-tone partner of a full major 13 chord.",
+    "maj7sus2":   "Major seventh suspended second — replaces the third with the ninth, open and modern.",
+    "maj7sus4":   "Major seventh suspended fourth — the smooth major-seventh color left hanging on an unresolved fourth.",
+    "maj9add13":  "Major nine with an added thirteenth (no eleventh) — the guide-tone partner of a full major 13 chord.",
+    "mb6":        "Minor flat-six triad — a minor chord colored by a lowered sixth degree, a classic melodic-minor-scale sound.",
+    "mb9":        "Minor flat-nine — a rare, dissonant minor triad clashing against a flat ninth.",
+    "mmaj13":     "Minor-major thirteenth — the fullest extension of the minor-major seventh sound, cinematic and complex.",
+    "sus2add#11": "Suspended second with an added sharp eleventh — open, Lydian-tinged ambiguity with no third at all.",
+    "susb9":      "Suspended fourth with a flat ninth — an unusual, dissonant suspended color.",
+    "7no3":       "Dominant seventh with the third omitted — an ambiguous, power-chord-like voicing built from just the root, fifth, and flat seventh.",
 }
 
 
@@ -361,6 +412,136 @@ def get_related_chords(root_name, quality, root_idx):
         related["Simpler version"] = root_name
 
     return related
+
+
+# ---------------------------------------------------------------------------
+# Quality-synonym "why" explanations (Phase 5 Part 2/7 follow-up, Task 3b)
+# ---------------------------------------------------------------------------
+# Investigated EVERY real quality-alt-spelling pair the registry actually
+# produces before writing any of this (36 total, via api.py's
+# _quality_alt_spellings() run against all 95 registry qualities) --
+# real findings, not assumed:
+#   - 4 pairs ("#9"/"(#9)", "b9"/"(b9)", "add#11"/"(add#11)", "7no3"/
+#     "7(no3)") are NOT real spelling differences at all -- identical once
+#     parens are stripped (format_chord() wraps bare-leading-accidental
+#     qualities in parens purely for round-trip parsing safety, per
+#     CLAUDE.md's core parser rule -- never a real alternate name).
+#   - 4 pairs are real, confirmed PARSER ARTIFACTS, not intentional
+#     notation: e.g. "C+7"/"Faddb6"/"GM#7" all resolve to a plain major
+#     triad only because their "+7"/"addb6"/"#7" tokens aren't in any
+#     alteration/add table this engine recognizes, so they're silently
+#     dropped rather than applied -- confirmed by inspecting each raw
+#     parsed structure directly (parse_chord("C+7")["quality"] shows
+#     alterations={"+7"}, a token compute_intervals never acts on), not
+#     assumed from the resolved quality name alone. Similarly "F#m7-11"
+#     resolving to "7#9"'s interval set turned out to be an
+#     interval_calculator quirk around an unsupported "b11" alteration,
+#     not real "m7b11 == 7#9" notation.
+#   - 2 pairs ("13sus4"/"13sus", "6sus2"/"sus2add13") are excluded on
+#     purpose: "13sus" is the SAME bare-"sus"-defaults-to-sus4 ambiguity
+#     Task 4's `_ambiguity_note()` already owns (see songs.py) -- listing
+#     it here too as if it were a clean, symmetric "these mean the same
+#     thing" fact would contradict that mechanism's own framing (there's
+#     no real "sus4 is also called sus", it's shorthand that only ever
+#     meant one thing once resolved). "sus2add13" would need a genuinely
+#     different (word-reordering) explanation than any rule below
+#     produces cleanly, so it's left out rather than forced.
+#   - 1 pair ("m7"/"m7+9") is a real, subtle music-theory edge case, not
+#     an artifact: a `#9`/`+9` alteration collapses onto the SAME semitone
+#     an m7's own minor 3rd already occupies (enharmonically identical
+#     pitch classes), so the raw interval SET is technically unchanged --
+#     but a plain "m7" and an "m7#9" are still understood as two
+#     deliberately different chord choices in practice, not "the same
+#     chord, different name" the way aug7/7#5 genuinely are. Forcing a
+#     "why" here would overclaim a real synonymy that isn't really there.
+#
+# The 32 remaining pairs DO have a clean, honest one-line reason, and
+# fall into a small number of real, recurring PATTERNS (not one hardcoded
+# reason per pair) -- stored as structured data/rules here, applied by
+# api.py's /chord-info enrichment, so the frontend never hardcodes
+# per-instance strings (per the task's explicit instruction).
+
+_SYNONYM_REASON_TEXT = {
+    "aug_sharp5": "`aug` means a raised 5th, exactly what `#5` specifies",
+    "dim_flat5": "`dim` means a minor 3rd and flat 5th, exactly what `mb5` spells out",
+    "b6_sharp5": "`b6` and `#5` land on the same altered tone, just named from two different reference points",
+    "symbol": "`+`/`#` and `-`/`b` are two common symbols for the same alteration",
+    "octave": "the two numbers name the same pitch class an octave apart (e.g. a 9th and a 2nd, or a 13th and a 6th, are the same note)",
+    "shorthand": "the shorter name is shorthand for the longer one -- both add the identical extra tone",
+    "m_shorthand": "`M` is shorthand for `maj` -- both mean the same major-quality extension",
+}
+
+# A small, explicit set for relationships that are real but too specific
+# (or too few in number, 1-3 each) to generalize into a regex rule without
+# it becoming harder to verify than just listing them -- verified against
+# the real registry data above, not guessed.
+_EXPLICIT_SYNONYM_REASONS = {
+    ("aug", "+"): "aug_sharp5",
+    ("aug7", "7#5"): "aug_sharp5",
+    ("augmaj7", "maj7#5"): "aug_sharp5",
+    ("dim", "mb5"): "dim_flat5",
+    ("mb6", "m#5"): "b6_sharp5",
+    ("6", "add6"): "shorthand",
+    ("6", "add13"): "octave",
+    ("m6", "madd6"): "shorthand",
+    ("m6", "madd13"): "octave",
+    ("6/9", "6add9"): "shorthand",
+    ("m6/9", "m6add9"): "shorthand",
+    ("m9", "m7add9"): "shorthand",
+}
+
+# Octave-equivalent extension-number pairs (a 9th and a 2nd, an 11th and a
+# 4th, a 13th and a 6th, are literally the same pitch class) -- a real,
+# general rule, not a per-pair memorization, since it applies identically
+# regardless of what quality/prefix the "addN" is attached to.
+_OCTAVE_EQUIVALENT_DEGREES = [("9", "2"), ("11", "4"), ("13", "6")]
+
+
+def _strip_parens(s):
+    return s.replace("(", "").replace(")", "")
+
+
+def _octave_equivalent_add(a, b):
+    match_a = re.fullmatch(r"(.*add)(\d+)", a)
+    match_b = re.fullmatch(r"(.*add)(\d+)", b)
+    if not match_a or not match_b or match_a.group(1) != match_b.group(1):
+        return False
+    degrees = {match_a.group(2), match_b.group(2)}
+    return any(degrees == {x, y} for x, y in _OCTAVE_EQUIVALENT_DEGREES)
+
+
+def _symbol_variant(a, b):
+    """'+' <-> '#' and '-' <-> 'b' (the flat symbol, only immediately
+    before a digit -- never a root/bass letter) are two notation
+    traditions for the identical alteration."""
+
+    def normalize(s):
+        s = s.replace("#", "+")
+        return re.sub(r"b(?=\d)", "-", s)
+
+    return normalize(a) == normalize(b)
+
+
+def explain_quality_synonym(canonical_quality, alt_spelling):
+    """Returns a short, honest, beginner-friendly reason the two quality
+    spellings describe identical notes, or None when there ISN'T a clean
+    one-liner (a real parser artifact, an ambiguous-shorthand duplicate of
+    Task 4's own note, or a genuine music-theory edge case that would
+    overclaim a synonymy that isn't really there -- see the real
+    investigation notes above). None means: exclude this pair from
+    Similar Chords entirely, don't force an explanation onto it."""
+    c, a = _strip_parens(canonical_quality), _strip_parens(alt_spelling)
+    if c == a:
+        return None  # pure formatting difference, not a real alt spelling at all
+    if (c, a) in _EXPLICIT_SYNONYM_REASONS:
+        return _SYNONYM_REASON_TEXT[_EXPLICIT_SYNONYM_REASONS[(c, a)]]
+    if "maj" in c and a == c.replace("maj", "M"):
+        return _SYNONYM_REASON_TEXT["m_shorthand"]
+    if _octave_equivalent_add(c, a):
+        return _SYNONYM_REASON_TEXT["octave"]
+    if _symbol_variant(c, a):
+        return _SYNONYM_REASON_TEXT["symbol"]
+    return None
 
 
 # Main public function

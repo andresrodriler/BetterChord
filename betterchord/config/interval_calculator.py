@@ -120,7 +120,16 @@ def compute_intervals(q):
             full.discard(natural_iv); required.discard(natural_iv)
             full.add(new_iv); required.add(new_iv)
         else:
-            # unrecognized alteration token -- keep it visible rather than dropping silently
+            # Should be unreachable for any `q` produced by
+            # chord_parser.parse_quality() -- that function now validates
+            # alteration tokens against this exact ALTERATION_MAP before
+            # accepting one (Phase 5 Part 2/7 follow-up, Task 0), so an
+            # unrecognized token there fails parsing rather than reaching
+            # here. Kept as a defensive no-op (not a raise) for any other
+            # caller that might hand-construct a `q` dict directly -- but
+            # this is a silent drop, not "kept visible" (the token remains
+            # in q["alterations"] itself, it just never touches full/
+            # required here); a previous comment here claimed otherwise.
             pass
 
     # -- no3 / no5 --

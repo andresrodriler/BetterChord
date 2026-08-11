@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getChords } from '../lib/api'
-import { enharmonicCaption, normalizeRoot } from '../lib/chordAlias'
+import { enharmonicCaption, normalizeAliases } from '../lib/chordAlias'
+import { renderChordNote } from '../lib/renderChordNote'
 import './ManualSearch.css'
 
 const MAX_SUGGESTIONS = 8
@@ -11,7 +12,7 @@ const MAX_SUGGESTIONS = 8
 // first and, if it finds anything, pass 2 never runs.
 //
 // `query` is expected to already be root-alias-normalized (see
-// normalizeRoot in chordAlias.js) -- the matcher itself has no alias
+// normalizeAliases in chordAlias.js) -- the matcher itself has no alias
 // awareness, so an alias spelling like "D#" would otherwise silently
 // match nothing (the suggestion list only contains canonical spellings).
 function getSuggestions(query, chordList) {
@@ -92,8 +93,11 @@ function ManualSearch({ onSubmit }) {
     setValue(next)
     const trimmed = next.trim()
     // Normalize an alias root spelling (e.g. "D#" -> "Eb") BEFORE matching --
-    // the suggestion list only ever contains canonical spellings.
-    const norm = normalizeRoot(trimmed, rootAliases)
+    // the suggestion list only ever contains canonical spellings. (Bass
+    // aliases are also detected by normalizeAliases now, but the typing
+    // caption below intentionally only ever surfaces the root one -- see
+    // enharmonicCaption's comment.)
+    const norm = normalizeAliases(trimmed, rootAliases)
     setRootNorm(norm)
     const nextSuggestions = getSuggestions(norm.normalized, chordList)
     setSuggestions(nextSuggestions)
@@ -101,25 +105,36 @@ function ManualSearch({ onSubmit }) {
     setHighlightedIndex(-1)
   }
 
-  function goToChord(chordName, searchedAs) {
+  // `fromSuggestion` (Phase 5 Part 2/7 follow-up, Task 2): true whenever
+  // `chordName` came from a canonical suggestion (mouse click or
+  // arrow-key-select + Enter), false for a raw typed-then-submit value.
+  // Threaded into route state so Results.jsx's conditional "why" teaser
+  // can tell "the URL differs because of a genuine spelling substitution"
+  // (typed+submit) apart from "the URL differs because a dropdown pick
+  // completed a partial prefix" (e.g. typing "Cmaj" and clicking
+  // "Cmaj7") -- both leave `searchedAs` != the final chord, but only the
+  // former is a real substitution worth teasing.
+  function goToChord(chordName, searchedAs, fromSuggestion) {
     onSubmit?.()
     setIsOpen(false)
-    navigate(`/chord/${encodeURIComponent(chordName)}`, { state: { searchedAs } })
+    navigate(`/chord/${encodeURIComponent(chordName)}`, { state: { searchedAs, fromSuggestion } })
   }
 
   function handleSubmit(e) {
     e.preventDefault()
     if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
-      goToChord(suggestions[highlightedIndex].chord, value)
+      goToChord(suggestions[highlightedIndex].chord, value, true)
       return
     }
     const chord = value.trim()
     if (!chord) return
     // Typing a full chord and hitting Search without ever opening/selecting
     // the dropdown must still land on the same canonical chord as a
-    // suggestion click would -- normalize the root here too.
-    const { normalized } = normalizeRoot(chord, rootAliases)
-    goToChord(normalized, value)
+    // suggestion click would -- normalize root AND bass here (this
+    // follow-up: a real bug had this only normalizing the root, so a
+    // slash chord's bass note reached Results un-canonicalized).
+    const { normalized } = normalizeAliases(chord, rootAliases)
+    goToChord(normalized, value, false)
   }
 
   function handleKeyDown(e) {
@@ -163,7 +178,7 @@ function ManualSearch({ onSubmit }) {
           />
           {isOpen && (
             <div className="manual-search__suggestions-panel">
-              {rootNorm.changed && (
+              {rootNorm.root && (
                 // Pinned header row inside the same floating panel as the
                 // suggestions -- not a list option: no role="option", not
                 // part of arrow-key navigation (that only ever indexes into
@@ -176,11 +191,15 @@ function ManualSearch({ onSubmit }) {
                 // same gating (isOpen implies suggestions.length > 0) the
                 // caption is deliberately suppressed then too, not just
                 // when non-alias.
+                // Gated on `rootNorm.root` specifically, not the broader
+                // `rootNorm.changed` (this follow-up: normalizeAliases now
+                // also flags a bass-only change) -- this typing caption is
+                // deliberately root-only, see enharmonicCaption's comment.
                 <div
                   className="manual-search__enharmonic-note"
                   onMouseDown={(e) => e.preventDefault()}
                 >
-                  {enharmonicCaption(rootNorm.originalRoot, rootNorm.canonicalRoot)}
+                  {renderChordNote(enharmonicCaption(rootNorm.root.original, rootNorm.root.canonical))}
                 </div>
               )}
               <ul className="manual-search__suggestions" id="manual-search-listbox" role="listbox">
@@ -197,7 +216,7 @@ function ManualSearch({ onSubmit }) {
                       // mousedown (not click) fires before the input's blur, so
                       // the click-outside handler above doesn't close this first.
                       e.preventDefault()
-                      goToChord(s.chord, value)
+                      goToChord(s.chord, value, true)
                     }}
                     onMouseEnter={() => setHighlightedIndex(i)}
                   >

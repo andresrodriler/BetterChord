@@ -1,0 +1,151 @@
+/* Phase 5 Part 2/7 follow-up -- "Chord Overview" card, positioned above
+   the Voicings/Songs grid in Results.jsx. Layout/structure follow a real
+   HTML/CSS mockup (frontend/design-reference); colors/type/spacing are
+   the app's own real tokens (App.css/index.css), not the mockup's
+   placeholder palette -- reuses .section.panel for the outer "device
+   face" look, same as every other panel on this page. */
+.chord-overview {
+  margin-bottom: 24px;
+}
+
+.chord-overview__grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.15fr 0.8fr;
+  gap: 0;
+  @media (max-width: 780px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chord-overview__col {
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+  @media (max-width: 780px) {
+    padding: 0 0 18px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.chord-overview__col:first-child {
+  padding-left: 0;
+  @media (max-width: 780px) {
+    padding-top: 0;
+  }
+}
+
+.chord-overview__col:last-child {
+  border-right: none;
+  padding-right: 0;
+  @media (max-width: 780px) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.chord-overview__kicker {
+  margin-bottom: 10px;
+}
+
+.chord-overview__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+.chord-overview__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chord-overview__note {
+  min-width: 56px;
+  text-align: center;
+}
+
+.chord-overview__note small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+/* A solid-fill circle, same interval-color tokens the fretboard dots and
+   IntervalLegend swatches already use (getIntervalStyle, live in JS) --
+   never a second hardcoded palette. */
+.chord-overview__ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chord-overview__formula {
+  font-family: var(--heading);
+  font-size: 22px;
+  color: var(--parchment);
+}
+
+.chord-overview__bass-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.chord-overview__bass-note .readout {
+  font-size: 13px;
+}
+
+/* "Why this spelling" -- reuses .related-note verbatim (recessed well,
+   moss left border) for the box treatment, this class only adds the
+   bold-label + stacking spacing on top, not a new visual language. */
+.chord-overview__explain {
+  margin-top: 16px;
+}
+
+.chord-overview__grid + .chord-overview__explain {
+  margin-top: 20px;
+}
+
+.chord-overview__explain strong {
+  color: var(--parchment);
+  font-weight: 600;
+}
+
+/* Task 3 (Phase 5 Part 2/7 follow-up): "Similar Chords" -- a plain list,
+   deliberately NOT a bordered Songs-style banner like .related-note
+   above (explicit instruction: match the Overview's other facts, e.g.
+   "Notes in this chord"/"Interval formula", not a callout box).
+   Replaces the old "Overlapping chords" banner entirely. */
+.chord-overview__block {
+  margin-top: 20px;
+}
+
+.chord-overview__grid + .chord-overview__block,
+.chord-overview__explain + .chord-overview__block {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.chord-overview__similar-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}

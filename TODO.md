@@ -35,28 +35,32 @@
 - Wire the guide-tone explanation text into the actual UI (bold the two chord names, currently just returned as plain text + a list of what to bold) -- formally scoped as **Phase 3 Part 3/6**, see CLAUDE.md's Phase 3 entry, not started (This is now done with Phase 3 part 3/6)
 - Make the model even better, more data (biggest thing that can help), tweaking the model a bit, messing with CNN layers, etc.
 - No handling yet for denied mic permission (fails silently, no on-page feedback) or cleanup if a user navigates away mid-recording (mic stream could stay open) -- fine for the Phase 1 test page, worth real handling once Phase 2 builds the actual UI
-- **Surface `voicings.py`'s dormant `fallback`/`translated`/`displayed`/
-  `translated_from` fields, and `chord_info.py`'s dormant chord-info data
-  (interval breakdown, per-quality "feeling" description, related
-  chords), in the actual UI.** Both are real, already-computed, correct
-  data that never reaches the frontend today -- not a gap in the
-  backend, a gap in exposing it. `voicings.py`'s fields are returned by
-  `GET /voicings/{chord}` but zero frontend code references them
-  (confirmed via a full `frontend/src` grep). `chord_info.py`'s
-  `get_chord_info()` is only ever called from `main.py`'s
-  `identify_from_audio()` (feeds `/identify`'s `info` field for the
-  audio-ID path only), and `CaptureContext.jsx`'s `handleContinue()`
-  discards `result.info` entirely before navigating to Results -- there
-  is no endpoint at all exposing chord-info data for the manual-search
-  path. This substantially overlaps the "More in depth information on
-  outputted chord" / "chord info" Dump Notes items (the "feeling of
-  chord" ask is already answered by `QUALITY_DESCRIPTIONS`, e.g.
-  `"7": "Dominant seventh — tense, wants to resolve..."`). **Identified
-  during Phase 5 Part 2/7's Step 0 "extra notes" investigation** --
-  deliberately kept OUT of Part 2/7's own scope (that part only unifies
-  wording for already-VISIBLE notes; this is new UI for currently-
-  invisible data, a different-sized task) -- not yet scoped to any
-  phase. See CLAUDE.md's Phase 5 Part 2/7 entry for the full writeup.
+- ~~Surface `chord_info.py`'s dormant chord-info data (interval
+  breakdown, per-quality "feeling" description, related chords) in the
+  actual UI~~ -- **substantially done.** What started as a Phase 5 Part
+  2/7 Step 0 finding (real, already-computed data that never reached
+  the frontend -- no endpoint exposed it for manual search, and the one
+  path that did compute it discarded the result before navigating) grew
+  into that part's main body of work across several rounds: a new
+  `/chord-info` endpoint, and a "Chord Overview" card on Results
+  showing the interval breakdown, notes, quality description/"feeling",
+  root/bass/quality alt-spelling explanations ("Why this spelling?"),
+  and a unified "Similar Chords" list (true quality synonyms +
+  guide-tone overlap relationships, each with a real theory
+  explanation, decoupled from song-data availability). See CLAUDE.md's
+  Phase 5 Part 2/7 entry for the full build/fix history.
+  **Still genuinely open, not done**: `chord_info.py`'s `related` dict
+  (relative minor/parallel/tritone-sub/"resolves from (V7)"/simpler-
+  version) remains deliberately unwired -- considered and explicitly
+  excluded from the Chord Overview card across multiple rounds, not an
+  oversight. Also still open: `voicings.py`'s dormant `fallback`/
+  `translated`/`displayed`/`translated_from` fields, returned by
+  `GET /voicings/{chord}` but referenced by zero frontend code
+  (confirmed via a full `frontend/src` grep) -- a genuinely separate
+  surface from the chord-info work above, never addressed by it. Both
+  remaining pieces were re-confirmed still-open when Phase 5 Part 2/7
+  closed; if picked up later, they'd most naturally land under Part
+  4/7 ("voicings & VoicingModal enhancements") rather than a new part.
 
 **Phase 3 UI polish (deferred from Phase 2 on purpose)**
 - ~~Real-time autocomplete on the manual chord search input~~ -- done,

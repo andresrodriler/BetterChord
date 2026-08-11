@@ -6,10 +6,37 @@
   margin-bottom: 4px;
 }
 
-.results-header__enharmonic-note {
+/* Task 3 (Phase 5 Part 2/7 follow-up): replaces the old
+   `.results-header__enharmonic-note` disclosure paragraph -- title-level
+   explanation text is gone entirely, this is just a small inline
+   parenthetical next to the title itself, not a separate block. */
+.results-header__searched-as {
+  font-size: 0.5em;
+  font-weight: 400;
+  color: var(--muted);
+  /* h1.readout's own text-shadow glow otherwise inherits down onto this
+     muted text too (text-shadow inherits by default) -- the nested
+     ChordName span re-applies its own glow correctly regardless, since
+     it matches .readout directly rather than relying on inheritance. */
+  text-shadow: none;
+}
+
+.results-header__searched-as .readout {
+  font-size: 1em;
+}
+
+/* Task 4 (Phase 5 Part 2/7 follow-up): ambiguous-shorthand note --
+   plain, non-interactive text (nothing to link/scroll to), same small
+   size as the teaser so the two read as siblings, distinct color so
+   they're not mistaken for the same kind of note. */
+.results-header__ambiguity-note {
   margin: 0;
   font-size: 13px;
-  color: var(--moss);
+  color: var(--muted);
+}
+
+.results-header__ambiguity-note .readout {
+  font-size: 13px;
 }
 
 .results-grid {
@@ -120,71 +147,6 @@
 }
 
 .related-note .readout {
-  font-size: 13px;
-}
-
-/* Phase 5 Part 1/6 follow-up: educational notes (searched_quality_note +
-   related_notes) live behind this collapsed-by-default toggle instead of
-   stacking as more banners. Deliberately a plain text disclosure, NOT
-   another bordered box -- the whole point is not recreating the same
-   visual clutter one level down. */
-.educational-notes-wrap {
-  margin-top: 16px;
-}
-
-.educational-notes__toggle {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  font-size: 13px;
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
-}
-
-.educational-notes__toggle:hover {
-  color: var(--parchment);
-}
-
-.educational-notes__caret {
-  display: inline-block;
-  width: 0.9em;
-  color: var(--moss);
-}
-
-.educational-notes {
-  margin-top: 8px;
-}
-
-/* 2+ educational notes render as tight one-line bullets instead of full
-   .related-note prose boxes -- same content, less reading, once expanded. */
-.educational-notes__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.educational-notes__item {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-  padding-left: 14px;
-  position: relative;
-}
-
-.educational-notes__item::before {
-  content: '·';
-  position: absolute;
-  left: 2px;
-  color: var(--moss);
-}
-
-.educational-notes__item .readout {
   font-size: 13px;
 }
 

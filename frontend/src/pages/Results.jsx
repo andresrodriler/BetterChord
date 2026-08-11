@@ -1,13 +1,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import CapturePanel from '../components/CapturePanel'
+import ChordName from '../components/ChordName'
+import ChordOverview from '../components/ChordOverview'
 import FretboardDiagram from '../components/FretboardDiagram'
 import IntervalLegend from '../components/IntervalLegend'
 import SongCard from '../components/SongCard'
 import VoicingModal from '../components/VoicingModal'
 import { useFretboardPrefs } from '../context/FretboardPrefsContext'
-import { getChords, getSongs, getVoicings } from '../lib/api'
-import { normalizeRoot, resultsEnharmonicCaption } from '../lib/chordAlias'
+import { getChordInfo, getSongs, getVoicings } from '../lib/api'
+import { renderChordNote } from '../lib/renderChordNote'
 import './Results.css'
 
 // Reads/writes the same global FretboardPrefsContext as before -- only the
@@ -34,70 +36,6 @@ import './Results.css'
 // mounting 5269 cards up front to ~150.
 const SONG_BATCH_SIZE = 150
 
-// Shared by every note rendered in the Songs panel (related_notes,
-// searched_quality_note, the inversion/quality fallback notes) -- splits on
-// backtick pairs and gives odd-indexed (chord-name) segments the existing
-// `.readout` treatment, same convention already used for related_notes.
-function renderBacktickedText(text) {
-  return text.split('`').map((part, j) =>
-    j % 2 === 1 ? (
-      <span className="readout" key={j}>{part}</span>
-    ) : (
-      part
-    )
-  )
-}
-
-// Phase 5 Part 1/6 follow-up (real screenshot review): the Songs panel can
-// show up to 2 kinds of note --
-//   STRUCTURAL (inversion_fallback_used, quality_fallback_used) -- tell the
-//     user what they're actually looking at, stay as visible banners.
-//   EDUCATIONAL (searched_quality_note, related_notes) -- explain WHY, not
-//     WHAT -- moved behind a single collapsed-by-default toggle so they
-//     don't stack as 2-3 bordered boxes above every result that has either.
-// Built once per songs.data response, not inline in JSX, since both the
-// toggle label and the expanded content need the same derived list.
-function buildEducationalNotes(songsData) {
-  const notes = []
-  if (songsData.searched_quality_note) {
-    notes.push({
-      kind: 'equivalence',
-      labelChord: songsData.primary_chord,
-      full: songsData.searched_quality_note,
-      short: `\`${songsData.query}\` = \`${songsData.primary_chord}\` (same notes, different name)`,
-    })
-  }
-  for (const note of songsData.related_notes || []) {
-    notes.push({
-      kind: 'related',
-      labelChord: note.chord,
-      full: note.text,
-      // Phase 5 Part 1/6 stale-chord-reference audit: this claims a note
-      // is "also shown here" alongside the chord actually below -- must
-      // reference resolved_primary_chord (post any inversion fallback),
-      // not primary_chord (frozen bass-inclusive, can go stale the same
-      // way songs.py's searched_quality_note did -- see that fix).
-      short: `\`${note.chord}\` also shown here -- same notes as \`${songsData.resolved_primary_chord}\`, just missing a tone or two`,
-    })
-  }
-  return notes
-}
-
-// "Why Eaug7?" (equivalence only) / "Why E7b13 songs too?" (related only) /
-// a combined form when both kinds are present -- always names the actual
-// chord/quality involved rather than a generic "why these results?".
-function educationalToggleLabel(educationalNotes) {
-  const equiv = educationalNotes.find((n) => n.kind === 'equivalence')
-  const related = educationalNotes.filter((n) => n.kind === 'related')
-
-  const relatedPhrase = related.length > 0 ? `${related.map((n) => n.labelChord).join(' & ')} songs too` : null
-
-  if (equiv && relatedPhrase) return `Why ${equiv.labelChord} & ${relatedPhrase}?`
-  if (equiv) return `Why ${equiv.labelChord}?`
-  if (relatedPhrase) return `Why ${relatedPhrase}?`
-  return null
-}
-
 function HandednessToggle() {
   const { leftHanded, toggleHandedness } = useFretboardPrefs()
   return (
@@ -115,22 +53,49 @@ function HandednessToggle() {
 function Results() {
   const { chordName } = useParams()
   const location = useLocation()
-  const { fromAudio, confidence, searchedAs } = location.state || {}
+  // `fromSuggestion` (Task 2, Phase 5 Part 2/7 follow-up): true whenever
+  // ManualSearch navigated here from a canonical suggestion (mouse click
+  // OR arrow-key-select + Enter) rather than a raw typed-then-submit
+  // value -- see ManualSearch.jsx's goToChord() call sites. Needed
+  // because `searchedAs` alone can't distinguish "path A, dropdown pick"
+  // from "path B, typed+submit": a dropdown pick's `searchedAs` is
+  // whatever text was in the box at click time, which can be a genuine
+  // PREFIX of the picked suggestion (e.g. typing "Cmaj" and clicking
+  // "Cmaj7") -- a real difference worth the title's parenthetical (Task
+  // 3, unchanged), but NOT a root/bass/quality substitution, so it must
+  // NOT trigger Task 2's narrower "why" teaser below.
+  const { fromAudio, confidence, searchedAs, fromSuggestion } = location.state || {}
 
   const [voicings, setVoicings] = useState(null) // { ok, status, data } | null (loading)
   const [songs, setSongs] = useState(null)
-  const [rootAliases, setRootAliases] = useState(null) // null = not loaded yet
+  const [chordInfo, setChordInfo] = useState(null) // { ok, status, data } | null (loading) -- Phase 5 Part 2/7 follow-up
   const [expandedVoicing, setExpandedVoicing] = useState(null) // Phase 3 Part 5/6 click-to-expand
   const [visibleSongCount, setVisibleSongCount] = useState(SONG_BATCH_SIZE) // Phase 4 follow-up: incremental song-list render
-  const [showEducationalNotes, setShowEducationalNotes] = useState(false) // Phase 5 Part 1/6 follow-up: collapsed by default
 
   useEffect(() => {
     setVoicings(null)
     setSongs(null)
+    setChordInfo(null)
     setVisibleSongCount(SONG_BATCH_SIZE)
-    setShowEducationalNotes(false)
     getVoicings(chordName).then(setVoicings)
     getSongs(chordName).then(setSongs)
+    // Task 4 (Phase 5 Part 2/7 follow-up): confirmed live, not assumed --
+    // React Router doesn't scroll-restore on its own, and this component
+    // never unmounts between two Results pages (only `chordName`, a route
+    // PARAM, changes -- the same component instance re-renders), so
+    // without this a re-search from Results' own mini search box lands on
+    // the new chord's page still scrolled to wherever the previous page
+    // happened to be (confirmed via real measurement: scrollY stayed at
+    // 1163 after a real re-search, deep in the previous chord's Songs
+    // list). This one effect, keyed on [chordName], covers every
+    // arrival path uniformly: it also fires on the FIRST mount (a plain
+    // useEffect always runs once on mount, not just on updates), so a
+    // fresh navigation from Home (either dropdown pick or typed submit)
+    // gets the same reset for free, no separate handling needed. Direct
+    // URL visits and the audio-ID path don't need this at all -- a fresh
+    // page load already starts at scrollY 0 natively, confirmed live
+    // rather than assumed.
+    window.scrollTo(0, 0)
   }, [chordName])
 
   // Flat list of every {spelling, song} pair across results_by_spelling,
@@ -166,39 +131,110 @@ function Results() {
     return () => observer.disconnect()
   }, [hasMoreSongs, flatSongs.length])
 
-  // Only needed to reconstruct the enharmonic caption below -- no route
-  // state (e.g. a direct URL visit/saved link/back-button arrival with no
-  // prior typed input) means there's nothing to compare against, so this
-  // fetch's result just goes unused in that case rather than guessing.
+  // Phase 5 Part 2/7 follow-up: chord_info.py's theory data, fetched once
+  // the Songs endpoint RESOLVES (succeeds or fails -- `songs` is non-null
+  // either way once the fetch completes), not once it SUCCEEDS. Waiting
+  // for `songs` to exist at all (rather than firing on the raw URL param
+  // immediately) still avoids wasting a fetch on a possibly non-canonical
+  // spelling that's about to be superseded once Songs resolves the real
+  // canonical name.
+  //
+  // Real bug fixed here (stress-test finding #1, closing round): this used
+  // to be gated on `songs?.ok` specifically, which meant a chord with
+  // genuinely zero songs anywhere (Songs correctly 404s) silently lost its
+  // ENTIRE Chord Overview panel too -- even though /chord-info is a fully
+  // independent endpoint with real data to show (verified live: Csus2sus4/
+  // Cm11b5 both return valid theory data from /chord-info despite /songs
+  // 404ing for them). Chord-theory content must never be gated by song-data
+  // availability -- a chord can be real and worth explaining with zero
+  // tagged songs.
+  //
+  // `songs.data.primary_chord` is present even on MOST 404s (api.py still
+  // returns the full get_songs() dict, with `error` appended, for the
+  // "real chord, no song data yet" case) -- only a truly UNPARSEABLE/
+  // unregistered query has no `primary_chord` at all (get_songs() failed
+  // before resolving one), in which case falling back to the raw
+  // `chordName` is the only option left; /chord-info will independently
+  // (and correctly) find nothing for it either, and ChordOverview already
+  // renders nothing when there's genuinely no data (see below).
   useEffect(() => {
-    if (!searchedAs) return
+    if (!songs) return
+    const target = songs.data?.primary_chord || chordName
     let cancelled = false
-    getChords()
-      .then(({ rootAliases: aliases }) => {
-        if (!cancelled) setRootAliases(aliases)
-      })
-      .catch(() => {})
+    getChordInfo(target).then((result) => {
+      if (!cancelled) setChordInfo(result)
+    })
     return () => {
       cancelled = true
     }
-  }, [searchedAs])
+  }, [songs, chordName])
 
-  // Reinforces the same-note note from ManualSearch (Part B.1) for anyone
-  // who arrives here without having seen it typed live -- but only when
-  // there IS route state to compare against; no state at all means don't
-  // guess what was typed.
-  let enharmonicNote = null
-  if (searchedAs && rootAliases) {
-    const norm = normalizeRoot(searchedAs.trim(), rootAliases)
-    if (norm.changed) {
-      enharmonicNote = resultsEnharmonicCaption(searchedAs.trim(), norm.canonicalRoot, chordName)
-    }
-  }
+  // Phase 5 Part 2/7 follow-up: the page TITLE is now always just the
+  // fully-resolved canonical chord (root + bass + quality) once the Songs
+  // endpoint responds, not the raw URL param -- this is `primary_chord`
+  // specifically, NOT `resolved_primary_chord` (which is post any
+  // inversion-fallback and would silently drop the bass note from the
+  // title, conflating a pure NAMING fact with a DATA-AVAILABILITY fact --
+  // see RESULTS_ENTRY_PATHS.md's substitution-vs-fallback split). Falls
+  // back to the raw `chordName` while songs is still loading or on error.
+  const title = songs?.ok ? songs.data.primary_chord : chordName
+
+  // Title-level parenthetical -- a small "(searched: X)" next to the
+  // title when the actual search differs from the canonical title.
+  // GATED ON `!fromSuggestion` as of this follow-up's Task 2 -- a
+  // dropdown pick is a deliberate choice (even when its `searchedAs` was
+  // only a typed PREFIX of what got picked, e.g. typing "Cmaj" and
+  // clicking "Cmaj7"), not something that needs "here's what you
+  // searched" framing the way an actual typed substitution or a
+  // non-canonical direct URL does. Previously this fired for dropdown
+  // picks too (e.g. "Bbaug7 (searched: A#aug)") -- real, confirmed
+  // inconsistency with the teaser below already excluding dropdown picks
+  // via the same flag; this brings the two in line.
+  const searchedValue = searchedAs ? searchedAs.trim() : chordName
+  const showSearchedParenthetical = songs?.ok && !fromSuggestion && searchedValue !== title
+
+  // Task 2 (this follow-up): whether ChordOverview's "Why this spelling"
+  // bar should render at all -- SUPPRESSED for dropdown picks
+  // (`fromSuggestion`). The typing-time dropdown caption (family 1,
+  // `ManualSearch.jsx`) already explains root/bass enharmonic
+  // substitution WHILE someone picks a suggestion; re-explaining it again
+  // on Results would be redundant. Still renders normally for typed
+  // submissions and direct URL visits (paths B/C), where nothing
+  // explained it beforehand -- confirmed against RESULTS_ENTRY_PATHS.md's
+  // matrix. (Previously this follow-up also had a title-level "Why this
+  // spelling? ↓" teaser pointing down at the bar -- removed entirely,
+  // Task 1: the bar already sits directly below the title, unscrolled,
+  // always in view, so the teaser -- and its scroll/highlight fix from
+  // the round before -- was solving a problem the current layout doesn't
+  // actually have.)
+  const showWhySpelling = !fromSuggestion
+
+  // Task 4 (Phase 5 Part 2/7 follow-up): a genuinely separate note from
+  // the two above -- fires when the raw search used ambiguous shorthand
+  // chord_parser.py had to default (e.g. bare "sus" -> sus4). Computed
+  // server-side from the ACTUAL search string (songs.py's `quality_blob`,
+  // see songs.py's `_ambiguity_note()`), so -- unlike the teaser -- it
+  // needs no `fromSuggestion`/`fromAudio` gating of its own: a dropdown
+  // suggestion or an audio-identified chord name is never ambiguous
+  // shorthand in the first place (both are always already-canonical
+  // strings), so this is naturally path-independent without extra logic.
+  const ambiguityNote = songs?.ok ? songs.data.ambiguity_note : null
 
   return (
     <div>
       <div className="section results-header">
-        <h1 className="readout">{chordName}</h1>
+        {/* Title is just the canonical chord name -- no disclosure
+            widget, no explanation text at this level. When the actual
+            search differs (typed input, or a route-state searchedAs
+            value), a small parenthetical names it; the full explanation
+            lives entirely in ChordOverview's "Why this spelling" bar,
+            directly below (see `showWhySpelling`). */}
+        <h1 className="readout">
+          {title}
+          {showSearchedParenthetical && (
+            <span className="results-header__searched-as"> (searched: <ChordName>{searchedValue}</ChordName>)</span>
+          )}
+        </h1>
         {fromAudio && (
           <span className="badge">
             <span className="badge__dot" />
@@ -206,8 +242,42 @@ function Results() {
             {confidence != null && ` (confidence: ${(confidence * 100).toFixed(1)}%)`}
           </span>
         )}
-        {enharmonicNote && <p className="results-header__enharmonic-note">{enharmonicNote}</p>}
+        {/* Task 4 (Phase 5 Part 2/7 follow-up): a separate, standalone
+            note for ambiguous search shorthand (e.g. "sus" -> "sus4") --
+            distinct from both the parenthetical/teaser above (which are
+            about spelling/naming substitutions) and Similar Chords below
+            (a chord-level fact; there's no symmetric "sus4 is also
+            called sus" the way there is for a true synonym). */}
+        {ambiguityNote && <p className="results-header__ambiguity-note">{renderChordNote(ambiguityNote)}</p>}
       </div>
+
+      {/* Task 1 (Phase 5 Part 2/7 follow-up): now positioned ABOVE the
+          Voicings/Songs grid (was below it in the prior round) -- per a
+          real HTML/CSS mockup, and because these are facts about the
+          resolved CHORD's identity, which reads more naturally as
+          context established before the practical Voicings/Songs data,
+          not an afterthought below it. Renders identically regardless of
+          arrival path (see RESULTS_ENTRY_PATHS.md) since both its data
+          sources (songs.data.related_notes, /chord-info) are already
+          path-independent. Hides itself entirely if there's truly nothing
+          to show (see ChordOverview.jsx).
+          Deliberately UNGATED on `songs.ok` (closing round, stress-test
+          finding #1) -- ChordOverview's own internal check (`!info &&
+          similarChords.length === 0`) already decides whether there's
+          anything real to render, including the "still loading" case
+          (both chordInfo and relatedNotes are undefined/null then, so it
+          correctly renders nothing rather than flashing an empty panel).
+          Gating on `songs.ok` here was the actual bug: a chord with real
+          theory data but zero songs would never even reach that internal
+          check. `relatedNotes` reads safely via optional chaining since
+          `songs` can be null (loading) or a failed response with no
+          `data.related_notes` at all (a truly unparseable/unregistered
+          query, the one case where get_songs() never resolves anything). */}
+      <ChordOverview
+        chordInfo={chordInfo}
+        relatedNotes={songs?.data?.related_notes}
+        showWhySpelling={showWhySpelling}
+      />
 
       <div className="results-grid">
         <div className="section panel">
@@ -280,50 +350,17 @@ function Results() {
           {songs && songs.ok && songs.data.inversion_fallback_used && (
             <div className="related-notes">
               <p className="related-note">
-                {renderBacktickedText(
-                  `No songs are tagged with the exact inversion \`${songs.data.primary_chord}\`. ` +
-                    `Showing songs for the root-position chord \`${songs.data.root_position_chord}\` instead.`
+                {/* STRUCTURAL banner (NOTE_STYLE_GUIDE.md): effect-before-cause
+                    -- the actionable status (no exact-inversion match) leads,
+                    the resolution follows, using the guide's fixed "shown
+                    here...instead" idiom for a full substitution. */}
+                {renderChordNote(
+                  `No songs are tagged with the exact inversion \`${songs.data.primary_chord}\` -- ` +
+                    `songs for the root-position chord \`${songs.data.root_position_chord}\` are shown here instead.`
                 )}
               </p>
             </div>
           )}
-          {songs && songs.ok && (() => {
-            // EDUCATIONAL notes (searched_quality_note + related_notes) --
-            // explain WHY these results look the way they do, not WHAT the
-            // user is looking at, so they sit behind a collapsed-by-default
-            // toggle rather than stacking as more banners (real screenshot
-            // feedback: up to 3 bordered boxes above the song list at once).
-            const educationalNotes = buildEducationalNotes(songs.data)
-            if (educationalNotes.length === 0) return null
-            const label = educationalToggleLabel(educationalNotes)
-            return (
-              <div className="educational-notes-wrap">
-                <button
-                  type="button"
-                  className="educational-notes__toggle"
-                  aria-expanded={showEducationalNotes}
-                  onClick={() => setShowEducationalNotes((v) => !v)}
-                >
-                  <span className="educational-notes__caret">{showEducationalNotes ? '▾' : '▸'}</span> {label}
-                </button>
-                {showEducationalNotes && (
-                  <div className="related-notes educational-notes">
-                    {educationalNotes.length === 1 ? (
-                      <p className="related-note">{renderBacktickedText(educationalNotes[0].full)}</p>
-                    ) : (
-                      <ul className="educational-notes__list">
-                        {educationalNotes.map((note, i) => (
-                          <li className="educational-notes__item" key={i}>
-                            {renderBacktickedText(note.short)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
           {songs && songs.ok && songs.data.total_songs > 0 && (
             <ul className="song-list" ref={songListRef}>
               {visibleSongs.map(({ key, song, spelling }) => (
@@ -340,17 +377,24 @@ function Results() {
           {songs && songs.ok && songs.data.quality_fallback_used && (
             <div className="related-notes">
               <p className="related-note">
-                {renderBacktickedText(
-                  // Phase 5 Part 1/6 stale-chord-reference audit: by the
-                  // time this fires, an inversion fallback may have ALREADY
-                  // tried root-position and also found zero -- naming
-                  // primary_chord (frozen, bass-inclusive) here would claim
-                  // "exactly X" for a spelling the inversion banner above
-                  // already said wasn't searched anymore. resolved_primary_chord
-                  // is whatever was actually, finally searched.
-                  `No songs found tagged exactly \`${songs.data.resolved_primary_chord}\`. Since a ` +
-                    `\`${songs.data.resolved_quality}\`-quality chord is the same shape ` +
-                    `wherever it's played, here are songs using that same quality on other roots:`
+                {/* STRUCTURAL banner, same effect-before-cause shape and
+                    "shown here instead" idiom as the inversion-fallback
+                    banner above (NOTE_STYLE_GUIDE.md) -- previously used a
+                    different verb ("found tagged" vs. the inversion
+                    banner's "are tagged") and a different closing phrase
+                    for the same kind of substitution; now unified.
+                    Phase 5 Part 1/6 stale-chord-reference audit still
+                    applies: by the time this fires, an inversion fallback
+                    may have ALREADY tried root-position and also found
+                    zero -- naming primary_chord (frozen, bass-inclusive)
+                    here would claim "exactly X" for a spelling the
+                    inversion banner above already said wasn't searched
+                    anymore. resolved_primary_chord is whatever was
+                    actually, finally searched. */}
+                {renderChordNote(
+                  `No songs are tagged with \`${songs.data.resolved_primary_chord}\` exactly -- since a ` +
+                    `\`${songs.data.resolved_quality}\` chord is the same shape wherever it's played, ` +
+                    `songs using that same quality on other roots are shown here instead:`
                 )}
               </p>
               {songs.data.quality_fallback_songs.map((entry) => (
@@ -373,7 +417,21 @@ function Results() {
 
       <div className="results-capture">
         <h2>🎧 Analyze another chord</h2>
-        <CapturePanel size="mini" />
+        {/* Task 4 (Phase 5 Part 2/7 follow-up): `key={chordName}` forces
+            this (and its nested ManualSearch) to fully REMOUNT whenever
+            the chord changes, rather than re-rendering the same instance
+            -- the standard React way to reset a component's own internal
+            state (ManualSearch's typed `value`) when there's no external
+            prop for that state to begin with. Confirmed live this was a
+            real, narrower bug than it first looked: navigating here FROM
+            Home never showed stale text (Home's own ManualSearch is a
+            completely separate mounted instance, unmounted on navigation
+            either way) -- the actual bug only appeared when searching
+            AGAIN from Results' own mini search box, landing on a new
+            Results page for the same route pattern (`chordName` is just
+            a route param, so this component instance never unmounts on
+            its own between two chords). */}
+        <CapturePanel key={chordName} size="mini" />
       </div>
 
       {expandedVoicing && (

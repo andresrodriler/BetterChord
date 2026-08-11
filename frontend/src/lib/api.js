@@ -23,6 +23,20 @@ export async function getSongs(chordName) {
   return { ok: res.ok, status: res.status, data }
 }
 
+// Phase 5 Part 2/7 follow-up: chord_info.py's interval breakdown/quality
+// description/related-chords data, for the new "Overall Chord Info"
+// section -- works for ANY resolved canonical chord, not just the
+// audio-ID path (see CHORD_INFO_AUDIT.md). A 404 here (an unregistered
+// quality, or one of the small number chord_info.py can't process yet --
+// see the audit doc) is a normal, expected response, not an error state:
+// callers should just omit the theory subsection, same pattern as
+// getVoicings/getSongs's own ok/data shape.
+export async function getChordInfo(chordName) {
+  const res = await fetch(`${API_BASE}/chord-info/${encodeURIComponent(chordName)}`)
+  const data = await res.json()
+  return { ok: res.ok, status: res.status, data }
+}
+
 // Module-scoped cache of the in-flight/resolved /chords fetch -- ManualSearch
 // is mounted repeatedly (Home, Results, capture modal), so this ensures the
 // full autocomplete suggestion list (and the root-alias map alongside it) is
