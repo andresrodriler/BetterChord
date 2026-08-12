@@ -152,6 +152,55 @@
   --interval-ext-13-border: #474033;
   --interval-ext-13-glow: rgba(119, 106, 85, 0.55);
 
+  /* --- Loudness ramp (Waveform.jsx, Phase 5 Part 3/7 5th polish pass) ---
+     A genuinely new token family -- not a one-off hex value. Neither
+     --brass nor --error fit "how loud is this moment": --brass is the
+     control accent (used for the trace/play button/etc, a role that
+     shouldn't also mean "loud"), and painting --error across a merely
+     loud-but-healthy passage was a real, confirmed bug in the prior
+     pass (it read as a clipping warning on perfectly fine audio). This
+     ramp is a copper/rust family, visually related to --brass (same
+     warm hue family) but distinct enough to read as its own "intensity"
+     signal rather than a state color -- 5 fixed stops, scaled per-bar
+     against each clip's OWN measured quietest-to-loudest range (not an
+     absolute scale), quiet/dark through loud/vivid. Purely a data-
+     encoding color, never used for text or a control -- --scan (true
+     peak) and --error (bars actually past the clip line) stay the only
+     two "state" signals on the waveform, sparse and absolute-threshold-
+     only, unchanged in role.
+     Contrast, actually computed (WCAG relative luminance) against
+     --brown-900 (the nearest existing panel-surface token; the ramp
+     itself sits on --brown-800, the waveform canvas's own background --
+     both numbers given below, they land within ~0.2-0.3:1 of each other):
+       --loudness-quiet  #814932  -> 2.13:1 vs 800, 2.32:1 vs 900
+       --loudness-low    #9D5334  -> 2.70:1 vs 800, 2.95:1 vs 900
+       --loudness-mid    #A85736  -> 2.96:1 vs 800, 3.23:1 vs 900  (clearly
+                          visible as a filled shape, though below AA text
+                          thresholds -- irrelevant here, nothing is ever
+                          painted as text in this color)
+       --loudness-high   #D97B4F  -> 5.00:1 vs 800, 5.46:1 vs 900
+       --loudness-peak   #F2A268  -> 7.36:1 vs 800, 8.04:1 vs 900
+                          (AAA-equivalent, reads as the ramp's brightest/
+                          most vivid stop)
+     quiet/low were raised in a follow-up pass (Phase 5 Part 3/7, 6th
+     polish pass) from their original #3D2A22 (1.13:1 vs 800) / #6B3F2C
+     (1.72:1 vs 800) -- real user feedback that quiet content needs to
+     read as visibly-present-but-quiet on its own, not rely on the
+     playhead or another overlay sitting on top of it to become legible.
+     Same hue (~17.5deg, matching --loudness-mid's own ~17.4deg) at higher
+     saturation/lightness, not a hue shift -- still a smooth, monotonic
+     ramp into --loudness-mid (2.13 -> 2.70 -> 2.96 vs 800, no jump/seam)
+     rather than a new visible step. high/peak untouched, they weren't
+     flagged as a problem.
+     Flagged for the user's review before this goes into SKILL.md as a
+     documented reusable rule -- not added there by this pass, per
+     standing instructions. */
+  --loudness-quiet: #814932;
+  --loudness-low: #9D5334;
+  --loudness-mid: #a85736;
+  --loudness-high: #d97b4f;
+  --loudness-peak: #f2a268;
+
   --border: var(--brown-700);
   --shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.45);

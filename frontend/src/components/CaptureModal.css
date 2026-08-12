@@ -38,8 +38,19 @@
 
 .capture-modal__top {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+}
+
+/* Preview's title, merged onto the same row as Close (was its own row
+   above the waveform) -- overrides h2's default block margin so it sits
+   correctly inline in this flex row instead of adding its own vertical
+   gap. Empty (zero-width) string content on every other modal state, so
+   Close still ends up flush right via space-between either way. */
+.capture-modal__title {
+  margin: 0;
 }
 
 .capture-modal__body {
@@ -75,6 +86,36 @@
   min-width: 0;
 }
 
-.capture-modal audio {
-  width: 100%;
+/* -- Loading overlay: reuses .capture-overlay's exact tint+blur (same
+   rgba/backdrop-filter values) one layer further in -- dims/blurs the
+   frozen preview content underneath instead of replacing it, per this
+   pass's explicit ask. `position: absolute` against the body's own
+   `position: relative` (set inline in CaptureModal.jsx) keeps this fully
+   scoped to the modal's own content area -- no second `position: fixed`
+   backdrop, no separate z-index stack beyond sitting after its siblings
+   in normal DOM order. -- */
+.capture-modal__loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 7, 4, 0.72);
+  backdrop-filter: blur(2px);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+}
+
+.capture-modal__loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px 28px;
+  background: var(--brown-900);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: 320px;
 }

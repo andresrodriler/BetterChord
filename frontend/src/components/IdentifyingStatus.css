@@ -1,0 +1,59 @@
+/* display: contents -- was a bordered/backgrounded card when this was an
+   addendum appended below the preview content; now that it's the WHOLE
+   modal body (see CaptureModal.jsx), a nested box would read as a box
+   within a box. This keeps the wrapper purely semantic (aria-live
+   grouping) while letting .capture-modal__body--centered's own flex/gap
+   lay out the dots and fact directly, matching the armed/recording
+   states' plain centered layout. */
+.identifying-status {
+  display: contents;
+}
+
+/* -- "Processing" indicator, built as a sibling of .record-btn__dot's
+   pulse (App.css) rather than a borrowed generic spinner: same box-shadow
+   ring-expansion mechanic, recolored from --record-red to --scan (this is
+   BetterChord computing/detecting, not a live recording), and staggered
+   across 3 dots so the ripple itself reads as "actively working" instead
+   of one static pulsing circle. -- */
+.identifying-status__dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.identifying-status__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--scan);
+  box-shadow: 0 0 0 3px var(--scan-dim);
+  animation: pulse-scan 1.4s ease-in-out infinite;
+}
+
+.identifying-status__dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.identifying-status__dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes pulse-scan {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--scan-dim);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(111, 227, 214, 0.08);
+    transform: scale(1.2);
+  }
+}
+
+.identifying-status__fact {
+  max-width: 360px;
+  margin: 0 auto;
+  font-size: 14px;
+  color: var(--muted);
+}

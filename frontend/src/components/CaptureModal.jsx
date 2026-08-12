@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCapture } from '../context/CaptureContext'
 import CapturePanel from './CapturePanel'
+import Waveform from './Waveform'
+import RecordingInfo from './RecordingInfo'
+import IdentifyingStatus from './IdentifyingStatus'
 import './CaptureModal.css'
 
 // Renders as a fixed overlay on top of whatever page is mounted underneath
@@ -31,6 +34,7 @@ function CaptureModal() {
     blob,
     audioUrl,
     quality,
+    waveformData,
     identifying,
     error,
     beginRecording,
@@ -39,6 +43,7 @@ function CaptureModal() {
     close,
   } = useCapture()
   const [showChooser, setShowChooser] = useState(false)
+  const audioRef = useRef(null)
 
   // The component stays mounted (rendering null) while closed rather than
   // unmounting, since it lives at the App level -- reset the local toggle
@@ -56,6 +61,10 @@ function CaptureModal() {
   const modalClass = [
     'capture-modal',
     previewing && 'capture-modal--preview',
+    // The preview/chooser layout stays mounted (just dimmed/blurred, see
+    // the loading overlay below) while identifying now, rather than being
+    // replaced -- so the modal's width shouldn't change just because
+    // identifying started.
     previewing && showChooser && 'capture-modal--wide',
   ]
     .filter(Boolean)
@@ -65,6 +74,13 @@ function CaptureModal() {
     <div className="capture-overlay">
       <div className={modalClass}>
         <div className="capture-modal__top">
+          {/* Merged onto the Close button's own row (was a separate row
+              above the waveform) -- frees vertical space, spent on a
+              taller waveform instead (Waveform.jsx's CANVAS_HEIGHT).
+              Empty otherwise so Close stays pinned top-right consistently
+              across every other modal state (armed/recording/etc), which
+              have their own headline inside their own centered body. */}
+          <h2 className="capture-modal__title">{previewing ? 'Preview' : ''}</h2>
           <button className="btn-close" onClick={close} disabled={identifying}>Close</button>
         </div>
 
@@ -97,11 +113,26 @@ function CaptureModal() {
           </div>
         )}
 
+        {/* The preview content stays mounted and visible while /identify is
+            in flight (this pass's change) -- a blurred/dimmed overlay plus
+            a floating loading card render on top of it instead of
+            replacing it, reusing the exact same tint+blur visual language
+            as .capture-overlay (the page-level backdrop this whole modal
+            already sits on), just one layer further in. Still ONE modal:
+            the overlay is `position: absolute` inside this body (which
+            gets `position: relative` below), not a second fixed-position
+            backdrop or a separate z-index stack. */}
         {previewing && (
-          <div className={`capture-modal__body${showChooser ? ' capture-modal__body--split' : ''}`}>
+          <div
+            className={`capture-modal__body${showChooser ? ' capture-modal__body--split' : ''}`}
+            style={{ position: 'relative' }}
+          >
             <div className="capture-modal__preview">
-              <h2>Preview</h2>
-              <audio src={audioUrl} controls />
+              <Waveform channelData={waveformData} audioRef={audioRef} />
+              {/* Playback engine only -- the waveform above is the one clear seek
+                  surface (item 1 of an earlier Phase 5 Part 3/7 polish pass); native
+                  controls stay off so there's no second, redundant scrub bar. */}
+              <audio ref={audioRef} src={audioUrl} className="visually-hidden" />
 
               {quality === null && <p className="status-text">Checking recording quality...</p>}
               {quality === 'error' && (
@@ -109,23 +140,17 @@ function CaptureModal() {
                   Could not analyze this recording's quality (playback should still work).
                 </p>
               )}
-              {quality && quality !== 'error' && quality.quiet && (
-                <p className="status-text status-text--warn">
-                  Warning: this recording looks very quiet (peak level {quality.peak.toFixed(3)}). Consider
-                  rerecording closer to the guitar.
-                </p>
-              )}
-              {quality && quality !== 'error' && !quality.quiet && (
-                <p className="status-text">
-                  Recording level looks OK (peak {quality.peak.toFixed(3)}, RMS {quality.rms.toFixed(3)}).
-                </p>
-              )}
+              {quality && quality !== 'error' && <RecordingInfo quality={quality} />}
 
               <div className="button-row">
                 <button className="btn btn-primary" onClick={handleContinue} disabled={identifying}>
-                  {identifying ? 'Identifying...' : 'Continue'}
+                  Continue
                 </button>
-                <button className="btn btn-ghost" onClick={() => setShowChooser((v) => !v)} disabled={identifying}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setShowChooser((v) => !v)}
+                  disabled={identifying}
+                >
                   {showChooser ? 'Hide options' : 'Choose a different source'}
                 </button>
               </div>
@@ -136,6 +161,15 @@ function CaptureModal() {
             {showChooser && (
               <div className="capture-modal__chooser">
                 <CapturePanel size="compact" onSearchSubmit={close} />
+              </div>
+            )}
+
+            {identifying && (
+              <div className="capture-modal__loading-overlay">
+                <div className="capture-modal__loading-card">
+                  <h2>Identifying...</h2>
+                  <IdentifyingStatus />
+                </div>
               </div>
             )}
           </div>

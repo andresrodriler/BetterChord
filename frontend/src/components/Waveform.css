@@ -1,0 +1,136 @@
+.waveform-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waveform {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+/* -- Y-axis gutter: 3 dB tick labels, positioned outside the canvas so the
+   canvas's own coordinate space (and click/drag-seek math) never needs to
+   account for it. Heights/positions come from Waveform.jsx's own layout
+   constants (AXIS_TICKS), so this can't drift out of sync with what's
+   drawn on the canvas. -- */
+.waveform__axis {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+}
+
+.waveform__axis-tick {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.waveform__plot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* -- Timestamp row: real DOM elements immediately beneath the canvas
+   (margin-top: 0 -- no floating gap), directly under the tick marks the
+   canvas itself draws flush against its own bottom border. Kept as DOM
+   (not canvas-drawn) specifically so this positioning is trivially
+   precise/testable via getBoundingClientRect, the same reasoning the
+   y-axis dB labels already used. -- */
+.waveform__time-axis {
+  position: relative;
+  height: 12px;
+  margin-top: 0;
+}
+
+.waveform__time-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.waveform__canvas {
+  /* width/height here are a fallback only, for the brief window before
+     Waveform.jsx's configureCanvasForDpr() sets a matching inline style
+     -- kept in sync with CANVAS_HEIGHT (160) so there's never a stale
+     mismatch between this fallback and the canvas's real intrinsic
+     buffer size (a real, confirmed bug in an earlier pass: this was
+     still 120px after CANVAS_HEIGHT grew to 160, silently squishing the
+     buffer to fit). */
+  display: block;
+  width: 100%;
+  height: 160px;
+  background: var(--brown-800);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-inset);
+  cursor: pointer;
+  touch-action: none; /* pointer drag handles its own scrubbing, not browser panning */
+}
+
+.waveform__canvas:hover {
+  cursor: grab;
+}
+
+.waveform__canvas--dragging,
+.waveform__canvas--dragging:hover {
+  cursor: grabbing;
+}
+
+.waveform__canvas:focus-visible {
+  outline: 2px solid var(--scan-border);
+  outline-offset: 2px;
+}
+
+/* -- Custom minimal transport: the ONLY playback controls shown --
+   deliberately replaces the native <audio controls> bar (hidden, see
+   CaptureModal.jsx) so there's one clear seek surface (the waveform
+   above), not two stacked scrub bars. Play/pause uses --brass, the
+   control accent -- this is a user-triggered action, not a detected
+   result. -- */
+.waveform__transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.waveform__play {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  color: var(--brass);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.waveform__play:hover {
+  border-color: var(--brass-border);
+  background: var(--brass-dim);
+}
+
+.waveform__time {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.4px;
+}

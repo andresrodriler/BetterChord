@@ -6,8 +6,16 @@ const CaptureContext = createContext(null)
 
 // Very quiet by this peak-amplitude threshold (0.0-1.0 scale) gets flagged.
 // Deliberately a light heuristic, not the full spectrogram-visualization
-// system (that's a separate later phase per CLAUDE.md).
-const QUIET_PEAK_THRESHOLD = 0.05
+// system (that's a separate later phase per CLAUDE.md). Exported -- both
+// the waveform's y-axis reference line and the recording-status readout
+// (Waveform.jsx / RecordingInfo.jsx) key off this exact same constant,
+// rather than a second hardcoded copy of the number.
+export const QUIET_PEAK_THRESHOLD = 0.05
+
+// Peaks at/above this are flagged as clipping risk -- real samples don't
+// literally need to hit 1.0 to already sound distorted, so the line sits
+// just under full scale rather than exactly at it.
+export const CLIPPING_PEAK_THRESHOLD = 0.97
 
 // All capture/record/upload/quality-check/identify state lives here instead
 // of on a /preview route, so the same in-progress capture can be triggered
@@ -25,12 +33,18 @@ export function CaptureProvider({ children }) {
   const [filename, setFilename] = useState(null)
   const [audioUrl, setAudioUrl] = useState(null)
   const [quality, setQuality] = useState(null) // { peak, rms, quiet } | 'error' | null (checking)
+  const [waveformData, setWaveformData] = useState(null) // decoded Float32Array (channel 0) | null
   const [identifying, setIdentifying] = useState(false)
   const [error, setError] = useState('')
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
   const streamRef = useRef(null)
+  // Captured from the live MediaStream's audio track while it still exists
+  // (recording stops its tracks in onstop) -- record path only. Cleared on
+  // selectFile/close so a stale label from a previous recording session
+  // never leaks into an unrelated upload.
+  const deviceLabelRef = useRef(null)
 
   // Object URLs must be created as a side effect (useEffect), not during
   // render (e.g. useMemo) -- creating it in useMemo was a real bug found in
@@ -50,13 +64,20 @@ export function CaptureProvider({ children }) {
     return () => URL.revokeObjectURL(url)
   }, [blob])
 
+  // Single decode per blob, shared by both the quality check (peak/RMS) and
+  // the waveform display -- decodeAudioData is not cheap, and there's no
+  // reason to run it twice for the same blob. `waveformData` is a plain
+  // copy (via .slice()) of the decoded channel, not a live view into
+  // `decoded`/`ctx`, so it stays valid after this effect's scope ends.
   useEffect(() => {
     if (!blob) {
       setQuality(null)
+      setWaveformData(null)
       return
     }
     let cancelled = false
     setQuality(null)
+    setWaveformData(null)
 
     async function analyze() {
       try {
@@ -77,7 +98,17 @@ export function CaptureProvider({ children }) {
         ctx.close()
 
         if (!cancelled) {
-          setQuality({ peak, rms, quiet: peak < QUIET_PEAK_THRESHOLD })
+          setQuality({
+            peak,
+            rms,
+            quiet: peak < QUIET_PEAK_THRESHOLD,
+            clipping: peak >= CLIPPING_PEAK_THRESHOLD,
+            sampleRate: decoded.sampleRate,
+            channelCount: decoded.numberOfChannels,
+            format: blob.type,
+            deviceLabel: deviceLabelRef.current,
+          })
+          setWaveformData(channel.slice())
         }
       } catch {
         if (!cancelled) setQuality('error')
@@ -119,6 +150,7 @@ export function CaptureProvider({ children }) {
         },
       })
       streamRef.current = stream
+      deviceLabelRef.current = stream.getAudioTracks()[0]?.label || null
       setArmed(true)
     } catch (err) {
       setError(err.message || 'Could not access the microphone.')
@@ -163,6 +195,7 @@ export function CaptureProvider({ children }) {
   function selectFile(file) {
     if (!file) return
     releaseStream()
+    deviceLabelRef.current = null // upload path -- no input device to disclose
     setError('')
     setArmed(false)
     setRecording(false)
@@ -176,6 +209,7 @@ export function CaptureProvider({ children }) {
       mediaRecorderRef.current?.stop()
     }
     releaseStream()
+    deviceLabelRef.current = null
     setOpen(false)
     setArmed(false)
     setRecording(false)
@@ -212,6 +246,7 @@ export function CaptureProvider({ children }) {
     blob,
     audioUrl,
     quality,
+    waveformData,
     identifying,
     error,
     armRecording,

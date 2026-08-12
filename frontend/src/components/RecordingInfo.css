@@ -1,0 +1,109 @@
+.recording-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* -- Level status card: a real status treatment (colored left border +
+   dot), not plain prose -- three states, moss/brass/error matching the
+   app's existing "OK/warn/error" color roles (--brass is already the
+   established warning color via .status-text--warn; --error is the
+   existing error-status token). -- */
+.recording-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--brown-800);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--moss);
+  border-radius: var(--radius-sm);
+}
+
+.recording-status__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--moss);
+}
+
+.recording-status--quiet {
+  border-left-color: var(--brass);
+}
+
+.recording-status--quiet .recording-status__dot {
+  background: var(--brass);
+}
+
+.recording-status--clip {
+  border-left-color: var(--error);
+}
+
+.recording-status--clip .recording-status__dot {
+  background: var(--error);
+}
+
+.recording-status__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recording-status__label {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--parchment);
+}
+
+.recording-status__detail {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* -- Secondary meta panel (item 7): a clean "device readout" row, kept
+   visually separate from the level status above rather than crammed into
+   the same line. Mono eyebrow labels (moss) + mono values (parchment),
+   the same readout language used across the rest of the app. -- */
+.recording-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding: 10px 14px;
+  background: var(--brown-800);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.recording-meta__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recording-meta__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+
+.recording-meta__value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--parchment);
+}
+
+.recording-info__disclosure {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  padding: 0 2px;
+}
