@@ -438,6 +438,24 @@ function Results() {
         <VoicingModal
           voicing={expandedVoicing}
           formula={voicings?.ok ? voicings.data.formula : null}
+          // `chordName` (13th follow-up): /voicings/{chord}'s own
+          // `displayed` field (already the canonical, fully-resolved
+          // chord name -- e.g. "Cmaj11/E" -- confirmed via a live
+          // request) rather than this page's own `title` (which depends
+          // on `/songs` succeeding, a completely unrelated fetch this
+          // modal shouldn't be coupled to). Lets the modal show which
+          // chord a voicing belongs to without relying on page context
+          // behind it.
+          chordName={voicings?.ok ? voicings.data.displayed : null}
+          // `bass` (Phase 5 Part 4/7): /voicings/{chord}'s new top-level
+          // `bass` field -- a fact about the whole search (which every
+          // returned voicing shares), not a per-voicing field, so it's
+          // read off `voicings.data` here rather than off
+          // `expandedVoicing` itself. Already None/null whenever the
+          // response fell back to root-position voicings (no real bass
+          // backing these rows), so ChordTonePanel never shows a Bass
+          // slot for a fallback result.
+          bass={voicings?.ok ? voicings.data.bass : null}
           onClose={() => setExpandedVoicing(null)}
         />
       )}

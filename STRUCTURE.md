@@ -49,11 +49,47 @@ BetterChord/
       pages/       Home.jsx/.css, Results.jsx/.css, About.jsx/.css,
                     HowItWorks.jsx/.css
       components/  CapturePanel.jsx/.css       -- unified upload/drag-drop/record/search
-                    CaptureModal.jsx/.css       -- record/preview overlay
+                    CaptureModal.jsx/.css       -- record/preview overlay (preview body stays
+                                                   mounted -- blurred -- under a floating
+                                                   loading card while identifying; see
+                                                   IdentifyingStatus below -- Phase 5 Part 3/7)
+                    Waveform.jsx/.css           -- Phase 5 Part 3/7: canvas waveform + custom
+                                                   transport for the preview's audio -- click/
+                                                   drag-to-seek playhead, dB-scale bar heights
+                                                   (adaptive ceiling, fixed floor) with QUIET/
+                                                   CLIP reference lines, copper loudness-ramp
+                                                   bar coloring (--loudness-* tokens, index.css)
+                                                   relative to each clip's own range, --scan
+                                                   reserved for the true signature peak,
+                                                   devicePixelRatio-aware canvas sizing
+                    RecordingInfo.jsx/.css      -- Phase 5 Part 3/7: recording-quality status
+                                                   card (OK/quiet/clipping, dB via
+                                                   lib/audioUnits.js) + device/format/channel
+                                                   readout row, replaces the old plain quality text
+                    IdentifyingStatus.jsx/.css  -- Phase 5 Part 3/7: pulse-dots + rotating
+                                                   real-pipeline fact shown in CaptureModal's
+                                                   floating loading card while /identify runs
                     ManualSearch.jsx/.css       -- autocomplete search input
                     FretboardDiagram.jsx/.css   -- per-voicing chord diagram
                     IntervalLegend.jsx/.css     -- interval-color swatch legend
-                    VoicingModal.jsx/.css       -- click-to-expand voicing detail
+                    VoicingModal.jsx/.css       -- click-to-expand voicing detail; Phase 5
+                                                   Part 4/7: two-column layout, diagram left
+                                                   (unchanged size) + ChordTonePanel right
+                                                   (700px wide modal, fixed regardless of chord)
+                    ChordTonePanel.jsx/.css     -- Phase 5 Part 4/7: chord-tones column, one
+                                                   compact row per structural degree (Root/3rd-
+                                                   or-sus/5th/7th/9th/11th/13th, +Bass for slash
+                                                   chords) -- ALL 7 always render, degrees
+                                                   outside this chord's own formula in a
+                                                   visually smaller/muted tier vs. degrees the
+                                                   formula uses. Filled-tone chips reuse
+                                                   FretboardDiagram.css's own
+                                                   .interval-dot--<bucket> glow classes, same
+                                                   interval-bucket colors as the fretboard dots
+                                                   (lib/intervalColors.js). Slot data itself
+                                                   (lib/chordTones.js's buildAllToneSlots/
+                                                   buildBassSlot) is layout-agnostic, kept
+                                                   reusable for a possible future layout variant
                     ChordOverview.jsx/.css      -- Phase 5 Part 2/7: "Chord Overview" card
                                                    (interval breakdown/notes/formula, "Why
                                                    this spelling?", "Similar Chords" --
@@ -76,9 +112,24 @@ BetterChord/
                     renderChordNote.jsx  -- Phase 5 Part 2/7: shared backtick-to-ChordName
                                             text renderer, used by every "extra note" family
                     intervalColors.js    -- interval -> color/bucket classification
+                    chordTones.js        -- Phase 5 Part 4/7: shared "what functional slots
+                                            does this chord's formula have" logic
+                                            (formulaTones/omittedTones/presentToneLabels,
+                                            used by VoicingModal.jsx's omitted-tones sentence;
+                                            buildAllToneSlots/buildBassSlot, the layout-agnostic
+                                            data model ChordTonePanel.jsx renders -- ALL 7
+                                            canonical degrees always, tiered primary/muted by
+                                            whether this chord's own formula uses each one)
                     useAlbumThumb.js     -- Phase 4: album-art fetch/retry/blob-URL
                                             hook, works around a Deezer CDN
                                             placeholder-redirect issue (see
                                             CLAUDE.md's Phase 4 entry)
+                    audioUnits.js        -- Phase 5 Part 3/7: shared amplitude<->dB
+                                            conversion (amplitudeToDbClamped, formatDb),
+                                            used by both Waveform.jsx and RecordingInfo.jsx
+                                            so the two can't disagree on the same value
+                    identifyFacts.js     -- Phase 5 Part 3/7: real pipeline facts (condensed
+                                            from HowItWorks.jsx) rotated by IdentifyingStatus
+                                            while /identify is in flight
       assets/      hero.png (unused leftovers: react.svg, vite.svg from the Vite template)
 ```

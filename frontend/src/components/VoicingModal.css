@@ -8,13 +8,220 @@
   width: 480px;
 }
 
-.voicing-modal h2 {
+/* TOP ROW: the top-level TITLE stayed gone this round (13th follow-up
+   left that prior decision untouched) -- but a real CHORD NAME is back
+   in this row now, alongside Close (see VoicingModal.jsx). Two states,
+   handled via :has() rather than two separate override classes:
+     1. Chord name present (the normal case): base `.capture-modal__top`
+        rule's own `space-between` is exactly right again -- name left,
+        Close right -- so no override is needed for this state.
+     2. Chord name absent (the rare defensive fallback, no `chordName`
+        prop given): falls back to the 12th follow-up's `flex-end` fix,
+        so a lone Close still pins to the top-right corner rather than
+        space-between's flex-start default for a single child.
+   margin-bottom stays 18px (12th follow-up's own value, unchanged) --
+   still real breathing room below this row whether or not a name
+   renders alongside Close. */
+.voicing-modal .capture-modal__top {
+  margin-bottom: 18px;
+}
+
+.voicing-modal .capture-modal__top:not(:has(.voicing-modal__chord-name)) {
+  justify-content: flex-end;
+}
+
+/* Chord name (13th follow-up) -- reuses `.readout` (via the shared
+   ChordName component) verbatim for color/font/glow, only overriding
+   size here: `.readout`'s own base rule is tuned for Results.jsx's big
+   page-level `<h1>`, too large to sit comfortably in this compact top
+   row next to Close -- scaled down to this app's existing 20px "large
+   but not page-title" text tier (matches, e.g., SongCard's own artist
+   name size) rather than inventing a new size. */
+.voicing-modal__chord-name .readout {
+  font-size: 20px;
+}
+
+/* Tightened 16px -> 10px (9th follow-up) -- reclaims the gap both above
+   the diagram/tones row and below it (row-to-details, which is what
+   moves the "Omitted from this voicing" sentence closer to the tones
+   panel above it). `.voicing-modal__details`'s OWN internal gap (Notes/
+   Base fret/Capo/omitted-sentence, unchanged below) is completely
+   separate from this outer gap, so the Notes/Base-fret block's own
+   spacing to the omitted sentence is untouched -- only the WHOLE details
+   block moved closer to the row above it. */
+.voicing-modal .capture-modal__body {
+  gap: 10px;
+}
+
+/* Phase 5 Part 4/7 (3rd round on this panel): back to a two-column
+   layout, diagram left / Chord Tones panel right -- see that round's
+   report for the full reasoning. (History: round 1 was two-column at
+   760px with a boxy grid; round 2 reverted to full-width-below-diagram
+   at a flat 480px because the boxy grid wasted space; round 3 found
+   that full-width-below-diagram's real problem was TOTAL MODAL HEIGHT,
+   which a column fixes better than a row does -- a column's height
+   competes with the diagram's own height instead of adding to it.)
+   Diagram column stays EXACTLY the pixel width it already rendered at
+   pre-this-feature (432px = the base 480px modal's 480-48px padding)
+   with zero shrinkage.
+
+   WIDENED to 744px, then 768px, in earlier rounds for the same reason
+   (fitting "m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 · dim7", the two
+   longest real reference strings, tied at 20 characters). WIDENED AGAIN
+   to 792px this round (10th follow-up) -- a REAL, CONFIRMED REGRESSION:
+   the ":" label/reference separator added last round ate into that
+   budget, and the 768px confirmation was never re-run against it. Real
+   measurement this round (before widening) found every cell's content
+   fit inside its available width by only 1-2px -- not actually clipped
+   yet, but close enough that ordinary sub-pixel/font-rendering variance
+   could tip it over, which is almost certainly what the reported "sus4"/
+   "dim7" clipping screenshot actually caught.
+
+   NARROWED to 755px this round (11th follow-up) -- 792px's real margin
+   turned out to be much larger than needed once the true fix (the
+   .panel/.chord-tone-panel specificity bug, not the width itself) was
+   in place: ~51px of slack on the longest reference string, visibly
+   confirmable as excess empty space to the right of the 3rd-degree
+   cell. Re-measured fresh after this round's OTHER structural changes
+   (the new bordered diagram box, subtitles) via the same direct DOM
+   measurement used to catch the original clipping bug (reference
+   span's own rendered width vs. the real space actually available for
+   it in the flex row), not eyeballed -- 745px first (real minimum
+   found: only 4px of margin on the longest strings, under this round's
+   own 10-15px target), then bumped to 755px, landing at a real,
+   confirmed 14px margin on "m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 ·
+   dim7" -- see this round's report for the full per-cell numbers. */
+.voicing-modal--with-tones {
+  width: 755px;
+}
+
+.voicing-modal__row {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+}
+
+/* Both columns are now flex columns with two children each -- a
+   subtitle (.voicing-modal__section-title) and a bordered box below it
+   (.voicing-modal__diagram-box / ChordTonePanel's own .chord-tone-panel)
+   -- symmetric structure on both sides as of this round (11th
+   follow-up). Fixed width, not flex:1, on the diagram column -- this is
+   what guarantees the diagram never shrinks from its pre-this-feature
+   size regardless of how the tones column's own content wants to size
+   itself. */
+.voicing-modal__diagram-col {
+  flex: 0 0 432px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.voicing-modal__tones-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 760px) {
+  .voicing-modal--with-tones {
+    width: 92vw;
+    max-width: 480px;
+  }
+
+  .voicing-modal__row {
+    flex-direction: column;
+  }
+
+  .voicing-modal__diagram-col {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
+/* "Chord Diagram" / "Chord Tones" subtitles (11th follow-up), a real
+   sub-header tier above each box -- REVERSED from last round's "tiny
+   eyebrow label INSIDE the box" placement, which was a misread of the
+   original ask. Both share this one class so they match each other in
+   size/weight/spacing by construction, not just by coincidence. Plain
+   `<h3>` (see VoicingModal.jsx) reusing this app's EXISTING sub-header
+   typography tier verbatim -- index.css's base h3 rule (14px mono
+   uppercase muted), the same convention ChordOverview.jsx's own
+   "What is this chord?"/"Notes in this chord" kickers and Results.jsx's
+   voicing-list section headers already use -- not a new font-size tier
+   invented for this one spot, and noticeably more prominent than the
+   8px TRIAD/EXTENSIONS group-divider eyebrow style it was wrongly
+   borrowing before. This rule only adds the small bottom margin +
+   centering the base h3 rule doesn't already carry (h3 defaults to
+   left-aligned block text with a 10px bottom margin, tuned down
+   slightly here to keep the gap to its own box tight). */
+.voicing-modal__section-title {
+  margin: 0 0 6px;
   text-align: center;
 }
 
+/* Real bordered box (11th follow-up) around the legend + diagram
+   together -- same panel/panel--recessed classes ChordTonePanel's own
+   box uses (see VoicingModal.jsx), so the two columns' boxes visually
+   match. `flex: 1` + `min-height: 0` (not height: 100%) since this box
+   is now one of two flex children in its column (the subtitle above it
+   is the other) -- the standard fix for a flex child's content
+   otherwise forcing a taller-than-available box. Padding matches
+   ChordTonePanel's own box padding (8px 10px) for visual consistency
+   between the two boxes.
+
+   Compound selector (`.voicing-modal__diagram-box.panel`), NOT a bare
+   `.voicing-modal__diagram-box` rule -- this box carries the SAME
+   `panel` class ChordTonePanel.css's own box does, and would otherwise
+   hit the EXACT same real specificity bug found and fixed last round
+   (App.css's base `.panel { padding: 24px }` has identical selector
+   specificity to a bare single-class override and wins on source
+   order) -- caught and fixed proactively here before it could silently
+   repeat, not found again the hard way. */
+.voicing-modal__diagram-box.panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+}
+
+/* NEUTRALIZE THE DIAGRAM'S OWN NESTED BOX (12th follow-up) -- real
+   feedback + screenshot confirmed the legend/diagram read as "two
+   separately bordered boxes," not "one box, two flowing sections."
+   Root cause: FretboardDiagram.jsx unconditionally renders its OWN
+   `panel panel--recessed fretboard-diagram` box around just the SVG
+   (needed as-is for its OTHER real call site, the compact voicing cards
+   on Results.jsx, which have no outer wrapper of their own) -- nested
+   inside THIS round's new outer `.voicing-modal__diagram-box` (also
+   panel--recessed), that inner box's own border/background visibly
+   separated it from the legend sitting above it in the same outer box.
+   FretboardDiagram.jsx itself is NOT touched (a shared component, other
+   call site needs its own real box) -- instead, scoped here to ONLY
+   this specific context, its border/background/shadow are stripped via
+   a more-specific selector so it visually blends into the outer box's
+   OWN identical background (--brown-800) instead of drawing a second,
+   separate-looking one. The 12px inline padding FretboardDiagram.jsx
+   sets on this element (`style={{ padding: 12 }}`) is left alone --
+   inline style can't be overridden from here without `!important`
+   anyway, and it isn't the source of the "boxed" look on its own
+   (border/background were). */
+.voicing-modal__diagram-box .fretboard-diagram {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Faint hairline divider between legend and diagram (12th follow-up),
+   replacing the unwanted heavier nested-box separation above -- same
+   subtle `1px solid var(--brown-700)` treatment this file already uses
+   for the omitted-tones sentence's own divider (.voicing-modal__omitted
+   below), reused here rather than inventing a new divider style. */
 .voicing-modal__legend {
   justify-content: center;
-  margin-bottom: 4px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--brown-700);
 }
 
 .voicing-modal__details {
@@ -33,6 +240,63 @@
 .voicing-modal__details strong {
   color: var(--parchment);
   font-weight: 600;
+}
+
+/* THREE-FIELD Notes/Base fret/Voicing type row (12th follow-up),
+   replacing three separate stacked lines. LEFT-ALIGNED CLUSTER as of
+   this round (14th follow-up) -- SUPERSEDES the 13th follow-up's
+   `justify-content: space-between` spread entirely (real feedback: that
+   read as "pushed to the full modal width," not the intended look).
+   Back to the default `flex-start` (all three fields + their new
+   separators sit together starting from the row's own left edge, one
+   flowing line) with a smaller, fixed `gap: 10px` (down from 20px --
+   the separator glyphs below now carry the visual "these are distinct
+   fields" job that the old wide 20px gap alone used to carry, so the
+   gap itself no longer needs to be as wide).
+   `flex-wrap: wrap` kept as a safety net only, not the expected
+   behavior -- confirmed via real measurement (see this round's report)
+   that even the longest realistic Notes list (a real 6-note extended
+   voicing) fits on one line at this modal's current 755px width with
+   real margin to spare, so wrapping is not expected to trigger on real
+   data; if it ever did, wrapping is still a better failure mode than
+   silent overflow/clipping. */
+.voicing-modal__row-3col {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voicing-modal__row-3col-item {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Notes can still be the longest field by far (a real 6-note voicing),
+   so it alone is allowed to wrap onto a second line rather than forcing
+   the row wider than the modal -- `white-space: normal` overrides the
+   shared `nowrap` above specifically for this field. Every other field
+   stays a fixed, single-line label:value pair. */
+.voicing-modal__row-3col-item--notes {
+  white-space: normal;
+  min-width: 0;
+}
+
+/* Middle-dot field separator (14th follow-up) -- this app's existing
+   inline-separator convention (see ChordTonePanel.jsx's `ReferenceLine`/
+   `.chord-tone-panel__ref` and ChordOverview.jsx's interval-formula
+   line, both already use ' · ' between same-line items), reused here
+   rather than a new glyph/rule invented for this one spot. Low-opacity
+   (not full `--muted` strength) so it reads as a quiet divider, not a
+   fourth piece of content competing with the three real fields --
+   `aria-hidden` on the element itself (see VoicingModal.jsx) since it's
+   purely visual, redundant with the DOM's own field order for anyone
+   using a screen reader. */
+.voicing-modal__row-3col-sep {
+  color: var(--muted);
+  opacity: 0.5;
 }
 
 .voicing-modal__omitted {

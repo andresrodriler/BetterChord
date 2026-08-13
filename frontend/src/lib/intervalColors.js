@@ -80,22 +80,69 @@ export function classifyInterval(interval, formula) {
   if (FIFTH_INTERVALS.has(interval)) return 'fifth'
   if (THIRD_INTERVALS.has(interval)) return 'third'
   if (SEVENTH_INTERVALS.has(interval)) return 'seventh'
+  // REAL BUG, found + fixed this round (Phase 5 Part 4/7, 13th follow-up):
+  // this comment previously said "a plain ... non-sus '4' ... falls
+  // through to the single generic 'ext' bucket" as if that were always
+  // correct -- it wasn't. Confirmed directly against live /voicings
+  // responses across many extended qualities (C11, C13, Cmaj13, Cm13,
+  // Cadd11, Cmaj11/E, ...), not assumed: an UNALTERED natural 11th is
+  // declared as formula token "11", but every real voicing in the db
+  // logs that exact note using literal "4" instead -- "11" never appears
+  // verbatim anywhere in real per-voicing `intervals` data (only the
+  // ALTERED "#11" appears literally, e.g. real C7#11 data). A natural
+  // 13th is usually logged as literal "13" (matching formula) but is
+  // INCONSISTENTLY logged as "6" for the identical pitch in some real
+  // Cm13 rows (confirmed via direct query: real row "8-X-8-8-10-X" logs
+  // its A note -- Cm13's 13th -- as "6", while row "X-3-5-3-4-5" logs the
+  // same A as "13", same chord, same quality, same pitch). Both real
+  // tokens were falling into the generic catch-all "ext" bucket instead
+  // of the dedicated ext11/ext13 tint the chord's own declared extension
+  // is supposed to get -- this is what let a genuinely-played natural
+  // 11th/13th note render in a color that didn't match its own legend
+  // swatch, and (see chordTones.js's realTokenAliases, the deeper half of
+  // this same bug) let the Chord Tones panel miss that the note was
+  // played at all, since its own presence check compared formula's
+  // "11"/"13" label against the voicing's real "4"/"6" token via exact
+  // string equality and never found a match.
+  // Fixed by recognizing "4"/"6" as this chord's real 11th/13th ONLY when
+  // `formula.extensions` actually declares that degree -- gated so an
+  // UNRELATED chord's genuine sus4 tone ("4", already claimed by the
+  // sus-check above) or genuine plain 6th chord ("6", C6/C6/9's real
+  // token) are completely unaffected; confirmed via real Csus4/C6/C6/9
+  // data (neither has "11"/"13" in `extensions`) as part of this round's
+  // stress test. The sus4+11-extension combo (a real quality, e.g.
+  // C11sus4/C13sus4 -- confirmed via a live query, formula.sus=["sus4"]
+  // AND extensions includes "11" simultaneously) is a genuine, narrower,
+  // KNOWN LIMITATION left unresolved: "4" is already unambiguously the
+  // sus4 tone for that formula (the sus-check above takes priority,
+  // unchanged), and the real per-voicing data has no separate token to
+  // tell an actual additional 11th apart from the sus4 tone itself --
+  // flagged here rather than guessed at.
+  if (interval === '4' && formula?.extensions?.includes('11') && !formula?.sus?.includes('sus4')) return 'ext11'
+  if (interval === '6' && formula?.extensions?.includes('13')) return 'ext13'
   // Extension-tone tints (Phase 3 Part 5/6, 5th follow-up): bare "9"/"11"/
   // "13" each get their own lightness step of the ext family (see
   // index.css's --interval-ext-9/-11/-13) instead of one shared "ext"
   // fill -- confirmed via real C11/Cm13 screenshots that 9th/11th/13th
   // were visually indistinguishable from each other before this. Only
   // the bare extension token gets its own tint; altered variants
-  // (b9/#9/#11/b13/#13), a plain "6", and a non-sus "4" all still fall
-  // through to the single generic "ext" bucket below, unchanged -- the
-  // task scoped this to 9th/11th/13th specifically, not every extension.
+  // (b9/#9/#11/b13/#13) and a genuine plain "6"/non-sus "4" (i.e. NOT
+  // covered by the two new checks above) still fall through to the
+  // single generic "ext" bucket below, unchanged -- the task scoped this
+  // to 9th/11th/13th specifically, not every extension.
   if (interval === '9') return 'ext9'
   if (interval === '11') return 'ext11'
   if (interval === '13') return 'ext13'
   return 'ext'
 }
 
-function cssVar(name) {
+// Exported (Phase 5 Part 4/7, 4th round on ChordTonePanel) so callers that
+// need a plain, non-interval CSS token resolved to its real value (e.g.
+// chordTones.js's bass-slot placeholder styling, when there's no real
+// interval to classify) can read it the same way this file already does
+// for its own five/eight interval buckets, rather than hardcoding a
+// duplicate hex literal.
+export function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 

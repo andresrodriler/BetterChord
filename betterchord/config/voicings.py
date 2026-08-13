@@ -349,12 +349,28 @@ def _get_voicings_literal(conn, chord_name):
     voicings = _rows_to_dicts(rows, root=literal_root, quality="")
     sorted_voicings = _sort_by_type(voicings)
 
+    # `bass` (Phase 5 Part 4/7, VoicingModal's tone panel): the resolved
+    # slash-bass note actually backing the returned rows, canonicalized
+    # through cp.canon_note the same way the main resolve_voicing_chord
+    # path already does -- None whenever the returned rows are root-
+    # position (no slash requested, or a fallback already stripped the
+    # bass off). This is a top-level fact about the WHOLE response, not a
+    # per-voicing field: every row in one /voicings/{chord} response
+    # shares the same bass (or lack of one), since they all came from one
+    # resolved query. Deliberately NOT re-derived by splitting `displayed`
+    # on "/" frontend-side -- CLAUDE.md's core parser rule exists exactly
+    # because that looks simple and isn't: a compound quality name like
+    # "6/9" (A6/9) also contains a literal "/" that is NOT a bass
+    # separator, so a naive split would misparse a real, unrelated chord.
+    bass_out = cp.canon_note(bass_note) if (slash_match and not fallback) else None
+
     return {
         "voicings":        sorted_voicings,
         "fallback":        fallback,
         "displayed":       displayed,
         "translated":      False,
         "translated_from": None,
+        "bass":            bass_out,
     }
 
 
@@ -414,12 +430,20 @@ def get_voicings(chord_name):
         voicings = _rows_to_dicts(rows, root=root, quality=canonical_quality)
         sorted_voicings = _sort_by_type(voicings)
 
+        # `bass` -- see _get_voicings_literal's identical field for the
+        # full reasoning (top-level, not per-voicing; None whenever a
+        # fallback already stripped the bass off). `resolved["bass"]` is
+        # already canon_note-normalized (resolve_voicing_chord parses it
+        # via cp.parse_chord, whose own "bass" field is canon_note'd --
+        # see chord_parser.py:449), so no second normalization is needed
+        # here.
         return {
             "voicings":        sorted_voicings,
             "fallback":        fallback,
             "displayed":       displayed,
             "translated":      resolved["translated"],
             "translated_from": chord_name if resolved["translated"] else None,
+            "bass":            bass if not fallback else None,
         }
     finally:
         conn.close()
