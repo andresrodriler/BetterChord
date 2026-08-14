@@ -6,10 +6,12 @@ import ChordOverview from '../components/ChordOverview'
 import FretboardDiagram from '../components/FretboardDiagram'
 import IntervalLegend from '../components/IntervalLegend'
 import SongCard from '../components/SongCard'
+import { SongFiltersPanel, SongFiltersToggle } from '../components/SongFilters'
 import VoicingModal from '../components/VoicingModal'
 import { useFretboardPrefs } from '../context/FretboardPrefsContext'
 import { getChordInfo, getSongs, getVoicings } from '../lib/api'
 import { renderChordNote } from '../lib/renderChordNote'
+import { computeSongFilterOptions, EMPTY_SONG_FILTERS, filterSongs } from '../lib/songFilters'
 import './Results.css'
 
 // Reads/writes the same global FretboardPrefsContext as before -- only the
@@ -71,12 +73,19 @@ function Results() {
   const [chordInfo, setChordInfo] = useState(null) // { ok, status, data } | null (loading) -- Phase 5 Part 2/7 follow-up
   const [expandedVoicing, setExpandedVoicing] = useState(null) // Phase 3 Part 5/6 click-to-expand
   const [visibleSongCount, setVisibleSongCount] = useState(SONG_BATCH_SIZE) // Phase 4 follow-up: incremental song-list render
+  // Phase 5 Part 5/7: artist/genre/capo/release-year filters, applied
+  // entirely client-side against the already-fetched flatSongs array (see
+  // lib/songFilters.js) -- no new API calls/params needed.
+  const [songFilters, setSongFilters] = useState(EMPTY_SONG_FILTERS)
+  const [filtersOpen, setFiltersOpen] = useState(false) // closed by default -- .song-list is already space-constrained
 
   useEffect(() => {
     setVoicings(null)
     setSongs(null)
     setChordInfo(null)
     setVisibleSongCount(SONG_BATCH_SIZE)
+    setSongFilters(EMPTY_SONG_FILTERS)
+    setFiltersOpen(false)
     getVoicings(chordName).then(setVoicings)
     getSongs(chordName).then(setSongs)
     // Task 4 (Phase 5 Part 2/7 follow-up): confirmed live, not assumed --
@@ -108,8 +117,94 @@ function Results() {
     )
   }, [songs])
 
-  const visibleSongs = flatSongs.slice(0, visibleSongCount)
-  const hasMoreSongs = visibleSongCount < flatSongs.length
+  // Phase 5 Part 5/7 follow-up (Step 1 bugfix): the genuine-no-songs
+  // quality_fallback path (Dump Notes: "If genuine no songs exist") is a
+  // completely separate branch from results_by_spelling -- flatSongs above
+  // is always empty whenever this fires (quality_fallback_used only ever
+  // gets set when total_songs === 0). Filters was never wired into this
+  // branch at all last round -- confirmed via a real screenshot on a chord
+  // that genuinely triggers it (e.g. `C(#9)`): the Filters section was
+  // completely absent, not collapsed or empty. Verified the fallback song
+  // dicts have the IDENTICAL shape _rows_to_songs() produces for the
+  // primary path (same `artist`/`artist_genres`/`ug_capo`/
+  // `album_release_date` fields -- checked directly against a real
+  // get_songs('C(#9)') response before assuming so) -- same flattening/
+  // filtering logic applies unchanged, just from a different source array.
+  // `entryChord` is carried through so the filtered results can be
+  // re-grouped back under their real fallback-root headers below.
+  const flatFallbackSongs = useMemo(() => {
+    const groups = songs?.data?.quality_fallback_songs || []
+    return groups.flatMap((entry) =>
+      entry.songs.map((s, i) => ({ key: `${entry.chord}-${i}`, song: s, entryChord: entry.chord }))
+    )
+  }, [songs])
+
+  const isFallbackView = !!(songs?.ok && songs.data.quality_fallback_used)
+  // Whichever flat song list is actually being shown right now -- exactly
+  // one of these is ever non-empty for a given response (results_by_spelling
+  // is empty whenever quality_fallback fires, and vice versa), so Filters
+  // (and everything it drives: options, filtering, the empty state) can be
+  // built once, generically, off this, rather than duplicated per branch.
+  const songsForFilters = isFallbackView ? flatFallbackSongs : flatSongs
+
+  // Phase 5 Part 5/7: filter options (artist/genre lists, real release-year
+  // bounds) are always derived from the FULL unfiltered songsForFilters --
+  // not the already-filtered result -- so narrowing by one filter never
+  // removes another filter's own available options out from under it.
+  const songFilterOptions = useMemo(() => computeSongFilterOptions(songsForFilters), [songsForFilters])
+  const filteredSongs = useMemo(() => filterSongs(songsForFilters, songFilters), [songsForFilters, songFilters])
+
+  // Phase 5 Part 5/7 follow-up (Step 1): filtered fallback songs re-grouped
+  // back under their real per-root headers (quality_fallback_songs' own
+  // `root`/`chord`), preserving the original group order and the existing
+  // "cap each group's display to 5" behavior -- just applied AFTER
+  // filtering now, not before (filtering the already-capped 5 would silently
+  // hide real matches beyond the cap instead of surfacing them). A group
+  // with zero surviving songs is dropped entirely rather than showing an
+  // empty header.
+  const filteredFallbackGroups = useMemo(() => {
+    if (!isFallbackView) return []
+    const filteredKeys = new Set(filteredSongs.map((f) => f.key))
+    const groups = songs?.data?.quality_fallback_songs || []
+    return groups
+      .map((entry) => ({
+        ...entry,
+        filteredSongs: entry.songs.filter((_, i) => filteredKeys.has(`${entry.chord}-${i}`)),
+      }))
+      .filter((entry) => entry.filteredSongs.length > 0)
+  }, [isFallbackView, filteredSongs, songs])
+
+  // Phase 5 Part 5/7 follow-up (Step 4): seed the Album Release Year
+  // fields to this chord's REAL observed min/max once it's known, rather
+  // than leaving them permanently blank-with-a-placeholder (confirmed via
+  // screenshot review: looked bound but wasn't -- a real value the user can
+  // select/copy and see reflected in the filter is not the same thing as
+  // grey placeholder text that happens to show the same digits). Only
+  // seeds when the year fields are still at the pre-load blank sentinel
+  // (EMPTY_SONG_FILTERS) -- never overwrites a real user edit, and only
+  // fires once options.yearMin actually becomes known (i.e. once per real
+  // chord-data load, not on every keystroke).
+  useEffect(() => {
+    if (songFilterOptions.yearMin === null) return
+    setSongFilters((prev) => {
+      if (prev.yearMin !== '' || prev.yearMax !== '') return prev
+      return { ...prev, yearMin: String(songFilterOptions.yearMin), yearMax: String(songFilterOptions.yearMax) }
+    })
+  }, [songFilterOptions])
+
+  // Filtering narrows the list BEFORE it's sliced by visibleSongCount for
+  // infinite scroll -- visibleSongCount itself resets to the initial batch
+  // whenever a filter changes (separate effect below), so a narrowed
+  // result set is never stuck showing a stale, larger scroll position from
+  // before filtering. (Infinite scroll only ever applies to the primary
+  // path's single flat list -- the fallback path stays its existing
+  // per-group 5-song cap, unaffected by visibleSongCount.)
+  const visibleSongs = filteredSongs.slice(0, visibleSongCount)
+  const hasMoreSongs = !isFallbackView && visibleSongCount < filteredSongs.length
+
+  useEffect(() => {
+    setVisibleSongCount(SONG_BATCH_SIZE)
+  }, [songFilters])
 
   const songListRef = useRef(null)
   const songSentinelRef = useRef(null)
@@ -122,14 +217,14 @@ function Results() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setVisibleSongCount((c) => Math.min(c + SONG_BATCH_SIZE, flatSongs.length))
+          setVisibleSongCount((c) => Math.min(c + SONG_BATCH_SIZE, filteredSongs.length))
         }
       },
       { root, rootMargin: '400px' } // start loading the next batch before the user actually hits bottom
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMoreSongs, flatSongs.length])
+  }, [hasMoreSongs, filteredSongs.length])
 
   // Phase 5 Part 2/7 follow-up: chord_info.py's theory data, fetched once
   // the Songs endpoint RESOLVES (succeeds or fails -- `songs` is non-null
@@ -281,7 +376,7 @@ function Results() {
 
       <div className="results-grid">
         <div className="section panel">
-          <div className="voicings-panel__header">
+          <div className="panel-header">
             <h2>Voicings</h2>
             <HandednessToggle />
           </div>
@@ -340,9 +435,44 @@ function Results() {
         </div>
 
         <div className="section panel">
-          <h2>Songs</h2>
+          {/* Phase 5 Part 5/7 follow-up (Step 1, 3rd round): Filters'
+              trigger button now lives in the panel header itself, top-right
+              -- exactly mirroring HandednessToggle's placement in the
+              Voicings panel above (both share `.panel-header`, Results.css)
+              -- rather than inline above the song list. Real bug this
+              fixes: a chord triggering BOTH the inversion-fallback and
+              quality-fallback banners below used to render Filters
+              sandwiched between them (confirmed via screenshot); the
+              header position is independent of however many banners render
+              on any given chord -- always the same spot, 0/1/2 banners. */}
+          <div className="panel-header">
+            <h2>Songs</h2>
+            {songs && songs.ok && songsForFilters.length > 0 && (
+              <SongFiltersToggle
+                open={filtersOpen}
+                onToggleOpen={() => setFiltersOpen((o) => !o)}
+                options={songFilterOptions}
+                filters={songFilters}
+                matchCount={filteredSongs.length}
+                totalCount={songsForFilters.length}
+              />
+            )}
+          </div>
           {songs === null && <p className="status-text">Loading songs...</p>}
           {songs && !songs.ok && <p className="status-text status-text--error">{songs.data.error}</p>}
+          {/* The collapsible panel content itself renders directly below
+              the header too (still above every banner) -- so expanding it
+              never looks like it's being inserted between banner text
+              either, same "one consistent place" goal as the toggle
+              button's own move above. */}
+          {songs && songs.ok && songsForFilters.length > 0 && (
+            <SongFiltersPanel
+              open={filtersOpen}
+              options={songFilterOptions}
+              filters={songFilters}
+              onChange={setSongFilters}
+            />
+          )}
           {/* Phase 5 Part 1/6 follow-up: makes an inversion fallback
               explicit instead of silently showing root-position songs as
               if they matched the searched inversion (Dump Notes: "Fall
@@ -361,13 +491,27 @@ function Results() {
               </p>
             </div>
           )}
-          {songs && songs.ok && songs.data.total_songs > 0 && (
+          {songs && songs.ok && !isFallbackView && filteredSongs.length > 0 && (
             <ul className="song-list" ref={songListRef}>
               {visibleSongs.map(({ key, song, spelling }) => (
                 <SongCard key={key} song={song} spelling={spelling} />
               ))}
               {hasMoreSongs && <li ref={songSentinelRef} className="song-list__sentinel" aria-hidden="true" />}
             </ul>
+          )}
+          {/* Real "no songs match your filters" empty state -- distinct
+              from both the structural fallback banners above (unaffected
+              by filters) and the genuine-zero-songs status text below
+              (total_songs === 0, a completely different case: nothing was
+              ever found for this chord at all, not narrowed away by a
+              filter choice). PRIMARY path only here -- the fallback path
+              gets its own copy of this message INSIDE the fallback block
+              below (Step 1 follow-up), since showing this generic line
+              directly above the fallback's own "...shown here instead:"
+              banner read as two overlapping, confusing messages back to
+              back rather than one clear one. */}
+          {songs && songs.ok && !isFallbackView && songsForFilters.length > 0 && filteredSongs.length === 0 && (
+            <p className="song-filters__empty">No songs match your filters.</p>
           )}
           {/* Phase 5 Part 1/6: genuine-no-songs fallback (Dump Notes: "If
               genuine no songs exist") -- kept visually/structurally
@@ -397,16 +541,32 @@ function Results() {
                     `songs using that same quality on other roots are shown here instead:`
                 )}
               </p>
-              {songs.data.quality_fallback_songs.map((entry) => (
-                <div key={entry.chord} className="quality-fallback-group">
-                  <h3 className="voicing-list__section">{entry.chord}</h3>
-                  <ul className="song-list">
-                    {entry.songs.slice(0, 5).map((song, i) => (
-                      <SongCard key={`${entry.chord}-${i}`} song={song} spelling={entry.chord} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              {/* Phase 5 Part 5/7 follow-up (Step 1): renders the FILTERED
+                  regrouping (filteredFallbackGroups), not the raw
+                  songs.data.quality_fallback_songs -- filtering happens
+                  across the full per-group song list before the existing
+                  5-per-group display cap, so a real match beyond the first
+                  5 unfiltered songs still surfaces once other songs are
+                  filtered out. A group with zero surviving songs is
+                  dropped by filteredFallbackGroups itself, not rendered
+                  here as an empty header. If a filter combination wipes
+                  out every group, show the same empty-state message the
+                  primary path uses, in place of the (now-empty) group
+                  list, rather than the generic pre-banner line above. */}
+              {filteredFallbackGroups.length === 0 ? (
+                <p className="song-filters__empty">No songs match your filters.</p>
+              ) : (
+                filteredFallbackGroups.map((entry) => (
+                  <div key={entry.chord} className="quality-fallback-group">
+                    <h3 className="voicing-list__section">{entry.chord}</h3>
+                    <ul className="song-list">
+                      {entry.filteredSongs.slice(0, 5).map((song, i) => (
+                        <SongCard key={`${entry.chord}-${i}`} song={song} spelling={entry.chord} />
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
             </div>
           )}
           {songs && songs.ok && songs.data.total_songs === 0 && !songs.data.quality_fallback_used && (

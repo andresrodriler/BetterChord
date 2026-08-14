@@ -270,7 +270,7 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
             "SELECT title, artist, normalized_unique_chords, spotify_track_id, "
             "album_image_url, artist_image_url, youtube_video_id, youtube_confidence, "
             "ug_url, ug_key, ug_capo, ug_capo_source, ug_tuning_name, ug_tuning_value, "
-            "ug_votes, artist_genres, all_chords, normalized_all_chords "
+            "ug_votes, artist_genres, all_chords, normalized_all_chords, album_release_date "
             "FROM songs WHERE normalized_unique_chords LIKE ?",
             (f'%"{target}"%',)
         )
@@ -294,6 +294,10 @@ def get_songs(chord_query, db_path=None, registry_path=None, guide_tone_path=Non
                 "ug_tuning_value": r[13],
                 "ug_votes": r[14],
                 "artist_genres": r[15],
+                # ISO "YYYY-MM-DD" (confirmed against real data -- 31138 of
+                # 31140 rows, only 2 genuinely NULL/empty) -- Phase 5 Part
+                # 5/7, added for the year-range filter on the Songs panel.
+                "album_release_date": r[18],
                 # Both explain why the chord name shown here can differ from
                 # what's literally printed on the UG tab -- two genuinely
                 # separate reasons, see songs.py's helpers for how each is

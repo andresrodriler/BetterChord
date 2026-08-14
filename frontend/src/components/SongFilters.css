@@ -1,0 +1,482 @@
+/* Phase 5 Part 5/7: client-side filter panel for the Songs list. Reuses
+   existing pill/segmented/field vocabulary (.tag, .handedness-toggle's
+   pressed-pill treatment, .field-label, .text-input, .panel--recessed) --
+   no new visual language introduced, per betterchord-design's "prefer
+   evolving in place" guidance. */
+
+.song-filters__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.song-filters__toggle:hover {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+.song-filters__toggle[aria-expanded='true'] {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+.song-filters__count {
+  /* .tag's own font-family/size stay; this just tightens the pill so it
+     sits comfortably inside the toggle rather than looking like a second
+     independent control. */
+  padding: 2px 8px;
+  font-size: 10px;
+}
+
+.song-filters__chevron {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* 3rd follow-up round: margin-top bumped 10px -> 16px -- this panel used
+   to sit just below its own toggle button (10px felt right relative to
+   that); now that the toggle moved into the panel header (Step 1) and
+   this panel renders directly after it with no wrapper between them, it
+   needs the same breathing room as any other block directly under an h2
+   header row. */
+.song-filters__panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.song-filters__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* 4th follow-up round (Step 1, vertical-space pass): Capo and Album
+   Release Year now share one row instead of each taking a full-width row
+   of their own. flex-wrap (not a media query) is what provides the
+   "stack on narrow" fallback -- each `.song-filters__subfield` below has
+   a real min-width, so the two wrap onto separate lines automatically
+   once the ROW'S OWN rendered width can't fit both comfortably, correct
+   regardless of the Songs panel's actual column width rather than tied
+   to a guessed global viewport breakpoint. */
+.song-filters__row--split {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 16px;
+}
+
+/* min-width: max-content (not a guessed pixel value) -- a subfield must
+   never shrink below its OWN control's natural, un-wrapped width (real
+   bug found and fixed here: an earlier pixel-guessed min-width let the
+   flex-shrink algorithm squeeze the Capo segmented control narrower than
+   its own button labels, wrapping "Has capo"/"No capo" mid-word inside
+   the pills -- confirmed via a real screenshot, not assumed). With
+   max-content as the floor, `flex-wrap` on the parent row is what
+   actually provides the "stack on narrow" fallback: once both
+   subfields' real natural widths can't fit side by side, Year wraps
+   onto its own line entirely, rather than either control silently
+   compressing/wrapping its own internal content. */
+.song-filters__subfield {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: max-content;
+}
+
+/* Phase 5 Part 5/7 follow-up (Step 3): custom-built combobox, replacing
+   the prior round's native <datalist> -- its browser-native popup can't be
+   meaningfully styled cross-browser (confirmed via screenshot: a jarring
+   unstyled white list), a real implementation limitation, not a CSS miss
+   to patch. Positioned relatively so the dropdown list below can anchor to
+   it directly. */
+.song-filters__combobox {
+  position: relative;
+  width: 100%;
+}
+
+.song-filters__combobox-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.song-filters__artist-input {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.song-filters__combobox-clear {
+  position: absolute;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.song-filters__combobox-clear:hover {
+  color: var(--parchment);
+  background: var(--brown-700);
+}
+
+/* Dropdown list -- a raised .panel-style surface (not recessed, since it
+   floats ABOVE the recessed filter panel it belongs to), scrollable, capped
+   in height so a long relevance-sorted match list never grows unbounded. */
+.song-filters__combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--brown-900);
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+  scrollbar-color: var(--brown-700) transparent;
+}
+
+.song-filters__combobox-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: 14px/1.3 var(--sans);
+  color: var(--parchment);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.song-filters__combobox-option--highlighted,
+.song-filters__combobox-option:hover {
+  background: var(--brown-800);
+}
+
+.song-filters__combobox-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.song-filters__combobox-empty {
+  display: block;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Phase 5 Part 5/7 follow-up (Step 2, 3rd round; repositioned Step 3, 4th
+   round): the "ARTIST GENRE" field label and the currently-SELECTED
+   genres now share one flex-wrap row -- the always-visible summary
+   (SelectedGenres) renders as direct siblings of the label here, not
+   nested in a separate block, so the two read as one row with natural
+   overflow instead of two visually-disconnected pieces. Still a sibling
+   of the (scrollable, text-filterable) chip grid below, never nested
+   inside it -- neither scrolling that grid nor narrowing it with the text
+   filter can hide a real selection from this row. Overflow chips wrap
+   onto a new line within THIS row (flex-wrap, no explicit breakpoint
+   needed) -- still strictly above the search input/chip grid below. */
+.song-filters__genre-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+/* Same brass "active control" pill as a pressed .song-filters__chip, but
+   always shown regardless of the chip grid's own filtered/scrolled state
+   -- reads as "this one's on," with its own × for direct removal. */
+.song-filters__selected-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--brown-950);
+  background: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.song-filters__selected-chip:hover {
+  background: #d9af74;
+  border-color: #d9af74;
+}
+
+/* Phase 5 Part 5/7 follow-up (Step 2): small text filter narrowing the
+   genre chip list itself -- purely a discoverability aid, doesn't touch
+   the underlying ANY-match filter logic below. */
+.song-filters__genre-search {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.song-filters__chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--brown-700) transparent;
+}
+
+/* Toggleable genre chip -- same shape as .tag, but interactive with the
+   same brass "active control" treatment .handedness-toggle already uses
+   for its pressed state (never --scan: this is a user-driven filter
+   choice, not a detected/computed result). */
+.song-filters__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+/* Phase 5 Part 5/7 follow-up (Step 2): per-chip song count, sorted by this
+   descending elsewhere (computeSongFilterOptions) -- shown small/muted so
+   the genre name itself stays the visually primary text. */
+.song-filters__chip-count {
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.song-filters__chip[aria-pressed='true'] .song-filters__chip-count {
+  opacity: 0.85;
+}
+
+.song-filters__chip:hover {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+.song-filters__chip[aria-pressed='true'] {
+  color: var(--brown-950);
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.song-filters__segmented {
+  display: inline-flex;
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.song-filters__segment {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: none;
+  border-right: 1px solid var(--brown-700);
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.song-filters__segment:last-child {
+  border-right: none;
+}
+
+.song-filters__segment:hover {
+  color: var(--parchment);
+}
+
+.song-filters__segment[aria-pressed='true'] {
+  color: var(--brown-950);
+  background: var(--brass);
+}
+
+.song-filters__year-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 4th follow-up round (Step 1): narrowed from the original 90px so Capo +
+   Year can comfortably share one row within the Songs panel's real max
+   content width (~436px, confirmed via screenshot at every real desktop
+   viewport width -- the app's own centered-column max-width caps it there
+   regardless of browser window size beyond that). Real, screenshot-
+   confirmed clipping bug from that pass (a too-narrow width cut off the
+   last digit of real values like "1900"/"2026") was root-caused to the
+   browser's native number-input spinner eating part of the content box --
+   fixed THEN by suppressing that spinner entirely.
+   5th round (user request): the suppressed spinner's tap/hold-to-adjust
+   affordance is back, rebuilt as themed buttons (`.song-filters__year-
+   steppers` below) instead of un-suppressing the native one -- so the
+   native spin buttons stay hidden here (`appearance: textfield`) and
+   `padding-right` grows to reserve real room for the custom buttons
+   instead, re-tuned together with the panel's overall footprint so the
+   Capo+Year row still fits on one line at every real desktop width
+   (see .song-filters__row--split). */
+.song-filters__year-input {
+  width: 82px;
+  padding: 8px 22px 8px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.song-filters__year-input::-webkit-outer-spin-button,
+.song-filters__year-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.song-filters__year-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Themed replacement for the native number-input spinner (5th round) --
+   two small triangle buttons stacked in the same visual position a
+   native spinner would occupy, tap-or-hold to increment/decrement (see
+   useHoldRepeat in SongFilters.jsx). Deliberately excluded from the tab
+   order (tabIndex={-1}) -- the input itself already supports the native
+   ArrowUp/ArrowDown keyboard stepping a `type="number"` input provides
+   regardless of whether its own visual spinner is shown, so a keyboard
+   user's path is the field itself, not tabbing through two extra mouse-
+   oriented buttons. */
+.song-filters__year-steppers {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  flex-direction: column;
+  width: 16px;
+}
+
+.song-filters__year-stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.song-filters__year-stepper:hover {
+  color: var(--brass);
+}
+
+.song-filters__year-stepper:active {
+  color: var(--parchment);
+}
+
+.song-filters__year-sep {
+  color: var(--muted);
+}
+
+/* Phase 5 Part 5/7 follow-up (Step 3, 3rd round): restyled from `.btn-ghost`
+   (a rectangular, differently-bordered treatment that read as a visual
+   outlier next to everything else in this panel) to match the same pill
+   treatment as `.song-filters__toggle`/`.handedness-toggle` -- the app's
+   established "small toggle/action control" language, not a new one. */
+.song-filters__clear {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.song-filters__clear:hover {
+  color: var(--parchment);
+  border-color: var(--brass-border);
+}
+
+/* Real "no songs match your filters" empty state -- deliberately distinct
+   from the structural fallback banners (.related-note, moss left border):
+   this is a plain informational status, not a substitution being made on
+   the user's behalf, so it stays as unadorned centered status text rather
+   than a bordered callout. */
+.song-filters__empty {
+  margin-top: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--brown-800);
+  border: 1px dashed var(--brown-700);
+  border-radius: var(--radius-sm);
+}

@@ -56,18 +56,24 @@
   }
 }
 
-/* Handedness toggle moved here from the global app header (Phase 3 Part 2
-   follow-up fix #5) -- top-right of the "VOICINGS" panel header, next to
-   the label it actually affects. The underlying preference is still the
-   same global FretboardPrefsContext. */
-.voicings-panel__header {
+/* Generic panel-header row: h2 label + a top-right control, same treatment
+   for any panel that needs it. Originally `.voicings-panel__header`
+   (Phase 3 Part 2 follow-up fix #5, moving the handedness toggle out of
+   the global app header to sit top-right of the "VOICINGS" heading it
+   actually affects) -- renamed/generalized (Phase 5 Part 5/7, 3rd
+   follow-up round, Step 1) when the Songs panel needed the exact same
+   "H2 + top-right control" row for its own Filters toggle, rather than
+   duplicating the same 3 CSS rules under a second, Songs-specific class
+   name. Both panels' headers are now genuinely the same treatment, not
+   two separately-maintained copies of it. */
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.voicings-panel__header h2 {
+.panel-header h2 {
   margin-bottom: 0;
 }
 
