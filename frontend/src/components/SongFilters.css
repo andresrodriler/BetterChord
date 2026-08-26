@@ -20,6 +20,7 @@
   padding: 7px 16px;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
+  line-height: normal;
 }
 
 .song-filters__toggle:hover {
@@ -244,8 +245,8 @@
 }
 
 .song-filters__selected-chip:hover {
-  background: #d9af74;
-  border-color: #d9af74;
+  background: var(--brass-hover);
+  border-color: var(--brass-hover);
 }
 
 /* Phase 5 Part 5/7 follow-up (Step 2): small text filter narrowing the

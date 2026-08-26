@@ -1,9 +1,108 @@
+/* Phase 5 Part 6/7, Results convergence follow-up: real, confirmed
+   ambient-lighting mismatch, found by direct pixel sampling (not
+   eyeballed) -- the mockup's header/hero region reads visibly warmer/
+   brighter than what the shared `:root` background (index.css, tuned
+   against HOME's own real decoded mockup, 14th follow-up) produces here.
+   Root-caused, not guessed: `:root`'s vignette is
+   `radial-gradient(62.5vw 70vh at 50% 40%, transparent 55%,
+   rgba(0,0,0,0.4) 100%)` -- centered 40% DOWN the viewport. Results' own
+   real mockup source (`Chord Results - G9 (Audio Identified).dc.html`)
+   has a DIFFERENT vignette for this page specifically:
+   `radial-gradient(ellipse 1100px 800px at 50% 0%, transparent 45%,
+   rgba(0,0,0,0.4) 100%)` -- centered at the very TOP edge, not 40% down.
+   Worked the math at a real sampled point, (200,65) in a 1440x1000
+   viewport, to confirm this actually explains the measured gap before
+   writing any CSS: `:root`'s own vignette (center 720,400) puts that
+   point at ~0.75 normalized distance -> ~18% black overlay; Results' own
+   vignette (center 720,0) puts the same point at ~0.48 normalized
+   distance -> ~2% black overlay -- a real, ~16-point alpha difference,
+   consistent with the measured RGB gap (mockup brighter by roughly
+   9-20 units per channel across several sampled header-region points,
+   largest near the widget's left edge, smallest near center -- exactly
+   what a repositioned-vignette explanation predicts, not a flat "add
+   more glow everywhere" one).
+   `:root`'s own vignette is independently correct for Home (verified
+   against Home's own real decoded source) and shared app-wide, so this
+   is a Results-page-scoped override, not a `:root` change: a full,
+   opaque repaint (grain + Results' own vignette, over the shared
+   `--brown-950` base) on a `.results-page::before` layer that sits
+   between `:root`'s background and this page's real content -- the
+   same "fully repaint over the shared background rather than try to
+   subtract from it" approach already used for `.app-header`'s own
+   opaque gradient fill. `position: absolute` (not `fixed`) so it
+   scrolls with the page like `:root`'s own background does, anchored to
+   this page's own top (matches the mockup's single-render page, where
+   the vignette also begins at the literal top of content). A linear
+   fade-out mask on the bottom edge blends back into `:root`'s own
+   background rather than ending in a hard, visible seam -- the exact
+   bug class already fixed twice elsewhere in this app (grain/vignette
+   layers scoped to a narrower box than the true page, Home's own 4th and
+   10th follow-ups) -- confirmed via the same before/after pixel-sampling
+   method used to find this issue in the first place, not assumed safe. */
+.results-page {
+  position: relative;
+}
+
+.results-page::before {
+  content: '';
+  position: absolute;
+  /* Real, confirmed bug in the first version of this fix, caught by
+     re-sampling rather than trusting the CSS alone: `.results-page`
+     itself doesn't start at the true viewport top -- `.app-header`
+     (~50.09px, measured) and `.app-main`'s own 40px padding-top sit
+     above it, so `top: 0` here would actually start ~90.09px down the
+     real page. The first attempt tried compensating by shifting the
+     GRADIENT's own center coordinate upward instead of moving the
+     element -- that doesn't work: an element's background is clipped to
+     its own box regardless of where a gradient's center falls, so
+     nothing painted above y_local=0 (i.e. above the real page's own
+     ~90px mark) no matter what the gradient said. The actual fix is to
+     move the ELEMENT itself up by that same measured offset (the
+     header's own opaque fill already hides anything behind IT, so
+     extending this layer up to the true viewport top is safe -- nothing
+     else needed to see it there anyway), keeping the gradient's own
+     "50% 0%" center exactly matching the mockup's real "vignette
+     centered at the literal page top" value, unmodified. */
+  top: -90.09px;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  height: 1000px;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+  background: radial-gradient(76.4vw 800px at 50% 0%, transparent 45%, rgba(0, 0, 0, 0.4) 100%),
+    radial-gradient(rgba(255, 255, 255, 0.0125) 1px, transparent 1px) 0 0 / 3px 3px,
+    var(--brown-950);
+}
+
 .results-header {
   gap: 4px;
+  /* Phase 5 Part 6/7, Results convergence pass: the real, confirmed 24px
+     gap down to Chord Overview (matching that panel's own 24px
+     margin-bottom to the Voicings/Songs grid below IT) now lives on the
+     `.results-hero-row` wrapper instead of here -- this element is a
+     flex child of that row now (title column beside the new header
+     CapturePanel), not the last full-width block before ChordOverview
+     the way it was when this margin was first added. */
 }
 
 .results-header h1 {
   margin-bottom: 4px;
+  /* Phase 5 Part 6/7, Results convergence pass: real, confirmed bug --
+     this h1 was inheriting the shared global h1 rule's 46px/weight:500
+     (index.css), but the real Results mockup's chord title is a much
+     bigger 65px/weight:600 device-readout, deliberately larger than a
+     normal page heading since it's the single most important piece of
+     information on the page. Scoped here rather than raising the shared
+     h1 rule, which other pages (Home/About/How It Works) already tune
+     independently. line-height:1 matches the mockup's own real value
+     too (the shared rule's 1.2 multiplier is tuned for wrapping prose
+     headings, not a single short chord name). */
+  font-size: 65px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 /* Task 3 (Phase 5 Part 2/7 follow-up): replaces the old
@@ -73,8 +172,46 @@
   gap: 12px;
 }
 
+/* 18th follow-up: real exhaustive-diff finding -- the real mockup's
+   panel-header h2 (Voicings/Songs) is smaller (14px/1.4px letter-
+   spacing) than the shared global h2 rule (15px/1.6px) -- same pattern
+   already found and fixed on About's own section h2s and ChordOverview's
+   kicker labels this round. */
 .panel-header h2 {
   margin-bottom: 0;
+  font-size: 14px;
+  letter-spacing: 1.4px;
+}
+
+/* Phase 5 Part 6/7, 16th follow-up: real element-count next to each panel
+   heading, matching the "Voicings  24" / "Songs  142" pairing in the
+   Results mockups -- wraps the h2 + count together so the existing
+   justify-content:space-between on .panel-header still puts the
+   Handedness/Filters control on the far right, unaffected. */
+.panel-header__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.panel-header__count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--placeholder);
+  line-height: normal;
+}
+
+/* Real "Showing N of M · scroll for more" caption under each scrollable
+   list -- Songs' version is a genuine incremental-batch count (see
+   Results.jsx), Voicings' is a real total with honest "scroll for more"
+   phrasing (every voicing is already mounted, just visually clipped). */
+.results-list-caption {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--placeholder);
+  text-align: center;
+  margin-top: 8px;
+  line-height: normal;
 }
 
 .voicing-list,
@@ -94,25 +231,33 @@
   scrollbar-color: var(--brown-700) transparent;
 }
 
-.song-list {
-  max-height: 520px;
-}
-
-/* Voicing items are now full fretboard diagrams (~330-360px tall each,
-   Phase 3 Part 2), not single-line text rows -- the old shared 520px cap
-   (tuned for text rows) only fit ~1.5 diagrams, which read as broken/cut
-   off rather than intentionally scrollable. Sized instead to comfortably
-   fit the full "Must Know" section for a typical chord (usually 2-5
-   voicings) before scrolling into Other/Capo -- confirmed against a real
-   chord ("A": 3 Must Know / 16 Other / 6 Capo) where 520px showed barely
-   one voicing but 1100px shows all 3 Must Know diagrams plus the start
-   of Other, a reasonable amount of content before scroll kicks in.
-   Deliberately no longer shares a single cap with .song-list -- forcing
-   both to the same number stopped making sense once one list's items
-   became ~6x taller than the other's; each is now sized for its own
-   content instead. */
+/* Phase 5 Part 7 (vertical fretboard orientation): retuned from 440px,
+   picking up exactly the deferred item this file itself flagged when
+   the shared 440px value was last set ("revisit this specific value
+   once the vertical rebuild lands, against the new card dimensions,
+   not before" -- Phase 5 Part 6/7's Results-follow-up entry). Vertical
+   cards are TALLER than the horizontal cards that 440px was tuned
+   against (measured directly, not assumed: 243.8px vs. the old 219px),
+   so 440px now cut off well into a 2nd row (~1.56 rows visible) rather
+   than the old design's deliberate "~1.9 rows, hints there's more"
+   cutoff. Retuned to fit exactly 2 full voicing-card rows (including
+   the sticky "MUST KNOW"-style section header above them) with no
+   partial 3rd row -- measured directly via real getBoundingClientRect()
+   on a live "MUST KNOW"/"C" page, not estimated (a first attempt at
+   540px, using only legend-height + 2 item-heights + 1 gap, undercounted
+   the section header's own real height and still showed a partial 3rd
+   row -- caught by re-measuring, not assumed correct from the math
+   alone): row 2's real bottom edge lands at 587.625px from the list's
+   own scroll-content top, rounded up to 590px for a small margin. Both
+   lists still share this ONE value on purpose -- same "Voicings/Songs
+   panels read as a matched pair" reasoning as before, just against the
+   new card height instead of the old one; Songs' own card design
+   (SongCard.jsx) is completely unaffected by this pass, its list
+   simply keeps the same real height as Voicings' for visual parity
+   between the two panels. */
+.song-list,
 .voicing-list {
-  max-height: 1100px;
+  max-height: 590px;
 }
 
 .voicing-list::-webkit-scrollbar,
@@ -256,6 +401,7 @@
   align-items: center;
   gap: 12px;
   text-align: center;
+  line-height: normal;
 }
 
 .voicing-list__section::before,
@@ -287,11 +433,13 @@
   letter-spacing: 0.5px;
   color: var(--moss);
   padding: 1px 8px;
+  line-height: normal;
 }
 
 .song-title {
   color: var(--parchment);
   font-weight: 600;
+  line-height: normal;
 }
 
 /* Phase 4 follow-up: invisible marker row at the end of the currently-
@@ -305,21 +453,23 @@
   height: 1px;
 }
 
-/* Deliberately de-emphasized: nestled below the voicings/songs content
-   that this page is actually about, not competing with it for attention.
-   Constrained width + centered rather than spanning the full page like
-   Home's version. */
-.results-capture {
-  margin-top: 40px;
-  max-width: 460px;
-  margin-inline: auto;
-  text-align: center;
+/* Phase 5 Part 6/7, Results convergence follow-up: replaces the old
+   bottom-of-page `.results-capture` block (deleted) -- the real mockup
+   puts the "Analyze Your Chord" widget beside the title, not below the
+   Voicings/Songs grid. Matches the mockup's own real flex-row layout:
+   the title column flexes to fill remaining space (`flex: 1;
+   min-width: 260px`, its own real values), the CapturePanel size="header"
+   instance sits at its own natural width beside it, and the row wraps
+   below the title on narrow viewports instead of overflowing. */
+.results-hero-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
 }
 
-.results-capture h2 {
-  margin-bottom: 12px;
-}
-
-.results-capture .capture-panel {
-  text-align: left;
+.results-hero-row .results-header {
+  flex: 1;
+  min-width: 260px;
 }

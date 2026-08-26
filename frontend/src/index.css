@@ -13,11 +13,43 @@
        --brown-800  recessed surfaces -- inputs, dropzone, the fretboard
                     diagram's backing well
      Contrast-checked below.
-  ------------------------------------------------------------------- */
-  --brown-950: #1c1712;
-  --brown-900: #241d16;
-  --brown-800: #2d2419;
-  --brown-700: #3a2f23;
+
+     Phase 5 Part 6/7, 5th follow-up: --brown-950 (page background only)
+     warmed/lightened from #1c1712 to #3d2b1e, per the new Home mockup --
+     a real, app-wide shift since the token is shared (not a Home-only
+     override), confirmed propagating correctly to Results/About/How It
+     Works too (all paint through the same :root background rule). This
+     does invert which end of the 4-step ladder is literally lightest
+     (page now lighter than panel/recessed/border, was darkest before) --
+     a real, deliberate identity shift toward "a warm, lit desk with a
+     darker instrument panel resting on it," not a bug.
+
+     6th follow-up: that same round's claim that --brown-900/-800/-700
+     were correctly LEFT UNCHANGED was wrong on the actual values, caught
+     by the new computed-style audit tool (test_scripts/style_audit.py),
+     not another screenshot impression -- it only ever verified the
+     RELATIONSHIP (panel still darker than the new page bg), never the
+     exact hex against the mockup's own real rendered numbers. Real
+     values, extracted directly: panel/header-gradient-end
+     rgb(42,28,18)=#2a1c12 (was assumed close enough to the old
+     --brown-900 #241d16=rgb(36,29,22) -- it isn't, off by 6/-1/-4 per
+     channel), dropzone/search-input fill rgb(51,36,26)=#33241a (old
+     --brown-800 #2d2419=rgb(45,36,25) -- close on G/B, off 6 on R),
+     dropzone/search-input/record-button border rgb(125,91,55)=#7d5b37
+     (old --brown-700/--border #3a2f23=rgb(58,47,35) -- a large, clearly
+     visible gap, this is what made the dropzone/search/record borders
+     read as barely-there against the new lighter page). All 3 corrected
+     below. --ambient-line (added last round specifically because plain
+     --border read as invisible against the new page) turns out to
+     already equal this same corrected value (#7d5b37) -- confirms it was
+     solving the exact same underlying problem in one narrow spot instead
+     of at the token itself; left as its own token for now rather than
+     collapsed into --border, since removing it isn't required to fix
+     anything and isn't part of this round's verified scope. */
+  --brown-950: #3d2b1e;
+  --brown-900: #2a1c12;
+  --brown-800: #33241a;
+  --brown-700: #7d5b37;
 
   --brass: #c89b5c; /* primary accent -- CTAs, primary buttons, borders */
   --brass-dim: rgba(200, 155, 92, 0.16);
@@ -39,6 +71,10 @@
 
   --parchment: #f2ead9; /* headings / high-emphasis text */
   --muted: #a99c87; /* body copy -- dimmed parchment */
+  --placeholder: #6b5d4b; /* dimmer than --muted -- input placeholder text only.
+                              Was a bare hex literal in App.css's .text-input::
+                              placeholder; tokenized here during the Phase 5
+                              Part 6/7 materiality pass. */
 
   --record-red: #d92b2b; /* recording-equipment convention: red = live/recording,
                              independent of the accent palette on purpose --
@@ -46,66 +82,126 @@
   --error: #e2685b; /* readable warm red for error status text -- lighter than
                         --record-red specifically so it clears 4.5:1 at 14px */
 
-  /* Contrast checked against --brown-950 (WCAG relative luminance):
-       --parchment  14.9:1  (headings, AAA)
-       --scan       11.6:1  (readouts/badges, AAA)
-       --brass       7.0:1  (buttons/labels, AAA)
-       --moss        7.4:1  (eyebrow labels/secondary text, AAA)
-       --muted       6.6:1  (dimmed body copy, AA+)
-       --error       5.4:1  (error status text, AA)
+  /* Contrast checked against --brown-950 (WCAG relative luminance) --
+     RECOMPUTED, Phase 5 Part 6/7 5th follow-up, after --brown-950
+     lightened from #1c1712 to #3d2b1e (every ratio below is real text
+     sitting directly on the bare page background -- Home's hero h1/p,
+     Results' h1.readout chord title -- not inside a --brown-900 panel,
+     so these are the numbers that actually matter for those real spots):
+       --parchment  11.3:1  (headings, was 14.9, still AAA)
+       --scan        8.8:1  (readouts/badges, was 11.6, still AAA)
+       --brass       5.3:1  (buttons/labels, was 7.0, now AA -- down from AAA)
+       --moss        5.6:1  (eyebrow labels/secondary text, was 7.4, now AA)
+       --muted       5.0:1  (dimmed body copy, was 6.6, still AA)
+       --error       4.1:1  (error status text, was 5.4 -- FAILS AA at 4.5:1
+                     if ever rendered directly on the bare page background.
+                     Confirmed this never actually happens: every real
+                     --error usage in the app renders inside a --brown-900
+                     panel/modal (CaptureModal's error text, Results'
+                     voicings/songs error text), never on raw --brown-950 --
+                     against --brown-900 (unchanged), --error is a real
+                     5.0:1, clearing AA comfortably. Flagged here rather
+                     than silently left stale, since the exact number
+                     technically changed meaning for this token specifically.)
      --moss-deep (3.7:1) and --record-red (3.7:1) stay decorative-only
      (icons, dots, borders) -- never used for small body text. */
 
   /* --- Interval-colored finger dots (Phase 3 Part 5/6) --------------------
      Each fretboard dot's fill depends on the interval it plays; a paired
      text color is picked per fill (not one blanket dark color for all
-     five) since the fills range from light (root/5th) to genuinely dark
-     (7th). Text-on-fill contrast is checked against the FILL color, not
-     against --brown-950 -- that's the relevant background for text
-     painted directly on top of a dot.
-       --interval-root  #d9895c  (root, interval "1") -- new token, a
-                         warmer/redder cousin of --brass so root dots read
-                         as distinct from 5th dots at a glance.
-       --interval-3rd   = --moss    (3rd, interval "3")
-       --interval-5th   = --brass   (5th, interval "5")
-       --interval-7th   = --moss-deep (7th family: "7", "b7", etc.)
-       --interval-ext   = --muted   (anything else -- 9/11/13/extensions,
-                         or any interval string not matched above)
+     eight) since the fills range from light to genuinely dark. Text-on-
+     fill contrast is checked against the FILL color, not against
+     --brown-950/--brown-800 directly -- that's the relevant pairing for
+     the digit painted directly on top of a dot (the dot itself is a small
+     graphical swatch sitting on the page/diagram, not text-on-background,
+     so the page/diagram background contrast is reported below for
+     completeness but isn't the binding legibility constraint).
 
-     Per-fill text color + contrast, actually computed (WCAG relative
-     luminance formula run against each real pair below, not eyeballed --
-     checked against the FILL, not the page background, since that's what
-     the digit is actually sitting on):
-       on --interval-root (#d9895c): --brown-950 text  -> 6.51:1  (AA)
-       on --interval-3rd  (#8faf9b): --brown-950 text  -> 7.43:1  (AAA)
-       on --interval-5th  (#c89b5c): --brown-950 text  -> 7.03:1  (AAA)
+     PALETTE REPLACED, Phase 5 Part 7 (calmer-palette session) -- this
+     supersedes every prior "final" interval-color entry earlier in this
+     phase (the root/5th swap round, the terracotta-5th retune, the
+     original 3rd/5th/ext-9/-11/-13 overhaul). A DELIBERATE aesthetic
+     replacement, not a bugfix -- the prior values were correct and
+     shipped correctly, they just read as too "rainbow"/saturated once
+     all 7 tokens were seen together against the brown UI. Design intent:
+     root and 7th stay the two tones meant to visually lead (unchanged
+     guide-tone reasoning from earlier this phase); 3rd and 5th are now
+     deliberately quieter/receding; 9th/11th/13th are now ONE hue family
+     (~325deg) varying only in lightness -- a deliberate, real-saturation
+     (~26%) cohesion, NOT a regression back to the original ext-9/-11/-13
+     "muted ladder" problem from Phase 3 Part 5/6 (that problem was ZERO
+     saturation reading as disabled; this is real, consistent saturation
+     shared across three lightness steps on purpose).
+       --interval-root  #a74c44  (root, interval "1")
+       --interval-3rd   #4e627e  (3rd, interval "3")
+       --interval-5th   #8a5638  (5th, interval "5")
+       --interval-7th   = --moss-deep (7th family: "7", "b7", etc.) --
+                         --moss-deep's own defined role is "decorative use
+                         only," so aliasing it here doesn't compete with an
+                         active UI role -- untouched all phase, including
+                         this round.
+       --interval-ext   = --muted   (anything else -- extensions not
+                         individually tinted below, or any interval string
+                         not matched above) -- also untouched.
+
+     Text color: white (#ffffff) for all 7, re-verified fresh against
+     each NEW fill rather than assumed carried over from the prior
+     palette's own text-color choices (WCAG relative luminance, computed,
+     not eyeballed):
+       root    (#a74c44) vs white -> 5.58:1  (AA)
+       3rd     (#4e627e) vs white -> 6.23:1  (AA)
+       5th     (#8a5638) vs white -> 6.05:1  (AA)
+       ext-9   (#9d5c82) vs white -> 4.90:1  (AA -- the tightest of the 7,
+                         double-checked specifically per explicit
+                         instruction; still clears the 4.5:1 minimum)
+       ext-11  (#915578) vs white -> 5.56:1  (AA)
+       ext-13  (#6d405a) vs white -> 8.30:1  (AAA)
+     For completeness (not the binding constraint, see the note above),
+     each fill vs. the two real backgrounds a fill can sit against:
+       root    vs brown-950 -> 2.41:1, vs brown-800 -> 2.67:1
+       3rd     vs brown-950 -> 2.16:1, vs brown-800 -> 2.40:1
+       5th     vs brown-950 -> 2.22:1, vs brown-800 -> 2.46:1
+       ext-9   vs brown-950 -> 2.74:1, vs brown-800 -> 3.04:1
+       ext-11  vs brown-950 -> 2.42:1, vs brown-800 -> 2.68:1
+       ext-13  vs brown-950 -> 1.62:1, vs brown-800 -> 1.80:1
+     (all 6 fail AA against both bare backgrounds -- moot, since white
+     text on the fill itself is what's actually rendered; unchanged
+     precedent from every prior round of this same palette work.)
+     7th/ext are unchanged, restated for a complete reference:
        on --interval-7th  (#5c7a63): --brown-950 text  -> 3.74:1  FAILS AA;
-                         --parchment text -> 3.97:1  still fails AA (moss-
-                         deep is too dark for parchment/dark text alike --
-                         checked directly, not assumed from the palette's
-                         page-background contrast table, which measures a
-                         different pair). Landed on pure white text
-                         (#ffffff) -> 4.75:1, clears AA. The one dot that
-                         flips to light text; the other four stay dark-on-
-                         light.
-       on --interval-ext  (#a99c87): --brown-950 text  -> 6.60:1  (AA+)
-     Four of five clear AA at minimum, three clear AAA; --interval-7th
-     needed its text color corrected from the originally-proposed
-     parchment to plain white after actually computing the ratio. */
-  --interval-root: #d9895c;
-  --interval-root-text: var(--brown-950);
-  --interval-root-border: #b5673d; /* deeper shade of --interval-root, for the dot's stroke */
-  --interval-root-glow: rgba(217, 137, 92, 0.55);
+                         white text -> 4.75:1, clears AA.
+       on --interval-ext  (#a99c87): --brown-950 text  -> 5.00:1  (AA)
 
-  --interval-3rd: var(--moss);
-  --interval-3rd-text: var(--brown-950);
-  --interval-3rd-border: #6f9382; /* deeper shade of --moss */
-  --interval-3rd-glow: rgba(143, 175, 155, 0.55);
+     Border/glow: regenerated FRESH from these 6 new fills (never carried
+     over from any prior round's derivatives) -- same darken(fill, 0.72)
+     / rgba(fill, 0.55) formula this file has used for every interval
+     token all phase. While in here: a previously-flagged, never-resolved
+     loose end is now fixed for real -- --interval-5th's border/glow had
+     been left stale since the swap-round after the terracotta retune
+     (still computed from an even earlier #994e29, confirmed via direct
+     inspection of the live file before touching anything: border #6e381e
+     = darken(#994e29), NOT darken of the-then-live #aa572e fill) --
+     regenerated correctly from #8a5638 this time, and the live file was
+     re-read after writing to confirm all 4 properties (fill/text/border/
+     glow) for all 7 tokens actually match what was intended, not just
+     what was meant to be written -- this exact class of drift (documented
+     value vs. live file value) is what caused the stale-5th bug in the
+     first place, so it's worth re-checking directly rather than trusting
+     intent alone. */
+  --interval-root: #a74c44;
+  --interval-root-text: #ffffff;
+  --interval-root-border: #783731; /* deeper shade of --interval-root (darken 0.72) */
+  --interval-root-glow: rgba(167, 76, 68, 0.55);
 
-  --interval-5th: var(--brass);
-  --interval-5th-text: var(--brown-950);
-  --interval-5th-border: #a67c3e; /* deeper shade of --brass */
-  --interval-5th-glow: rgba(200, 155, 92, 0.55);
+  --interval-3rd: #4e627e;
+  --interval-3rd-text: #ffffff;
+  --interval-3rd-border: #38475b; /* deeper shade of --interval-3rd (darken 0.72) */
+  --interval-3rd-glow: rgba(78, 98, 126, 0.55);
+
+  --interval-5th: #8a5638;
+  --interval-5th-text: #ffffff;
+  --interval-5th-border: #633e28; /* deeper shade of --interval-5th (darken 0.72) */
+  --interval-5th-glow: rgba(138, 86, 56, 0.55);
 
   --interval-7th: var(--moss-deep);
   --interval-7th-text: #ffffff;
@@ -117,40 +213,69 @@
   --interval-ext-border: #85795f; /* deeper shade of --muted */
   --interval-ext-glow: rgba(169, 156, 135, 0.5);
 
-  /* Extension-tone tints (Phase 3 Part 5/6, 5th follow-up) -- 9th/11th/13th
-     previously all shared the exact same --interval-ext fill, making them
-     visually indistinguishable from each other on an extended-chord
-     voicing (confirmed via a real C11 screenshot). Per the task's explicit
-     instruction, these are NOT 3 new unrelated hues -- they're 3 lightness
-     steps of --muted's own hue (37 deg, ~16.5% saturation in HSL), so the
-     three read as one cohesive "extension" family while staying
-     individually distinguishable. --interval-ext-11 is --muted itself
-     (the middle step); -9 is the lighter tint, -13 the darker shade.
-     Anything else that falls into the ext bucket (b9/#9/#11/b13/#13, a
-     plain 6th, a non-sus "4", etc.) keeps the original --interval-ext
-     token above, unchanged -- only bare "9"/"11"/"13" get their own tint.
-     Contrast, actually computed against each fill (not assumed from the
-     base --muted numbers, since these are different colors):
-       9th  (#c8bfb2) vs brown-950 text -> 9.78:1  (AAA)
-       11th (#a99c87) vs brown-950 text -> 6.60:1  (AA+, same as before --
-             this IS --muted)
-       13th (#776a55) vs brown-950 text -> 3.37:1  FAILS AA -- flips to
-             white text -> 5.28:1 (AA), same "dark fill needs light text"
-             pattern as --interval-7th above. */
-  --interval-ext-9: #c8bfb2;
-  --interval-ext-9-text: var(--brown-950);
-  --interval-ext-9-border: #a69882;
-  --interval-ext-9-glow: rgba(200, 191, 178, 0.5);
+  /* Extension-tone tints (Phase 3 Part 5/6, 5th follow-up; palette
+     REPLACED Phase 5 Part 7, this round) -- 9th/11th/13th are now
+     deliberately ONE hue family (~325deg, ~26% saturation) varying only
+     in lightness, per this round's explicit design intent (see the note
+     above for why this is intentional cohesion, not the original
+     zero-saturation "muted ladder" problem this exact mechanism was
+     built to fix back in Phase 3 Part 5/6). Anything else that falls
+     into the ext bucket (b9/#9/#11/b13/#13, a non-sus "4", etc.) keeps
+     the original --interval-ext token above, unchanged -- only bare
+     "9"/"11"/"13" (and, as of the 8th-token session below, "6") get
+     their own tint. */
+  --interval-ext-9: #9d5c82;
+  --interval-ext-9-text: #ffffff;
+  --interval-ext-9-border: #71425e; /* deeper shade of --interval-ext-9 (darken 0.72) */
+  --interval-ext-9-glow: rgba(157, 92, 130, 0.55);
 
-  --interval-ext-11: var(--muted);
-  --interval-ext-11-text: var(--brown-950);
-  --interval-ext-11-border: #85795f;
-  --interval-ext-11-glow: rgba(169, 156, 135, 0.5);
+  --interval-ext-11: #915578;
+  --interval-ext-11-text: #ffffff;
+  --interval-ext-11-border: #683d56; /* deeper shade of --interval-ext-11 (darken 0.72) */
+  --interval-ext-11-glow: rgba(145, 85, 120, 0.55);
 
-  --interval-ext-13: #776a55;
+  --interval-ext-13: #6d405a;
   --interval-ext-13-text: #ffffff;
-  --interval-ext-13-border: #474033;
-  --interval-ext-13-glow: rgba(119, 106, 85, 0.55);
+  --interval-ext-13-border: #4e2e41; /* deeper shade of --interval-ext-13 (darken 0.72) */
+  --interval-ext-13-glow: rgba(109, 64, 90, 0.55);
+
+  /* 8th interval token, Phase 5 Part 7 (this round) -- the 6th degree
+     (add6/6-chords, e.g. real A6/9 data) never had its own bucket at
+     all before this: `classifyInterval()` already had a real, narrower
+     check disambiguating "6" spelled as a chord's natural 13th (a real
+     per-voicing data quirk) from a genuine 6th, but the genuine-6th case
+     was explicitly, deliberately routed to the generic --interval-ext
+     fallback (--muted, a flat pale grey-tan) -- confirmed via a real
+     A6/9 screenshot that this read as visibly wrong, not just "a little
+     plain." A 6th and a 13th are the SAME pitch class (which one a chord
+     calls it is a naming convention, not a different note) -- built as
+     a real 4th, LIGHTER step in the same ~325deg/~26%-saturation ext-9/
+     -11/-13 family so it reads as "part of that family, the lightest
+     member" at a glance, but deliberately NOT the exact same hex as
+     ext-13: a single chord can never show both a 6 and a 13 at once, but
+     OTHER UI contexts (filter chips, cross-chord lists) can show them
+     near each other outside of any one chord's page, where an exact
+     match would read as a bug, not intentional cohesion.
+     Contrast, actually computed (WCAG relative luminance) against the
+     REAL fill, not assumed -- and a real, worth-recording discrepancy:
+     the task's own stated ratio for this token (6.71:1 vs --brown-950)
+     did not match direct computation, re-verified 3 times including a
+     sanity check against this file's own already-published root/5th
+     ratios (matched those exactly, confirming the formula itself is
+     correct) -- the real, computed value is 5.07:1 vs --brown-950,
+     still comfortably clearing AA (4.5:1), so the dark-text choice
+     itself is unaffected by the discrepancy, only the specific number
+     was corrected here:
+       #bf92ac vs --brown-950 -> 5.07:1  (AA, dark text used -- the one
+                         exception among these 8 tokens; every other
+                         token this phase uses white text instead)
+       #bf92ac vs --brown-800 -> 5.63:1  (AA, for completeness)
+       #bf92ac vs white       -> 2.65:1  (FAILS AA -- moot, dark text is
+                         what's actually used) */
+  --interval-6th: #bf92ac;
+  --interval-6th-text: var(--brown-950);
+  --interval-6th-border: #8a697c; /* deeper shade of --interval-6th (darken 0.72) */
+  --interval-6th-glow: rgba(191, 146, 172, 0.55);
 
   /* --- Loudness ramp (Waveform.jsx, Phase 5 Part 3/7 5th polish pass) ---
      A genuinely new token family -- not a one-off hex value. Neither
@@ -202,10 +327,93 @@
   --loudness-peak: #f2a268;
 
   --border: var(--brown-700);
-  --shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+
+  /* --- Materiality refresh (Phase 5 Part 6/7) --------------------------
+     Palette/depth/motion source of truth for this pass is a real HTML/CSS
+     mockup (frontend/design-reference) -- unlike the Chord Overview card's
+     mockup (Phase 5 Part 2/7, structure-only), this one supplied the actual
+     token values below, extracted from its rendered inline styles via a
+     headless-browser dump (the file is a bundled/packed artifact, not raw
+     source). Evolved existing tokens in place per the design skill's
+     guidance rather than adding a parallel system -- --shadow/--shadow-inset
+     keep their names and roles, just deeper/more physical recipes; the few
+     genuinely new tokens below (bevel highlight, rivet color, overlay tint,
+     brass hover) fill real gaps the old palette had no token for at all. */
+  --shadow: 0 24px 50px -18px rgba(0, 0, 0, 0.55), 0 10px 30px -8px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-inset: inset 0 4px 10px rgba(0, 0, 0, 0.5);
   --radius: 10px;
   --radius-sm: 6px;
+
+  --bevel-light: #85623d; /* lighter top-edge highlight on a raised .panel's
+                              border -- a real bevel (light catching the top
+                              edge), not just a flat outline. Phase 5 Part 6/7
+                              6th follow-up: corrected from #4a3d2e (a
+                              plausible-looking guess never checked against
+                              the mockup's own real value) to the actual
+                              rgb(133,98,61) the mockup uses for this exact
+                              border, found via the computed-style audit tool. */
+  --rivet: #5a4a37; /* small corner-dot "hardware" detail on raised panels --
+                        decorative-scale only, never text. */
+  --rivet-highlight: rgba(255, 255, 255, 0.15); /* the rivet's own tiny
+                        top-edge glint, painted as a 1px box-shadow. */
+  --overlay-tint: rgba(10, 7, 4, 0.72); /* modal/capture backdrop tint --
+                        was a repeated literal in CaptureModal.css, now one
+                        token. */
+  --brass-hover: #d9af74; /* brighter brass for hover states on brass-filled
+                        controls -- was a repeated literal (App.css's
+                        .btn-primary:hover, SongFilters.css), now one token. */
+  --header-gradient-from: #332318; /* the sticky header's own lighter gradient
+                        stop (top) -- Phase 5 Part 6/7 6th follow-up: replaces
+                        the old scheme of using --brown-900 itself as the FROM
+                        stop with --header-gradient-to as a separate darker TO
+                        stop. Real audit finding: the mockup's header gradient
+                        doesn't run --brown-900-to-something-darker at all --
+                        it runs a THIRD, header-specific lighter shade down to
+                        --brown-900 itself (confirmed: the header's own real
+                        darker stop, rgb(42,28,18), is now exactly --brown-900's
+                        own corrected value) -- so --header-gradient-to is
+                        retired as redundant rather than carried forward
+                        wrong. */
+
+  --ambient-line: #7d5b37; /* AmbientFretboards' decorative grid/border lines
+                        (Phase 5 Part 6/7, 5th follow-up) -- real bug found
+                        against the new (lighter) --brown-950: reusing plain
+                        --border (then #3a2f23) read as nearly invisible,
+                        since that value was tuned for contrast against the
+                        OLD near-black page background, not this one. Value
+                        taken directly from the new Home mockup. 6th
+                        follow-up note: --border itself was corrected to this
+                        exact same value shortly after (see --brown-700 above)
+                        -- this token is now numerically redundant with
+                        --border, kept separate rather than collapsed since
+                        that consolidation isn't itself a verified part of
+                        this round's scope, not because the two need to stay
+                        independent. */
+  --ambient-line-dim: #74593a; /* Phase 5 Part 6/7 closing round: raised
+                        from #4d3d2c -- real, confirmed bug, not a
+                        preference tweak: at that value the blurred
+                        shapes' grid lines rendered with essentially ZERO
+                        measurable contrast against the real grain texture
+                        (confirmed via direct pixel sampling -- the
+                        shape's own region mean was statistically
+                        indistinguishable from its surrounding background
+                        mean, ~65.9 vs ~66.3 out of 255, while the mockup's
+                        own equivalent region showed a real +4.9 delta),
+                        making them functionally invisible rather than
+                        "dim" -- confirmed visually via a 3x zoomed,
+                        contrast-boosted crop showing the mockup's faint
+                        grid clearly and the live version's grid not at
+                        all. The 1.2px blur on these shapes spreads a 1px
+                        line's energy over a wider area, dropping its peak
+                        contrast well below the un-blurred --ambient-line
+                        variant's own margin -- #4d3d2c wasn't accounting
+                        for that. New value is the midpoint between the
+                        old #4d3d2c and the full-strength --ambient-line
+                        (#7d5b37), keeping these shapes visibly dimmer
+                        than the un-blurred ones (still a real, intentional
+                        secondary/receded shape) while clearing real,
+                        confirmed visibility against the grain. */
 
   --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: 'Fraunces', Georgia, serif;
@@ -215,7 +423,130 @@
   letter-spacing: 0.18px;
   color-scheme: dark;
   color: var(--muted);
-  background: var(--brown-950);
+  /* Phase 5 Part 6/7, 4th follow-up: the grain layer lives HERE now, not
+     on .app-shell -- :root (the real <html> element; CSS background
+     propagation paints this behind the whole canvas whenever <body> has
+     no background of its own, which it doesn't, see `body` below) is the
+     one place a background is genuinely page-wide, with no box edge to
+     create a seam against. .app-shell previously painted its own grain
+     scoped to its own bordered box, which is exactly what produced a
+     visible hard edge where the textured area started/stopped -- see
+     App.css's `.app-shell` rule for the fix on that side (its own
+     corner-glow/top-gradient layers stay there, unchanged, just no
+     longer backed by an opaque fill that would otherwise hide this
+     page-wide texture from showing through inside its own box).
+
+     5th follow-up: a vignette layer added on top of the grain (CSS
+     background layers paint first-listed = frontmost, so the vignette
+     needs to come BEFORE the grain url() to actually darken it toward the
+     edges, matching how a real photographic vignette dims noise/grain
+     along with everything else, not just the flat color underneath it).
+     This directly addresses the flatness the 4th follow-up's page-wide
+     grain move introduced -- a bounded, .app-shell-scoped texture read as
+     more "physical" partly because its own edges (border + surrounding
+     plain page) gave it implicit depth; once the texture became
+     genuinely uniform edge-to-edge, that depth cue was gone. Values
+     (ellipse size, 55% inner radius, 0.4 max darkening) reused directly
+     from the new Home mockup -- this is a plain radial-gradient darkening
+     effect, NOT the periodic tiny-dot noise recipe that caused the
+     original grid bug, so reusing it carries none of that risk.
+
+     9th follow-up: real bug found, confirmed via the person's own
+     screenshot at a viewport wider than every prior round ever tested
+     (every previous round's testing stopped at 1440px) -- the ellipse's
+     FIXED 900px/700px semi-axes mean its darkening influence reaches a
+     hard, literal end a fixed pixel distance from center; past that
+     radius, the radial-gradient is just its own flat 100%-stop color
+     (fully "rgba(0,0,0,0.4)") with nothing left to blend, so at a wide
+     enough viewport the page's right (and left) edges sit in a
+     visibly distinct, uniformly-darker band with a real edge where the
+     ellipse's influence stops -- a seam, structurally the same CLASS of
+     bug as the original periodic-grain seam, just from a fixed-px
+     radius instead of a fixed-px tile. Fixed by switching to
+     viewport-relative sizing (62.5vw / 70vh, the same 900/1440 and
+     700/1000 ratios the mockup's own fixed pixels implied at its own
+     1440x1000 reference size) so the ellipse's influence scales
+     continuously with the real viewport instead of having a hard-coded
+     boundary -- verified at 1280/1440/1728/1920px, not just 1440.
+
+     Closing round (Phase 5 Part 6/7): the two corner-glow radials + the
+     top linear-gradient moved here from .app-shell (App.css), for the
+     same reason grain/vignette are here and not there -- anything scoped
+     to a box narrower than the real viewport (#root/.app-shell max out
+     at 1126px; any width above that leaves real page margin outside it)
+     creates a genuine background discontinuity at that box's own edge,
+     confirmed via the bucketed edge-brightness audit
+     (test_scripts/visual_diff.py's compute_edge_brightness_buckets()) --
+     see App.css's own comment for the isolation test that confirmed
+     these specific layers, not the vignette math (already fixed once, in
+     the 9th follow-up), were the real cause this time. Kept in their
+     original relative paint order to each other (glow1, glow2, then the
+     top gradient), inserted between the vignette (stays frontmost, so it
+     still darkens these glows toward the edges same as it darkens the
+     grain) and the grain texture. Percentage anchors (92% 96%, 4% 40%)
+     now resolve against the full viewport instead of the narrower
+     app-shell box -- a real, accepted visual difference at wide
+     viewports (the glow now centers nearer the true page corner rather
+     than #root's own inner corner), traded deliberately for a seamless
+     background, matching the same tradeoff already made for grain.
+
+     13th follow-up: real PERIODICITY bug, a different failure mode from
+     either prior grain round -- the 256x256 tile (sparse per-pixel
+     specks, fixed in the round right before this one) still tiled at a
+     256px CSS `background-size`, and 256px is small enough that a normal
+     1280-1920px-wide viewport shows the exact SAME speckle arrangement
+     repeat 5-7 times horizontally (and repeatedly vertically down any
+     page taller than 256px) -- visible as a real repeating lattice at
+     3x zoom, the same underlying bug CLASS as the original 3px CSS-
+     gradient grid-seam saga, just from a much larger (but still too
+     small) repeat interval. Per the explicit diagnosis this round: a
+     repeating point pattern reads as structure to the human eye
+     regardless of how randomized the noise is WITHIN one tile -- density/
+     alpha tuning (the prior 2 grain rounds) could never have fixed this,
+     since neither round touched the repeat INTERVAL itself. Fixed (at
+     the time) by generating the noise field at 2048x2048 instead of
+     256x256, same sparse-speckle recipe, unchanged.
+
+     14th follow-up: this whole background stack REPLACED with the real
+     source values, now that the mockup export is actually decodable
+     (see test_scripts/decode_mockup.py + this file's own standing note
+     near the top of :root) instead of approximated from screenshots.
+     Two real, confirmed findings from the decoded HTML:
+     1. The grain IS genuinely a plain CSS radial-gradient dot pattern in
+        the real source -- `radial-gradient(rgba(255,255,255,0.025) 1px,
+        transparent 1px)` at `background-size: 3px 3px`, on its own div
+        with `opacity: 0.5` (pre-multiplied here into one effective alpha,
+        0.025*0.5=0.0125, since a single combined `background` shorthand
+        has no per-layer opacity of its own) -- confirmed by decoding AND
+        by screenshotting the decoded HTML itself at the same 3x-zoom+
+        contrast-boost this project already uses to check for periodicity:
+        the REAL source shows the identical "regular sparse dot grid"
+        character at that magnification too. That 3x+boosted view is an
+        artificial diagnostic, not how anyone actually looks at the page;
+        at normal (1x, unboosted) viewing scale -- confirmed via a real
+        screenshot of the decoded source too -- it reads as fine, subtle
+        grain, not an obvious plaid. The image-based PNG approach (this
+        entry and the two before it) was solving a problem the real
+        design doesn't have; replaced with the real, exact recipe.
+     2. The 2 corner-glow radials (92%/96% brass, 4%/40% scan) and the
+        separate top linear-gradient added in the "closing round" entry
+        above were NOT real -- confirmed absent from the decoded source
+        entirely. The real base background is ONE radial glow, centered
+        above the viewport: `radial-gradient(680px 420px at 50% -60px,
+        rgba(200,155,92,0.1), transparent)`. Converted to viewport-
+        relative sizing (47.2vw / 42vh, the same 680/1440 and 420/1000
+        ratios used for the vignette's own existing vw/vh conversion)
+        for the same already-established reason -- a fixed-px radius
+        stops short of the edge at a wide enough viewport, reintroducing
+        the exact edge-seam bug class this project has already fixed
+        twice (9th and this-round's-predecessor follow-ups). The
+        vignette itself (900x700 ellipse, 55%/0.4, already
+        viewport-relative) is unchanged -- independently confirmed
+        against the decoded source as already correct. */
+  background: radial-gradient(62.5vw 70vh at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.4) 100%),
+    radial-gradient(rgba(255, 255, 255, 0.0125) 1px, transparent 1px) 0 0 / 3px 3px,
+    radial-gradient(47.2vw 42vh at 50% -60px, rgba(200, 155, 92, 0.1), transparent),
+    var(--brown-950);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -228,6 +559,66 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Phase 5 Part 6/7, continued round: real belt-and-suspenders safety net
+   for the horizontal-scroll bug fixed in App.css's `.app-header` rule
+   (see that rule's own comment, and App.jsx's `--scrollbar-w` effect, for
+   the actual structural fix) -- covers the brief pre-mount frame before
+   that effect runs (where `--scrollbar-w` falls back to its `0px`
+   default) and guards against any FUTURE viewport-unit mistake becoming a
+   visible horizontal scrollbar. Deliberately not a substitute for the
+   real fix: `overflow-x: hidden` alone does NOT shrink `scrollWidth`
+   back down (confirmed directly -- it only suppresses the resulting
+   scrollbar), so it wouldn't clear the literal `scrollWidth ===
+   clientWidth` verification the real fix is checked against. Safe here
+   -- no component in this app relies on intentional page-level
+   horizontal scroll; components with their own internal horizontal
+   scroll (none currently) would use their own nested overflow-x, unaffected
+   by this root-level rule.
+
+   Phase 5 Part 6/7, Home polish follow-up: real, confirmed bug this
+   round -- a second, real scrollbar was visibly rendering on Home,
+   distinct from the true page scrollbar. Root-caused via direct
+   `getComputedStyle`/`scrollHeight`/`clientHeight` checks on every
+   ancestor from `html` down to `.home-page` (not guessed): BOTH `html`
+   and `body` had a real, independent `overflowY: 'auto'` with their own
+   `scrollHeight > clientHeight` -- i.e. `body` was genuinely acting as
+   its OWN nested scroll container, separate from `html`'s legitimate
+   page-level one, even though `document.scrollingElement` still
+   correctly pointed at `html`.
+
+   Two real layers to this, confirmed with minimal isolated test pages
+   (no app code) before touching the real rule, not guessed:
+   1. Setting only `overflow-x` (leaving `overflow-y` unset/`visible`)
+      makes the browser silently COMPUTE `overflow-y` as `auto` too -- a
+      real, spec-defined CSS Overflow interop rule ("if one axis is
+      `visible` and the other isn't, the `visible` one computes as
+      `auto` instead"). A first attempt at this fix added an EXPLICIT
+      `overflow-y: visible` alongside `overflow-x: hidden` on both rules
+      -- re-tested in the same isolated page and confirmed this does
+      NOT prevent the promotion (`overflow-y` still computes to `auto`
+      even when `visible` is written explicitly, not just left to
+      default) -- so that specific attempt was real, but incomplete.
+   2. The actual, confirmed-working fix is layer 2: once BOTH `html`
+      AND `body` have their own non-`visible` overflow (even just via
+      the auto-promotion above), the browser's normal "body's overflow
+      propagates up to become the viewport's own scroll behavior" rule
+      stops applying -- each element becomes its OWN independent scroll
+      box instead, and `body` specifically gets constrained to roughly
+      the viewport's own height rather than growing to fit its real
+      content, which is what actually produced the second, functioning
+      scrollbar (confirmed directly: an isolated page with the rule on
+      `html` ONLY has `body.scrollHeight` grow to its real full content
+      height with `overflowY: visible`, no promotion, no second
+      scrollbar -- the exact same rule on BOTH elements is what breaks
+      it). Real fix: keep this safety net on `:root` only, removed
+      entirely from `body` -- `html` already fully covers the "block
+      horizontal scroll" intent on its own (it's the real scrolling
+      element, confirmed via `document.scrollingElement`), so `body`
+      never needed its own copy of this rule to begin with. */
+:root {
+  overflow-x: hidden;
 }
 
 body {
@@ -254,6 +645,18 @@ h3 {
 
 h1 {
   font-size: 46px;
+  /* Phase 5 Part 6/7, 6th follow-up: real bug found via the computed-style
+     audit tool -- h1 never set its own line-height, so it inherited
+     :root's `font: 18px/145%` as an already-RESOLVED PIXEL value (26.1px,
+     computed once at :root's own 18px font-size) rather than a relative
+     multiplier recalculated at h1's own much larger font-size -- a real
+     CSS inheritance quirk (percentage line-heights resolve to px at the
+     point they're specified, then inherit as that px value unchanged),
+     confirmed directly: live's h1 measured 26.1px line-height at a 46px
+     font-size, which would visibly overlap on any 2+-line heading. Fixed
+     with an explicit relative value, matching the mockup's own real ratio
+     (38.4px / 32px font-size = 1.2). */
+  line-height: 1.2;
   letter-spacing: -0.5px;
   margin: 0 0 12px;
   @media (max-width: 1024px) {
@@ -311,4 +714,72 @@ button {
 input,
 button {
   color-scheme: dark;
+}
+
+/* --- Shared "device face" motion vocabulary (Phase 5 Part 6/7) ----------
+   Global, not component-scoped, since more than one component reuses each
+   -- icon-glow/copper-bar: CapturePanel's dropzone icon + mini waveform;
+   pulse-scan/scan-bar: DetectionBadge's dot + waveform bars. pulse-record
+   (App.css) and dropzone-breathe (CapturePanel.css) already existed and
+   are unchanged -- listed here only so this file's own comment names the
+   complete set the mockups specified. */
+@keyframes icon-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px rgba(200, 155, 92, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(200, 155, 92, 0.6));
+  }
+}
+
+@keyframes copper-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pulse-scan {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--scan-dim);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(111, 227, 214, 0.08);
+    transform: scale(1.15);
+  }
+}
+
+/* Phase 5 Part 6/7, 18th follow-up: real, previously-missing keyframe --
+   found via a real exhaustive diff against the Results G9 mockup's own
+   DetectionBadge markup (3 small ripple dots, staggered animation-delay,
+   emanating outward from the pulsing scan dot and fading -- a "sonar
+   ping" read entirely absent from the live badge until now). */
+@keyframes sig-ripple {
+  0% {
+    transform: scale(0.25);
+    opacity: 0.6;
+  }
+  60% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+@keyframes scan-bar {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }

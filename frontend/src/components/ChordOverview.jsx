@@ -9,10 +9,12 @@ import './ChordOverview.css'
 // on things like "3"/"b3"/"5"/"b7"/"maj7"/"dim7") -- the one real gap is
 // the root, labeled "R" here vs. the "1" classifyInterval()/voicings.db
 // actually use everywhere else. Anything else this doesn't recognize
-// (bare "2"/"4"/"6", altered extensions) already falls through to the
+// (bare "4"/"6", altered extensions) already falls through to the
 // generic "ext" bucket by design, same graceful default every other
 // caller of getIntervalStyle relies on when it doesn't have a `formula`
 // to disambiguate sus tones with (see intervalColors.js's own comment).
+// A sus2's own bare "2" label is handled by classifyInterval() itself now
+// (Phase 5 Part 7), not here -- see that function's own comment.
 function toIntervalColorToken(short) {
   return short === 'R' ? '1' : short
 }
@@ -78,7 +80,18 @@ export function buildSimilarChords(chordInfoData, relatedNotes) {
 // minor/parallel/tritone-sub/"resolves from (V7)"/simpler-version) --
 // confirmed out of scope for this card, not wired up at all rather than
 // half-built and hidden.
-function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true }) {
+// `formula` (Phase 5 Part 7 addition) is the /voicings/{chord} response's
+// own `formula` field -- the SAME object IntervalLegend/ChordTonePanel
+// already use, passed through here purely so this card's note balls can
+// disambiguate a sus2/sus4 chord's characteristic tone the same way every
+// other interval-colored surface in the app already does (see
+// intervalColors.js's classifyInterval). Optional and additive: `voicings`
+// can still be null/loading/failed when this card renders (chord-theory
+// content is deliberately never gated on song/voicing availability, per
+// this file's own history) -- omitting `formula` just means a sus tone
+// falls back to the generic "ext" bucket, exactly the pre-existing
+// behavior, not a regression.
+function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true, formula = null }) {
   const info = chordInfo?.ok ? chordInfo.data : null
   const altSentence = showWhySpelling ? buildAltSpellingSentence(info) : null
   const similarChords = buildSimilarChords(info, relatedNotes)
@@ -100,12 +113,17 @@ function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true }) {
             <h3 className="chord-overview__kicker">Notes in this chord</h3>
             <div className="chord-overview__notes">
               {info.intervals.map((iv) => {
-                const style = getIntervalStyle(toIntervalColorToken(iv.short))
+                const style = getIntervalStyle(toIntervalColorToken(iv.short), formula)
                 return (
                   <div className="chord-overview__note" key={iv.semitones}>
                     <span
                       className="chord-overview__ball"
-                      style={{ background: style.fill, color: style.text, borderColor: style.stroke }}
+                      style={{
+                        background: style.fill,
+                        color: style.text,
+                        borderColor: style.stroke,
+                        '--chord-overview-ball-glow': style.glow,
+                      }}
                     >
                       {iv.note}
                     </span>

@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Design mockup references (Phase 5 Part 6/7) -- large bundled HTML files,
+# not source, not meant to be tracked.
+design-reference
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

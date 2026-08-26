@@ -3,6 +3,7 @@ import { useLocation, useParams } from 'react-router-dom'
 import CapturePanel from '../components/CapturePanel'
 import ChordName from '../components/ChordName'
 import ChordOverview from '../components/ChordOverview'
+import DetectionBadge from '../components/DetectionBadge'
 import FretboardDiagram from '../components/FretboardDiagram'
 import IntervalLegend from '../components/IntervalLegend'
 import SongCard from '../components/SongCard'
@@ -316,34 +317,54 @@ function Results() {
   const ambiguityNote = songs?.ok ? songs.data.ambiguity_note : null
 
   return (
-    <div>
-      <div className="section results-header">
-        {/* Title is just the canonical chord name -- no disclosure
-            widget, no explanation text at this level. When the actual
-            search differs (typed input, or a route-state searchedAs
-            value), a small parenthetical names it; the full explanation
-            lives entirely in ChordOverview's "Why this spelling" bar,
-            directly below (see `showWhySpelling`). */}
-        <h1 className="readout">
-          {title}
-          {showSearchedParenthetical && (
-            <span className="results-header__searched-as"> (searched: <ChordName>{searchedValue}</ChordName>)</span>
-          )}
-        </h1>
-        {fromAudio && (
-          <span className="badge">
-            <span className="badge__dot" />
-            BetterChord detected {chordName}!
-            {confidence != null && ` (confidence: ${(confidence * 100).toFixed(1)}%)`}
-          </span>
-        )}
-        {/* Task 4 (Phase 5 Part 2/7 follow-up): a separate, standalone
-            note for ambiguous search shorthand (e.g. "sus" -> "sus4") --
-            distinct from both the parenthetical/teaser above (which are
-            about spelling/naming substitutions) and Similar Chords below
-            (a chord-level fact; there's no symmetric "sus4 is also
-            called sus" the way there is for a true synonym). */}
-        {ambiguityNote && <p className="results-header__ambiguity-note">{renderChordNote(ambiguityNote)}</p>}
+    <div className="results-page">
+      {/* Phase 5 Part 6/7, Results convergence follow-up: real,
+          previously-missing feature -- the mockup's own top-right
+          "Analyze Your Chord" widget (compact upload/search/record),
+          sized to sit beside the page title. This row wrapper is what
+          places the title block and the new CapturePanel size="header"
+          instance side by side, matching the mockup's own real flex-row/
+          gap:24px/flex-wrap layout (`.results-hero-row`, Results.css) --
+          `.results-header` itself keeps its own internal content
+          unchanged, it just no longer owns the bottom margin down to
+          ChordOverview (moved to the row wrapper, see Results.css). */}
+      <div className="results-hero-row">
+        <div className="section results-header">
+          {/* Title is just the canonical chord name -- no disclosure
+              widget, no explanation text at this level. When the actual
+              search differs (typed input, or a route-state searchedAs
+              value), a small parenthetical names it; the full explanation
+              lives entirely in ChordOverview's "Why this spelling" bar,
+              directly below (see `showWhySpelling`). */}
+          <h1 className="readout">
+            {title}
+            {showSearchedParenthetical && (
+              <span className="results-header__searched-as"> (searched: <ChordName>{searchedValue}</ChordName>)</span>
+            )}
+          </h1>
+          {fromAudio && <DetectionBadge chord={chordName} confidence={confidence} />}
+          {/* Task 4 (Phase 5 Part 2/7 follow-up): a separate, standalone
+              note for ambiguous search shorthand (e.g. "sus" -> "sus4") --
+              distinct from both the parenthetical/teaser above (which are
+              about spelling/naming substitutions) and Similar Chords below
+              (a chord-level fact; there's no symmetric "sus4 is also
+              called sus" the way there is for a true synonym). */}
+          {ambiguityNote && <p className="results-header__ambiguity-note">{renderChordNote(ambiguityNote)}</p>}
+        </div>
+        {/* `key={chordName}` forces this (and its nested ManualSearch) to
+            fully REMOUNT whenever the chord changes, rather than
+            re-rendering the same instance -- the standard React way to
+            reset a component's own internal state (ManualSearch's typed
+            `value`) when there's no external prop for that state to
+            begin with. Carried over unchanged from the bottom mini
+            CapturePanel this widget replaces (Task 4, Phase 5 Part 2/7
+            follow-up) -- the underlying bug (stale search text surviving
+            a Results-to-Results navigation via this component's own
+            search box, since `chordName` is just a route param and this
+            component instance never unmounts on its own between two
+            chords) is identical regardless of where on the page this
+            instance is mounted. */}
+        <CapturePanel key={chordName} size="header" />
       </div>
 
       {/* Task 1 (Phase 5 Part 2/7 follow-up): now positioned ABOVE the
@@ -372,12 +393,22 @@ function Results() {
         chordInfo={chordInfo}
         relatedNotes={songs?.data?.related_notes}
         showWhySpelling={showWhySpelling}
+        formula={voicings?.ok ? voicings.data.formula : null}
       />
 
       <div className="results-grid">
         <div className="section panel">
           <div className="panel-header">
-            <h2>Voicings</h2>
+            {/* Real count next to the heading, matching the mockup's own
+                "Voicings  24" pairing -- unlike Songs' count (below), this
+                is the true total: every returned voicing is already
+                rendered into the DOM at once (the internal scroll container
+                just clips it visually), there's no incremental-batch count
+                to distinguish it from. */}
+            <div className="panel-header__title">
+              <h2>Voicings</h2>
+              {voicings?.ok && <span className="panel-header__count">{voicings.data.voicings.length}</span>}
+            </div>
             <HandednessToggle />
           </div>
           {voicings === null && <p className="status-text">Loading voicings...</p>}
@@ -432,6 +463,15 @@ function Results() {
               })}
             </ul>
           )}
+          {/* Real, honest caption -- per the mockup's own "Showing N of M ·
+              scroll for more" pattern, adapted to what's actually true
+              here: every voicing IS already in the DOM (no incremental
+              batching the way Songs has below), so this names the real
+              total and just signals that scrolling reveals the rest,
+              rather than implying a partial-render count that isn't real. */}
+          {voicings?.ok && voicings.data.voicings.length > 0 && (
+            <p className="results-list-caption">{voicings.data.voicings.length} voicings &middot; scroll for more</p>
+          )}
         </div>
 
         <div className="section panel">
@@ -446,7 +486,16 @@ function Results() {
               header position is independent of however many banners render
               on any given chord -- always the same spot, 0/1/2 banners. */}
           <div className="panel-header">
-            <h2>Songs</h2>
+            {/* Real count next to the heading, matching the mockup's own
+                "Songs  142" pairing -- the total BEFORE any filter narrows
+                it (songsForFilters.length), not the currently-filtered
+                count (SongFiltersToggle's own matchCount/totalCount pair,
+                unchanged, already conveys the filtered-vs-total split once
+                Filters is opened). */}
+            <div className="panel-header__title">
+              <h2>Songs</h2>
+              {songs?.ok && songsForFilters.length > 0 && <span className="panel-header__count">{songsForFilters.length}</span>}
+            </div>
             {songs && songs.ok && songsForFilters.length > 0 && (
               <SongFiltersToggle
                 open={filtersOpen}
@@ -492,12 +541,23 @@ function Results() {
             </div>
           )}
           {songs && songs.ok && !isFallbackView && filteredSongs.length > 0 && (
-            <ul className="song-list" ref={songListRef}>
-              {visibleSongs.map(({ key, song, spelling }) => (
-                <SongCard key={key} song={song} spelling={spelling} />
-              ))}
-              {hasMoreSongs && <li ref={songSentinelRef} className="song-list__sentinel" aria-hidden="true" />}
-            </ul>
+            <>
+              <ul className="song-list" ref={songListRef}>
+                {visibleSongs.map(({ key, song, spelling }) => (
+                  <SongCard key={key} song={song} spelling={spelling} />
+                ))}
+                {hasMoreSongs && <li ref={songSentinelRef} className="song-list__sentinel" aria-hidden="true" />}
+              </ul>
+              {/* Real "Showing N of M · scroll for more" caption, matching
+                  the mockup's own pattern -- unlike Voicings' caption
+                  above, this one IS a genuine incremental-batch count
+                  (visibleSongs.length is the real number of <SongCard>s
+                  actually mounted right now, via the existing infinite-
+                  scroll batching), not just decorative phrasing. */}
+              <p className="results-list-caption">
+                Showing {visibleSongs.length} of {filteredSongs.length} &middot; {hasMoreSongs ? 'scroll for more' : 'all shown'}
+              </p>
+            </>
           )}
           {/* Real "no songs match your filters" empty state -- distinct
               from both the structural fallback banners above (unaffected
@@ -573,25 +633,6 @@ function Results() {
             <p className="status-text">No songs found for this chord.</p>
           )}
         </div>
-      </div>
-
-      <div className="results-capture">
-        <h2>🎧 Analyze another chord</h2>
-        {/* Task 4 (Phase 5 Part 2/7 follow-up): `key={chordName}` forces
-            this (and its nested ManualSearch) to fully REMOUNT whenever
-            the chord changes, rather than re-rendering the same instance
-            -- the standard React way to reset a component's own internal
-            state (ManualSearch's typed `value`) when there's no external
-            prop for that state to begin with. Confirmed live this was a
-            real, narrower bug than it first looked: navigating here FROM
-            Home never showed stale text (Home's own ManualSearch is a
-            completely separate mounted instance, unmounted on navigation
-            either way) -- the actual bug only appeared when searching
-            AGAIN from Results' own mini search box, landing on a new
-            Results page for the same route pattern (`chordName` is just
-            a route param, so this component instance never unmounts on
-            its own between two chords). */}
-        <CapturePanel key={chordName} size="mini" />
       </div>
 
       {expandedVoicing && (

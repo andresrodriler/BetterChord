@@ -60,7 +60,11 @@
   background: var(--brown-700);
 }
 
+/* Phase 5 Part 6/7: diagonal-stripe "no artwork" pattern, matching the
+   design mockup's cover placeholder -- a real material-looking fallback
+   instead of a flat fill, still pure CSS (no new element/markup). */
 .song-card__thumb--placeholder {
+  background: repeating-linear-gradient(45deg, var(--brown-700) 0 6px, var(--brown-800) 6px 12px);
   border: 1px solid var(--brown-700);
 }
 
@@ -76,12 +80,14 @@
 .song-card__artist {
   color: var(--muted);
   font-size: 13px;
+  line-height: normal;
 }
 
 .song-card__chevron {
   color: var(--muted);
   font-size: 12px;
   flex-shrink: 0;
+  line-height: normal;
 }
 
 .song-card__detail {

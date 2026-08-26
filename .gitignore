@@ -254,6 +254,23 @@ spectrograms/
 visualizations/
 plots/
 
+# Phase 5 Part 6/7, 14th follow-up: the grain-tile.png exception that lived
+# here (3rd follow-up onward) is retired -- the decoded mockup source
+# confirmed grain is a real plain CSS radial-gradient in the design, not an
+# image asset at all (see index.css's :root background comment). The PNG
+# and its generated-asset status are gone; nothing needs this exception
+# anymore.
+
+# Phase 5 Part 6/7, 16th follow-up: the How It Works page's real
+# spectrogram illustration + audio sample -- these ARE meant to ship as
+# real public frontend assets (a real, confirmed, deliberate decision, not
+# an oversight -- see CLAUDE.md), unlike the blanket *.png/*.wav rules
+# above, which are aimed at the Python training pipeline's own generated/
+# data files. Narrow negations, same pattern already established for
+# grain-tile.png.
+!frontend/public/assets/Gminor_heatmap_only.png
+!frontend/public/assets/Gminor_3_5_5_3_3_3.wav
+
 # Checkpoint files from training
 checkpoints/
 *.ckpt

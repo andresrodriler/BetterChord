@@ -1,3 +1,42 @@
+/* Phase 5 Part 7 (vertical orientation): real, confirmed bug found while
+   verifying vertical cards, not present under horizontal. svguitar's own
+   <svg> never sets a `width`/`height` attribute (only `viewBox` --
+   confirmed by reading svg-js-renderer.js), so its CSS-computed size
+   follows the browser's normal "auto sizing of a replaced element with
+   only an intrinsic aspect ratio" rules -- and the containing div
+   (`.fretboard-diagram > div`, styled inline via `aspect-ratio` in
+   FretboardDiagram.jsx) has `height: auto`, whose own auto-height
+   algorithm can still grow past the CSS `aspect-ratio`-computed height
+   to fit taller intrinsic content (aspect-ratio sets a PREFERRED size,
+   not a hard cap, once real content wants more room).
+   This was invisible under horizontal orientation by coincidence, not
+   because the mechanism didn't apply there too: a wider intrinsic SVG
+   (viewBox width grows with fret span, height fixed at 400) has a
+   SHALLOWER intrinsic height-per-width ratio than the fixed CSS box, so
+   its content-based height need is always <= the CSS box's own height --
+   never triggers the overflow-grow path. Vertical orientation inverts
+   this (viewBox width fixed at 400, height grows with fret span), so a
+   voicing needing a taller-than-baseline window has a STEEPER intrinsic
+   ratio than the fixed CSS box -- confirmed via direct measurement on a
+   real wide-gap capo-attachment voicing (chord E, base_fret 4/capo 4,
+   frets 12-X-14-13-12-4): its card rendered at 257.6px tall against
+   every sibling card's 248.9-249.4px, a real, visible row-height
+   mismatch in the 2-column `.voicing-list` grid, not a rounding
+   difference.
+   Fixed by giving the <svg> itself an explicit 100%/100% CSS size --
+   this makes the PARENT's own `aspect-ratio`-computed box authoritative
+   for layout (no more content-driven auto-height to grow past it); the
+   svg's own `viewBox` + `preserveAspectRatio="xMidYMid meet"` (already
+   set by svguitar) still letterboxes/centers the real artwork correctly
+   within that fixed box, exactly as intended -- this rule doesn't change
+   what gets drawn, only removes the parent's own vulnerability to a
+   taller-than-expected intrinsic ratio. */
+.fretboard-diagram svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Interval-colored finger dots (Phase 3 Part 5/6) -- svguitar's per-finger
    fill/text/stroke colors are set directly via FingerOptions in
    fretParser.js (SVG presentation attributes, not CSS), but the glow is
@@ -47,6 +86,18 @@
 
 .interval-dot--ext13 {
   filter: drop-shadow(0 0 3px var(--interval-ext-13-glow));
+}
+
+/* A genuine 6th (Phase 5 Part 7, 8th-token session) -- same mechanism as
+   every bucket above, just a real gap: this rule didn't exist at all
+   before, since "6" had no dedicated bucket/glow token to point at yet
+   (see intervalColors.js's own classifyInterval() comment for the real
+   bug this closes). Without this rule, a "sixth"-bucket dot would still
+   get the correct fill/text/border via inline styles (getIntervalStyle),
+   but silently miss its glow halo -- confirmed this would have been a
+   real, if subtle, gap before adding it. */
+.interval-dot--sixth {
+  filter: drop-shadow(0 0 3px var(--interval-6th-glow));
 }
 
 /* Click-to-expand affordance (Phase 3 Part 5/6) -- only applied when

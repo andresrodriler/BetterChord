@@ -8,14 +8,40 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-inline: 1px solid var(--border);
-  background:
-    /* faint schematic grid, echoing the "diagram/instrument readout" feel
-       without the animated diagrams themselves */
-    linear-gradient(var(--brown-900) 1px, transparent 1px) 0 0 / 48px 48px,
-    linear-gradient(90deg, var(--brown-900) 1px, transparent 1px) 0 0 / 48px 48px,
-    linear-gradient(180deg, rgba(200, 155, 92, 0.05), transparent 320px),
-    var(--brown-950);
+  /* Phase 5 Part 6/7, 7th follow-up: REMOVED a `border-inline: 1px solid
+     var(--border)` that lived here since well before this materiality
+     pass -- confirmed via the audit tool as a real, user-reported bug,
+     not intentional page framing: the mockup's own outermost container
+     has no border at all (borderLeftStyle/borderRightStyle: none on
+     both sides). At normal wide viewports this rendered as a visible
+     thin vertical line partway across the page (where #root's own
+     1126px-centered column meets the wider viewport) -- previously
+     misread as "the border itself (a real, intentional 1px line, not a
+     texture seam)" while verifying the grain-seam fix (4th follow-up)
+     and never actually questioned until now. */
+  /* Phase 5 Part 6/7, 4th follow-up: the grain PNG moved OUT of this rule
+     entirely, up to `:root` (index.css). Closing round: the corner-glow/
+     top-gradient layers that stayed here after that move are GONE too,
+     moved to :root alongside the grain/vignette -- see index.css's :root
+     rule for the full trace. Real, confirmed bug, not the same seam
+     reported again by mistake: the bucketed edge-brightness audit (new
+     `compute_edge_brightness_buckets()` in test_scripts/visual_diff.py)
+     showed a real ~3-unit jump concentrated at exactly the #root/
+     .app-shell boundary width ((viewport-1126)/2) at every viewport
+     tested -- confirmed by isolating the layer (removing this rule's own
+     background-image via a live DOM override and re-running the same
+     bucketed check): the jump dropped from 3.1 to 1.5 (1280px) and 2.9
+     to 1.4 (1440px) with this rule's background removed, leaving only a
+     smooth vignette-driven drift. Root cause: this box is narrower than
+     the viewport at any width above 1126px (the exact same "box edge
+     creates a real background discontinuity against the plain page
+     outside it" bug class the grain layer already had) -- these corner
+     glows' own radial centers sit only 4%/92% inset with large radii, so
+     they're already meaningfully non-transparent right at this box's own
+     edge, making the page-margin-to-box-edge crossing a real, visible
+     step rather than a true fade to zero. No background left on this
+     rule at all now -- :root's own background (behind #root, which has
+     no background of its own) shows through unbroken. */
 }
 
 /* -- Chassis header: sticky top strip, like a device's brand plate --
@@ -30,12 +56,72 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 32px;
-  border-bottom: 1px solid var(--border);
+  /* Phase 5 Part 6/7, 7th follow-up: real audit finding, confirmed via a
+     dedicated viewport-width measurement (not just a `width` computed-
+     style number, which can look plausible without actually confirming
+     full-bleed) -- the mockup's header spans 100% of the real browser
+     viewport (1440/1440px measured), independent of #root's own 1126px
+     centered column that constrains .app-main's content. Standard
+     "break out of a centered container" technique: width:100vw sized
+     against the true viewport, offset back into place with a margin
+     calc'd from the element's own in-flow center rather than the
+     viewport's -- this is CSS only, no DOM/structural change, and
+     .app-header stays exactly where it already was in the tree. Verified
+     directly this doesn't introduce a horizontal scrollbar (Chromium
+     here uses overlay scrollbars so 100vw isn't wider than the visible
+     area, confirmed via document.documentElement.scrollWidth ==
+     clientWidth after the change, not assumed). This intentionally
+     means the header's own 48px content inset is no longer visually
+     aligned with .app-main's centered content below it (brand/nav sit
+     48px from the true screen edge, page content stays centered in the
+     1126px column) -- confirmed this is genuinely what the mockup itself
+     does too (its own hero content has a completely separate, narrower
+     centering rule), not a side effect to "fix" further.
+
+     Phase 5 Part 6/7, continued round: real, confirmed horizontal-scroll
+     bug in this exact rule -- the "confirmed directly this doesn't
+     introduce a horizontal scrollbar" note above was only ever verified
+     in headless Chromium, which reserves 0px for its scrollbar; on a real
+     browser with a classic (non-overlay) scrollbar -- Windows Chrome's
+     actual default -- 100vw resolves wider than the true visible area by
+     the scrollbar's own width, pushing this element's real right edge
+     past the true viewport edge (worked through algebraically in
+     App.jsx's own comment on the fix, and in CLAUDE.md). Fixed by
+     subtracting `--scrollbar-w` (set by App.jsx, 0px on any browser using
+     overlay scrollbars, so this is a no-op there) from the width and
+     adding half of it back into each margin -- proven to land the real
+     rendered edges at exactly x=0 and x=clientWidth regardless of
+     scrollbar width. */
+  width: calc(100vw - var(--scrollbar-w, 0px));
+  margin-left: calc(50% - 50vw + var(--scrollbar-w, 0px) / 2);
+  margin-right: calc(50% - 50vw + var(--scrollbar-w, 0px) / 2);
+  /* Phase 5 Part 6/7, 6th follow-up: was 18px 32px, a plausible-looking
+     value never actually checked against the mockup -- real audit value
+     is 12px 48px. */
+  padding: 12px 48px;
+  /* Real mismatch found by the audit tool, not assumed: the mockup's
+     header has NO border at all, only the box-shadow below for
+     separation from scrolled content -- removed rather than kept
+     "for safety," since the box-shadow alone is what the mockup
+     actually relies on. */
   position: sticky;
   top: 0;
+  /* z-index: 20 and position: sticky (mockup measures position: relative,
+     z-index: 1) are a DELIBERATE, pre-existing difference from Phase 3
+     Part 6/6 -- the mockup is a single static render with nothing to
+     scroll under it, but this app's header genuinely needs to stay
+     pinned above real scrolling content. Not "fixed" to match the
+     mockup literally, since matching it here would break the real,
+     working sticky-header feature. */
   z-index: 20;
-  background: var(--brown-950);
+  /* Phase 5 Part 6/7, 6th follow-up: real audit finding -- the mockup's
+     header gradient is NOT --brown-900-to-something-darker (the previous
+     round's guess); it runs a header-specific lighter stop down to
+     --brown-900 itself (see --header-gradient-from's own comment in
+     index.css for the full trace). */
+  background: linear-gradient(var(--header-gradient-from), var(--brown-900));
+  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
   @media (max-width: 700px) {
     padding: 14px 20px;
     gap: 10px;
@@ -53,20 +139,36 @@
 
 .app-nav__link {
   font-family: var(--mono);
-  font-size: 13px;
+  /* Phase 5 Part 6/7, 7th follow-up: real audit finding -- was 13px,
+     mockup measures 12px. */
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--muted);
   text-decoration: none;
   transition: color 0.15s ease;
+  /* Same real line-height-inheritance bug as the shared h1 rule and
+     .record-btn (index.css / App.css) -- no line-height of its own
+     meant inheriting :root's resolved 26.1px regardless of this much
+     smaller font-size. */
+  line-height: normal;
   @media (max-width: 700px) {
     font-size: 11px;
   }
 }
 
+/* Phase 5 Part 6/7, 7th follow-up: real audit finding -- was --parchment,
+   mockup's real hover color is brass (rgb(199,155,93) ≈ --brass, a 1-unit
+   rounding difference from independent rendering, not a different color),
+   matching the same "you can click this" brass hover language used
+   everywhere else (dropzone, search/record buttons) rather than a plain
+   text-lightening effect. This also now reads consistently with
+   `.app-nav__link.active`'s own existing brass color -- hovering the
+   active page's own link no longer changes to a different color than its
+   resting active state. */
 .app-nav__link:hover {
-  color: var(--parchment);
+  color: var(--brass);
 }
 
 .app-nav__link.active {
@@ -118,6 +220,7 @@
   padding: 7px 16px;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  line-height: normal;
 }
 
 .handedness-toggle:hover {
@@ -149,20 +252,38 @@
   align-items: stretch;
 }
 
-/* -- Panel: the base "device face" surface used for cards/wells -- */
+/* -- Panel: the base "device face" surface used for cards/wells --
+   Phase 5 Part 6/7: two new physical details, both from the design
+   mockups, neither requiring any markup -- a bevel (the top border edge
+   catches light, so it's a hair lighter than the other three sides) and
+   four small corner "rivets" (hardware dots), painted as extra
+   background-image layers rather than real elements so every existing
+   .panel usage picks them up automatically. */
 .panel {
-  background: var(--brown-900);
+  background-color: var(--brown-900);
+  background-image: radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px);
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  background-position: 8px 8px, calc(100% - 8px) 8px, 8px calc(100% - 8px), calc(100% - 8px) calc(100% - 8px);
   border: 1px solid var(--border);
+  border-top-color: var(--bevel-light);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 24px;
+  position: relative;
   @media (max-width: 700px) {
     padding: 18px;
   }
 }
 
 .panel--recessed {
-  background: var(--brown-800);
+  background-color: var(--brown-800);
+  /* No rivets/bevel on a recessed surface -- it should read as pressed
+     IN, not as its own raised hardware panel. */
+  background-image: none;
   box-shadow: var(--shadow-inset);
   border-color: var(--brown-700);
 }
@@ -192,6 +313,16 @@
   padding: 12px 20px;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.05s ease, background 0.15s ease;
+  /* 18th follow-up (Results page exhaustive diff): the shared base .btn
+     rule never set its own line-height, so every plain button app-wide
+     (Search, GitHub-link's own .btn-primary base before its page-scoped
+     override, etc.) silently inherited :root's resolved 26.1px pixel
+     value -- same inheritance bug already found and fixed individually
+     on h1/nav-link/record-btn/CapturePanel/badge/About's text/
+     HowItWorks' illustrations/ChordOverview's kickers. Fixed at the one
+     shared root instead of per-button this time, since every button
+     using this base class has the identical gap. */
+  line-height: normal;
 }
 
 .btn:hover:not(:disabled) {
@@ -215,8 +346,8 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #d9af74;
-  border-color: #d9af74;
+  background: var(--brass-hover);
+  border-color: var(--brass-hover);
 }
 
 .btn-ghost {
@@ -266,10 +397,38 @@
   padding: 10px 20px 10px 14px;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+  /* Phase 5 Part 6/7, 6th follow-up: real missing effect the audit
+     surfaced -- a subtle top-edge bevel highlight, same "raised pill"
+     language the mockup uses on this button too.
+     12th follow-up: the exhaustive diff found this was still missing the
+     mockup's own OUTER drop-shadow layer (only had the inset highlight) --
+     added, matching the same 2-layer recipe already applied to the
+     search button above. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.35);
+  /* Same real bug as the shared h1 rule (index.css) -- no line-height
+     of its own meant inheriting :root's resolved 26.1px, cramped badly
+     against this button's own much smaller font-size/padding. */
+  line-height: normal;
 }
 
-.record-btn:hover:not(:disabled) {
-  border-color: var(--record-red);
+/* Phase 5 Part 6/7, 6th follow-up: real audit finding, and a genuine
+   behavior fix, not just a color swap -- hovering an INACTIVE record
+   button (not yet armed/live) mockup-confirmed uses the standard brass
+   "you can click this" hover language (matching the dropzone/search
+   input's own hover treatment), the same pulse-ring animation as
+   dropzone-breathe, reusing that keyframe rather than inventing a
+   second one. Red stays reserved for the genuinely LIVE recording state
+   below, which this selector explicitly excludes -- :hover previously
+   had higher specificity than .record-btn--live's own border-color, so
+   hovering a LIVE button would have incorrectly flashed brass without
+   this exclusion. */
+.record-btn:hover:not(:disabled):not(.record-btn--live) {
+  /* Solid --brass, not --brass-border -- real audit finding: the mockup's
+     hover border is solid brass, matching the dropzone's own hover
+     treatment (also solid var(--brass)), not the translucent variant. */
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px var(--brass-dim);
+  animation: dropzone-breathe 1.4s ease-in-out infinite;
 }
 
 .record-btn:disabled {
@@ -278,16 +437,33 @@
 }
 
 .record-btn__dot {
-  width: 14px;
-  height: 14px;
+  /* Phase 5 Part 6/7, 14th follow-up: real value from the decoded mockup
+     source -- was 14px, real value is 11px. */
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--record-red);
+  /* 12th follow-up's own "0.09 alpha / 7px spread" fix is REVERTED here,
+     confirmed wrong by the decoded source: that value was never the
+     dot's real static/rest state -- it was one mid-cycle frame of the
+     SAME pulse-record animation the mockup runs on this dot
+     UNCONDITIONALLY (see below), sampled from a screenshot without
+     realizing an animation was already running under it. The decoded
+     source's own inline (pre-animation) value is `0 0 0 3px
+     rgba(217,43,43,0.2)`, close to this animation's own real 0%/100%
+     keyframe (0.25/3px, confirmed unchanged/already correct by decoding
+     the source's own @keyframes block) -- used directly as the rest
+     value here. */
   box-shadow: 0 0 0 3px rgba(217, 43, 43, 0.2);
   flex-shrink: 0;
-}
-
-.record-btn--live .record-btn__dot,
-.record-btn--armed .record-btn__dot {
+  /* Real, confirmed finding: the decoded source's own dropzone record
+     button has `animation: pulse-record 1.4s ease-in-out infinite`
+     directly on this dot, unconditionally -- not gated behind an
+     armed/live state the way this rule previously assumed. Moved here
+     from the old `.record-btn--live .record-btn__dot,
+     .record-btn--armed .record-btn__dot` selector (removed, now
+     redundant) so every record-btn dot pulses gently at rest, matching
+     the real always-on design intent, not just once actually recording. */
   animation: pulse-record 1.4s ease-in-out infinite;
 }
 
@@ -323,8 +499,16 @@
 .record-btn--block {
   width: 100%;
   justify-content: center;
-  padding: 14px 20px;
-  font-size: 14px;
+  /* Phase 5 Part 6/7, 6th follow-up: was 14px 20px / 14px -- real audit
+     values are 9px 20px / 13px (this variant's own font-size/padding,
+     not the base .record-btn's 13px/10px-20px-10px-14px, which suits the
+     dot-plus-label layout, not this icon-plus-label one). Letter-spacing
+     also has its own real value here (1.04px), distinct from the base
+     class's fixed 1.4px, which doesn't scale with the smaller font-size
+     on its own. */
+  padding: 9px 20px;
+  font-size: 13px;
+  letter-spacing: 1.04px;
 }
 
 /* -- Inputs -- */
@@ -352,15 +536,25 @@
   padding: 12px 14px;
   box-shadow: var(--shadow-inset);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Phase 5 Part 6/7, 7th follow-up: real audit finding (search input,
+   Home's CapturePanel) + the task's own explicit ask for a real focus
+   affordance -- was translucent --brass-border with no shadow change at
+   all (functionally invisible focus state, confirmed via the audit: no
+   visible difference between :focus and resting). Fixed site-wide (every
+   `.text-input`, not just the search input this was actually audited
+   on) since this is the same "you can interact with this" brass language
+   already used consistently for dropzone/button hover -- a real focus
+   ring was missing everywhere this class is used, not a Home-only gap. */
 .text-input:focus {
-  border-color: var(--brass-border);
+  border-color: var(--brass);
+  box-shadow: var(--shadow-inset), 0 0 0 3px var(--brass-dim);
 }
 
 .text-input::placeholder {
-  color: #6b5d4b;
+  color: var(--placeholder);
 }
 
 .file-input {
@@ -386,6 +580,12 @@
   gap: 8px;
   font-family: var(--mono);
   font-size: 13px;
+  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
+     exhaustive (non-curated) diff -- same line-height-inheritance bug
+     already fixed elsewhere (h1/nav-link/record-btn/CapturePanel), never
+     previously checked on this shared class -- affects every real .badge
+     usage app-wide (Home's confidence pill, not just this one spot). */
+  line-height: normal;
   letter-spacing: 0.4px;
   color: var(--parchment);
   background: var(--scan-dim);
@@ -399,6 +599,10 @@
   height: 7px;
   border-radius: 50%;
   background: var(--scan);
+  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
+     exhaustive diff -- mockup's own dot has a soft scan-colored glow
+     ring around it (live had none). */
+  box-shadow: 0 0 0 2px rgba(111, 227, 214, 0.18);
 }
 
 .tag {
@@ -411,12 +615,14 @@
   border: 1px solid var(--brown-700);
   border-radius: 999px;
   padding: 3px 10px;
+  line-height: normal;
 }
 
 .status-text {
   font-family: var(--mono);
   font-size: 14px;
   color: var(--muted);
+  line-height: normal;
 }
 
 .status-text--warn {

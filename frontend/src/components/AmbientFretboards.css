@@ -1,0 +1,96 @@
+/* Phase 5 Part 6/7, 5th follow-up -- scattered decorative fretboard
+   sketches behind Home's hero. Originally positioned relative to
+   `.home-hero` alone (only ~625px of the page); using plain `inset: 0`
+   here would cluster every shape inside that narrow column, losing the
+   mockup's actual composition (shapes scattered near the page's own
+   left/right edges). The standard "break out of a centered container"
+   trick instead: centered via left:50% + a transform, but given its OWN
+   wider width, independent of the parent's.
+
+   Phase 5 Part 6/7, Home polish follow-up: real, requested extension --
+   moved from `.home-hero` to `.home-page` (Home.jsx's new outer
+   wrapper, `position: relative`) so `top/bottom: 0` now spans the WHOLE
+   page (hero + the hero-to-teaser gap + the teaser row + the page's own
+   bottom margin), not just the hero section -- the new shapes in
+   AmbientFretboards.jsx's own `SHAPES` array use `top` values in this
+   same full-page coordinate system. Negative z-index so it paints
+   behind the real in-flow content (hero text/CapturePanel, and now also
+   the teaser cards) with no extra z-index bookkeeping needed on that
+   content. */
+/* Phase 5 Part 6/7, Home polish follow-up (3rd round): real, requested
+   fix -- `width: 1100px; max-width: 94vw` meant the effective width was
+   `min(1100px, 94vw)`, which STAYS AT 1100px for every viewport wider
+   than ~1170px (94vw exceeds 1100px past that point) -- confirmed
+   directly, not assumed: at 1920px this left a real, fixed ~410px
+   margin between the container's own edge and the true screen edge that
+   no percentage-based `left`/`right` offset in AmbientFretboards.jsx
+   could meaningfully close, however negative. Switched to a real
+   viewport-relative width (97vw) with a generous sanity cap far above
+   any tested breakpoint (2400px, not expected to bind at 1280-1920px)
+   instead of a fixed px value -- now the container itself tracks the
+   real viewport width, leaving only ~1.5vw margin per side, which is
+   what actually gives AmbientFretboards.jsx's negative `left`/`right`
+   values real room to land shapes close to the true edge at every
+   width, not just narrow ones. Re-verified `scrollWidth === clientWidth`
+   at all 4 required breakpoints after this change (see the chat
+   writeup) -- the shared `:root`/`body` `overflow-x: hidden` safety net
+   (index.css, from an earlier Home follow-up) still catches the rare
+   shape whose own negative offset lands it a few px past the true edge,
+   same as it already did before this specific change. */
+.ambient-fretboards {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 97vw;
+  max-width: 2400px;
+  transform: translateX(-50%);
+  z-index: -1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.ambient-fretboards__item {
+  position: absolute;
+  text-align: center;
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.35));
+}
+
+.ambient-fretboards__item--blurred {
+  filter: blur(1.2px) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.3)) saturate(0.65);
+}
+
+/* A tiny abstracted fretboard: a bordered box with a faint 4x5 grid,
+   matching the "diagram/instrument readout" motif already used for the
+   real schematic-grid texture elsewhere -- not a literal, accurate
+   fretboard rendering (that's FretboardDiagram's job for real voicings). */
+.ambient-fretboards__grid {
+  position: relative;
+  margin: 0 auto;
+  border: 1px solid var(--ambient-line);
+  border-radius: 3px;
+  background-image: repeating-linear-gradient(90deg, var(--ambient-line) 0 1px, transparent 1px 25%),
+    repeating-linear-gradient(180deg, var(--ambient-line) 0 1px, transparent 1px 20%);
+}
+
+.ambient-fretboards__item--blurred .ambient-fretboards__grid {
+  border-color: var(--ambient-line-dim);
+  background-image: repeating-linear-gradient(90deg, var(--ambient-line-dim) 0 1px, transparent 1px 25%),
+    repeating-linear-gradient(180deg, var(--ambient-line-dim) 0 1px, transparent 1px 20%);
+}
+
+.ambient-fretboards__dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ambient-fretboards__label {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}

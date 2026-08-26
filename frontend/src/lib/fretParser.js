@@ -22,17 +22,21 @@ const MIN_FRET_WINDOW = 5
 // a plain, non-attached window need to show every note" number, and having
 // two separate copies of this calc is exactly how the 8th-follow-up bug
 // happened (see needsCapoAttachment's comment). One implementation.
-function computeHighestLocalFret(voicing) {
-  const { frets, base_fret: baseFret } = voicing
+//
+// Takes an explicit `position` (Phase 5 Part 7, follow-up 2) rather than
+// re-deriving it from `base_fret` internally -- needed once `position` can
+// legitimately differ from `base_fret` (nut-anchoring, see voicingToChord's
+// own `nutAnchor` below). Callers that don't nut-anchor (needsCapoAttachment,
+// always Capo-only) just pass the same `baseFret > 1 ? baseFret : 1` value
+// this function used to compute on its own -- no behavior change for them.
+function computeHighestLocalFret(voicing, position) {
+  const { frets } = voicing
   const positions = frets.split('-')
   return Math.max(
     MIN_FRET_WINDOW,
     ...positions
       .filter((p) => p !== 'X' && p !== 'x' && p !== '0')
-      .map((p) => {
-        const fretNum = parseInt(p, 10)
-        return baseFret > 1 ? fretNum - baseFret + 1 : fretNum
-      })
+      .map((p) => parseInt(p, 10) - position + 1)
   )
 }
 
@@ -71,8 +75,32 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
   // draw() and sizes its container to match, so "meet" scaling (already
   // in use, never "none") fills the container correctly at whatever
   // window size this specific voicing actually needs, no stretch either way.
-  const position = baseFret > 1 ? baseFret : 1
-  const highestLocalFret = computeHighestLocalFret(voicing)
+  //
+  // Nut-anchoring (Phase 5 Part 7, follow-up 2): a non-Capo voicing whose
+  // own base_fret is 1 or 2 gets its window anchored to the real nut
+  // (position 1) instead of its own base_fret -- a base_fret=2 voicing
+  // like D's X-X-0-2-3-2 previously showed a "2fr" window starting one
+  // fret below the nut, with the open D marked separately above it, which
+  // reads as an arbitrary offset rather than "this is basically a nut
+  // chord." Deliberately EXCLUDES Capo-type voicings: `base_fret ===
+  // capo` is a structural invariant there (see CLAUDE.md's Part 2 --
+  // local fret 1 IS the capo's own fret for every real Capo-type row), so
+  // nut-anchoring a Capo row would show real fret space BEHIND the capo,
+  // which is wrong -- the capo bar's own position is what's meant to
+  // anchor that diagram, not the literal nut. base_fret===1 rows are
+  // unaffected either way (already nut-anchored under the pre-existing
+  // `baseFret > 1 ? baseFret : 1` logic below).
+  // Real data checked before choosing the threshold (2), not guessed: of
+  // 5142 real non-Capo base_fret===2 rows, only 9 (~0.18%) have a note
+  // past real fret 6 -- confirmed via a direct query against
+  // voicings.db, not estimated. The window still needs to grow for those
+  // 9 (computeHighestLocalFret, below, already handles this the same way
+  // it already handles today's wide-span voicings -- letterboxed via the
+  // shared aspect-ratio mechanism, never clipped), it just can't be
+  // hardcoded to a strict 1-5 span for every base_fret===2 row.
+  const nutAnchor = voicing.type !== 'Capo' && baseFret <= 2
+  const position = nutAnchor ? 1 : baseFret > 1 ? baseFret : 1
+  const highestLocalFret = computeHighestLocalFret(voicing, position)
 
   const fingers = []
   const unmutedIndexes = []
@@ -89,7 +117,14 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
   positions.forEach((pos, index) => {
     const stringNumber = leftHanded ? index + 1 : 6 - index
     if (pos === 'X' || pos === 'x') {
-      fingers.push([stringNumber, 'x'])
+      // 24th follow-up: explicit strokeWidth override so the mute
+      // marker's own X keeps its original 2px weight -- it reads from
+      // svguitar's general `strokeWidth` setting by default (confirmed
+      // in svguitar's own source), which the nut/grid-hierarchy fix in
+      // FretboardDiagram.jsx just dropped to 1px for regular fret/string
+      // lines. Mute-marker rendering itself is explicitly out of scope
+      // for that fix, so this keeps it unaffected.
+      fingers.push([stringNumber, 'x', { strokeWidth: 2 }])
       return
     }
     unmutedIndexes.push(index)
@@ -139,7 +174,13 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
         fingers.push([stringNumber, 0])
       }
     } else {
-      const localFret = baseFret > 1 ? fretNum - baseFret + 1 : fretNum
+      // Derived from `position`, not `baseFret`, directly -- see
+      // `position`'s own comment above for why these can now legitimately
+      // differ (nut-anchoring). This is mathematically identical to the
+      // old `baseFret > 1 ? fretNum - baseFret + 1 : fretNum` for every
+      // row that ISN'T nut-anchored (position === baseFret there, or both
+      // are 1), so no behavior change for Capo/base_fret>2 rows.
+      const localFret = fretNum - position + 1
       // Capo-sounded notes (Phase 3 Part 5/6, 4th follow-up; repositioning
       // logic removed in the 5th follow-up's mini pass, see below): for
       // Capo-type voicings specifically, a string at local fret 1 sounds
@@ -326,7 +367,11 @@ export function needsCapoAttachment(voicing) {
     .map((p) => parseInt(p, 10) - baseFret + 1)
   const clusterFrets = localFrets.filter((l) => l > 1)
   if (clusterFrets.length === 0) return false
-  return computeHighestLocalFret(voicing) > MAX_SPAN_BEFORE_ATTACH
+  // Capo-only by construction (the early return above), so never
+  // nut-anchored -- same `baseFret > 1 ? baseFret : 1` position
+  // computeHighestLocalFret used to derive internally before it took an
+  // explicit `position` param.
+  return computeHighestLocalFret(voicing, baseFret > 1 ? baseFret : 1) > MAX_SPAN_BEFORE_ATTACH
 }
 
 // Builds the ONE Chord config for the cluster window, plus a list of
@@ -351,6 +396,22 @@ export function voicingToClusterChord(voicing, { leftHanded = false, formula = n
     .filter((fretNum) => fretNum - baseFret + 1 > 1)
   const clusterMinAbs = Math.min(...clusterAbsoluteFrets)
   const clusterMaxAbs = Math.max(...clusterAbsoluteFrets)
+  // Phase 5 Part 7, follow-up (this round): REVERTED back to the
+  // MIN_FRET_WINDOW floor -- the immediately-prior follow-up's removal
+  // of it was a real, confirmed miscommunication, not a correction.
+  // Dropping the floor entirely didn't just trim unused visual space --
+  // it cut real CONTENT: the repro voicing (D, Capo 2,
+  // `10-X-12-11-10-2`) went from showing all 5 real fret rows (10-14)
+  // down to only 3 (10-12), a genuine reduction in what the diagram
+  // displays, not a rendering-only tightening. What was actually asked
+  // for was the SAME content rendered bigger within its existing box
+  // (padding/scale-to-fit slack), not fewer rows. Restored to
+  // `Math.max(MIN_FRET_WINDOW, ...)`, matching `voicingToChord`'s own
+  // window (above) exactly -- every split-view Capo voicing is back to
+  // its full original span, same as two rounds ago. See this round's
+  // own CLAUDE.md entry for whether any REAL rendering-layer slack
+  // (distinct from this content-window question) was found once the
+  // window was restored.
   const clusterWindow = Math.max(MIN_FRET_WINDOW, clusterMaxAbs - clusterMinAbs + 1)
 
   const fingers = []

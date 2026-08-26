@@ -186,6 +186,57 @@
   padding: 8px 10px;
 }
 
+/* REAL BUG FIXED (Phase 5 Part 7, Item 4 session) -- confirmed via
+   direct computed-style reads at a genuinely narrow+short viewport
+   (480x700, real overflow present -- `modalScrollH > modalClientH`),
+   not assumed from the standing hypothesis alone. The hypothesis held
+   in spirit but the actual chain runs one level deeper than "flex:1 has
+   no row to size against": `.voicing-modal__diagram-col` (the media
+   query above) is ALREADY correctly auto-sized to its own content in
+   the narrow column layout (`flex-basis: auto`, confirmed rendering at
+   whatever height its children need) -- but its own child, THIS rule
+   above, still carries the WIDE-layout `flex: 1; min-height: 0` (written
+   for the row-direction case, where `align-items: stretch` gives
+   diagram-col a real, definite height to hand down). In the narrow
+   column layout, diagram-col's own height is itself auto/content-driven
+   -- so this box's `flex: 1` has no defined space to grow INTO, and
+   `min-height: 0` removes the one thing that would otherwise stop it
+   collapsing toward its flex-basis (0%). Confirmed directly: diagram-col
+   rendered at 80px, this box at 51px (just the legend row's own real
+   height), and the SVG inside at literally 0px height -- a real,
+   reproducible collapse, not merely a "looks empty" impression.
+   Fixed by giving this box its own NATURAL, content-driven size in the
+   narrow context instead of fighting to flex-fill a parent that has no
+   space to offer -- `flex: 0 0 auto; min-height: auto` overrides the
+   wide-layout flex-grow behavior for exactly this breakpoint, letting
+   the box (and the real FretboardDiagram inside it, already sized via
+   its own `aspect-ratio` CSS once its width is known) size itself the
+   same way every other block-level element in this now-vertically-
+   stacked layout already does.
+   REAL, ONE-TIME GOTCHA, worth naming plainly: this override was
+   INITIALLY added inside the existing early `@media (max-width: 760px)`
+   block above (right next to `.voicing-modal__diagram-col`'s own narrow
+   override) -- and silently did nothing, because that block sits BEFORE
+   this base rule in the file, and at equal selector specificity (both
+   `.voicing-modal__diagram-box.panel`, 0,2,0) CSS cascade resolves by
+   SOURCE ORDER regardless of which one is inside a media query -- the
+   later, unconditional base rule kept winning even when the media query
+   matched. Confirmed via a real before/after computed-style re-read (not
+   assumed fixed from the CSS alone) before concluding this second,
+   correctly-ordered placement actually took effect. A genuinely new,
+   second `@media (max-width: 760px)` block (not merged into the earlier
+   one) is the right fix here specifically BECAUSE it needs to sit after
+   this base rule -- matching the "declare it right where the specificity
+   math actually requires" principle rather than one single early
+   media-query block for the whole component regardless of what it needs
+   to override. */
+@media (max-width: 760px) {
+  .voicing-modal__diagram-box.panel {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+}
+
 /* NEUTRALIZE THE DIAGRAM'S OWN NESTED BOX (12th follow-up) -- real
    feedback + screenshot confirmed the legend/diagram read as "two
    separately bordered boxes," not "one box, two flowing sections."
@@ -201,15 +252,41 @@
    this specific context, its border/background/shadow are stripped via
    a more-specific selector so it visually blends into the outer box's
    OWN identical background (--brown-800) instead of drawing a second,
-   separate-looking one. The 12px inline padding FretboardDiagram.jsx
-   sets on this element (`style={{ padding: 12 }}`) is left alone --
-   inline style can't be overridden from here without `!important`
-   anyway, and it isn't the source of the "boxed" look on its own
-   (border/background were). */
+   separate-looking one.
+
+   PADDING override ADDED (Phase 5 Part 7, follow-up, step 2 of the
+   "restore MIN_FRET_WINDOW, then find any REAL rendering-layer slack"
+   task): the 12px inline padding this element carries
+   (`style={{ padding: 12 }}`, FretboardDiagram.jsx) was previously left
+   alone here -- flagged at the time as "not the source of the boxed
+   look" (true, that was border/background) but never actually measured
+   for whether it cost real space once the window was restored to its
+   full content span. Measured directly this round, after Step 1's
+   revert: with the outer `.voicing-modal__diagram-box` ALREADY
+   providing its own `padding: 8px 10px` around the legend+diagram
+   together, this inner element's 12px is pure REDUNDANT padding in the
+   modal context specifically -- confirmed via direct DOM measurement, a
+   real, unaccounted-for 26px gap between the outer box's own height and
+   the sum of its two real children (legend + this panel), fully
+   explained by exactly this inline padding (12px top + 12px bottom)
+   plus this panel's own 1px top/bottom border width (kept invisible via
+   `border-color: transparent` above, but still occupying layout space).
+   Zeroed out via `!important` -- the ONLY way to override an inline
+   style from CSS, and the one already-documented precedent this
+   codebase uses for exactly this situation (VoicingModal.css's own
+   comment already named this specific inline style as the case
+   `!important` exists for). Scoped narrowly to this one selector, so
+   the compact-card usage of FretboardDiagram (Results.jsx's voicing
+   grid, which has no outer wrapper providing its own padding) keeps its
+   real, needed 12px untouched. This does NOT touch `clusterWindow`,
+   `MIN_FRET_WINDOW`, or any fret-count logic -- purely how much of the
+   ALREADY-CORRECT window's content renders within the box, per the
+   task's own explicit scope. */
 .voicing-modal__diagram-box .fretboard-diagram {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
+  padding: 0 !important;
 }
 
 /* Faint hairline divider between legend and diagram (12th follow-up),

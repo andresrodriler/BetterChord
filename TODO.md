@@ -85,6 +85,35 @@
   Site chrome (persistent header, About/How-it-works/GitHub pages) --
   done, see CLAUDE.md's Phase 3 Part 6/6 entry. **Phase 3 is fully closed.**
 
+**Site chrome**
+- A slim footer for the bottom of every page. Raised during a Phase 5
+  Part 6/7 Results follow-up session (real trigger: once the bottom-of-
+  page mini capture panel moved into the header row and the panel-height
+  fix landed, nothing renders below the Voicings/Songs row on Results
+  anymore -- the page just ends). **This is new-feature scope, not part
+  of the visual-fidelity pass** -- no mockup shows a footer for this
+  exact page state, this is a genuinely new idea raised in chat, not a
+  mockup-fidelity gap being tracked in `RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md`.
+  Deliberately scoped SMALL -- discussed and explicitly rejected: a full
+  sitemap-style, multi-column link-directory footer. BetterChord doesn't
+  have the page count or site scale that would justify one (three real
+  pages beyond Home/Results: About, How It Works, and the GitHub link,
+  all of which already live in the top nav). What's actually proposed: a
+  single slim row, same content on every page --
+  - The same two links already in the top nav (About, How It Works) --
+    genuinely useful to repeat at the bottom of a long Results page,
+    where the top nav has long since scrolled out of view.
+  - A GitHub link -- real value here specifically: someone who just used
+    a chord-ID tool and is curious how it works is a plausible audience
+    for "here's the actual code," more so than on a typical marketing
+    site's footer.
+  - A one-line copyright/made-by credit.
+  No Legal/license line yet -- deliberately deferred, not forgotten.
+  Would become a real, meaningful thing to add only once Phase 8
+  (Publishing/release decisions, see CLAUDE.md's own Phase 8 entry)
+  actually resolves the open data/model-weight licensing questions;
+  adding a Legal link now would either be blank or premature.
+
 **Phase 4 rich media (done)**
 - Album art, artist image, Spotify embed playback, YouTube embed
   (confidence-gated), UG capo/key/tuning display, plus several follow-up

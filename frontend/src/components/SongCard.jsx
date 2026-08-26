@@ -75,7 +75,13 @@ function SongCard({ song, spelling }) {
         </span>
         <span className="song-card__summary-text">
           <span className="song-title">{title}</span>
-          <span className="song-card__artist">- {artist}</span>
+          {/* Phase 5 Part 6/7, Results convergence pass: real, confirmed
+              mismatch -- the real mockup shows title/artist stacked with
+              no separator at all, relying on font-weight/size/color alone
+              to distinguish them (matching the title/artist pairing
+              already used the same way on the artist-image row below).
+              Dropped the hardcoded "- " prefix to match. */}
+          <span className="song-card__artist">{artist}</span>
         </span>
         <span className="tag">{spelling}</span>
         <span className="song-card__chevron" aria-hidden="true">{expanded ? '▴' : '▾'}</span>

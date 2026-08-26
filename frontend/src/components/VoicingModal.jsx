@@ -225,32 +225,42 @@ function VoicingModal({ voicing, formula, bass, chordName, onClose }) {
           </div>
 
           <div className="voicing-modal__details">
-            {/* THREE-FIELD ROW (12th follow-up, REBALANCED 13th follow-up,
-                now a LEFT-ALIGNED CLUSTER as of this round -- 14th
-                follow-up) -- Notes/Base fret/Voicing type, one flowing
-                line. The 13th follow-up's `justify-content: space-between`
+            {/* THREE/FOUR-FIELD ROW (12th follow-up, REBALANCED 13th
+                follow-up, LEFT-ALIGNED CLUSTER as of the 14th follow-up,
+                Capo folded IN as of Phase 5 Part 7's own follow-up round)
+                -- Notes/Base fret/Voicing type/[Capo], one flowing line.
+                The 13th follow-up's `justify-content: space-between`
                 (Notes anchored left, Voicing type anchored right, Base
                 fret floating wherever the flex math put it) read as
-                "spread across the whole modal," which real feedback this
-                round said wasn't the right look -- reverted to a single
-                left-aligned cluster instead, all three fields starting
-                from the row's own left edge like one continuous line of
-                text. A visible middle-dot separator (this app's existing
-                inline-separator convention -- see
-                ChordTonePanel.jsx's `ReferenceLine`/`chord-tone-panel__ref`
-                and ChordOverview.jsx's interval-formula line, both already
-                use ' · ' between same-line items) sits between each
-                field now that they're clustered together rather than
-                pushed apart, so the eye can still tell where one field
-                ends and the next begins -- reused verbatim rather than
-                inventing a new divider style, per this round's explicit
-                "reuse an existing convention if one exists" instruction.
+                "spread across the whole modal," which real feedback said
+                wasn't the right look -- reverted to a single left-aligned
+                cluster instead, all fields starting from the row's own
+                left edge like one continuous line of text. A visible
+                middle-dot separator (this app's existing inline-separator
+                convention -- see ChordTonePanel.jsx's `ReferenceLine`/
+                `chord-tone-panel__ref` and ChordOverview.jsx's
+                interval-formula line, both already use ' · ' between
+                same-line items) sits between each field -- reused
+                verbatim rather than inventing a new divider style.
                 Wrapped in its own `<span>` (not bare text) so it can be
                 styled/muted independently of the surrounding label:value
-                text -- see VoicingModal.css. Capo (only present for
-                Capo-type voicings) stays its own separate line below this
-                row, unchanged -- this restructure is still scoped to
-                Notes/Base fret/Voicing type, not Capo. */}
+                text -- see VoicingModal.css.
+
+                Capo MOVED into this row (was its own separate `<p>` line
+                below, real, confirmed cost: a full extra text row's
+                worth of vertical space on EVERY Capo-type voicing's
+                modal -- exactly the category driving the remaining
+                ResizeObserver-correction cases from last round's own
+                investigation). `showCapo` unchanged (`voicing.type ===
+                'Capo' && voicing.capo > 0`), conditionally rendered as a
+                4th cluster item + separator, same pattern as the other
+                three -- when false, the row simply ends after "Voicing
+                type" exactly as before, no dangling separator. `flex-wrap:
+                wrap` (already on `.voicing-modal__row-3col`, a safety net
+                even before this change) is what a long Notes list wraps
+                onto if the row ever runs out of width -- unchanged
+                mechanism, now also covering the Capo segment when
+                present. */}
             <div className="voicing-modal__row-3col">
               <p className="voicing-modal__row-3col-item voicing-modal__row-3col-item--notes">
                 <strong>Notes:</strong> {noteNames || '—'}
@@ -263,8 +273,15 @@ function VoicingModal({ voicing, formula, bass, chordName, onClose }) {
               <p className="voicing-modal__row-3col-item">
                 <strong>Voicing type:</strong> {voicing.type}
               </p>
+              {showCapo && (
+                <>
+                  <span className="voicing-modal__row-3col-sep" aria-hidden="true">·</span>
+                  <p className="voicing-modal__row-3col-item">
+                    <strong>Capo:</strong> {voicing.capo}
+                  </p>
+                </>
+              )}
             </div>
-            {showCapo && <p><strong>Capo:</strong> {voicing.capo}</p>}
             <p className="status-text voicing-modal__omitted">
               {omitted.length > 0
                 ? `Omitted from this voicing: ${omitted.join(', ')}.`

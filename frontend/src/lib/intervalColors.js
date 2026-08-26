@@ -15,6 +15,7 @@ const SUFFIX_BY_BUCKET = {
   third: '3rd',
   fifth: '5th',
   seventh: '7th',
+  sixth: '6th',
   ext: 'ext',
   ext9: 'ext-9',
   ext11: 'ext-11',
@@ -76,7 +77,24 @@ export function susRealToken(susLabel) {
 export function classifyInterval(interval, formula) {
   if (interval === '1') return 'root'
   if (formula?.sus?.includes('sus4') && interval === '4') return 'third'
-  if (formula?.sus?.includes('sus2') && interval === '9') return 'third'
+  // Accepts BOTH real tokens for the sus2 tone, not just the per-voicing
+  // one -- Phase 5 Part 7 (interval/note color token overhaul). Real bug
+  // found while wiring ChordOverview.jsx's note balls to this same
+  // formula-aware path: chord_info.py's own theoretical interval labels
+  // spell the sus2 tone as bare "2" (a plain semitone-distance label,
+  // confirmed via a live /chord-info/Csus2 call), never the "9" real
+  // voicings.db per-voicing data uses for the identical tone (see
+  // susRealToken() below) -- so a genuine Csus2's characteristic tone was
+  // classified correctly everywhere fed by real voicing data (fretboard
+  // dots, IntervalLegend, ChordTonePanel) but fell through to the generic
+  // "ext" bucket in ChordOverview specifically, reading as --muted instead
+  // of the shared 3rd-bucket color every other sus2 tone gets. Safe to
+  // accept "2" unconditionally within this branch: it's only ever reached
+  // when formula.sus already confirms this chord IS a sus2 chord, and
+  // literal "2" never appears in real per-voicing intervals data for
+  // anything else (that data always uses "9" for this tone, per the
+  // comment above).
+  if (formula?.sus?.includes('sus2') && (interval === '9' || interval === '2')) return 'third'
   if (FIFTH_INTERVALS.has(interval)) return 'fifth'
   if (THIRD_INTERVALS.has(interval)) return 'third'
   if (SEVENTH_INTERVALS.has(interval)) return 'seventh'
@@ -126,13 +144,31 @@ export function classifyInterval(interval, formula) {
   // fill -- confirmed via real C11/Cm13 screenshots that 9th/11th/13th
   // were visually indistinguishable from each other before this. Only
   // the bare extension token gets its own tint; altered variants
-  // (b9/#9/#11/b13/#13) and a genuine plain "6"/non-sus "4" (i.e. NOT
-  // covered by the two new checks above) still fall through to the
+  // (b9/#9/#11/b13/#13) and a non-sus "4" still fall through to the
   // single generic "ext" bucket below, unchanged -- the task scoped this
   // to 9th/11th/13th specifically, not every extension.
   if (interval === '9') return 'ext9'
   if (interval === '11') return 'ext11'
   if (interval === '13') return 'ext13'
+  // A genuine 6th (Phase 5 Part 7, 8th-token session) -- previously fell
+  // through, undocumented as a real gap, to the generic "ext" bucket
+  // (--muted, a flat pale grey-tan -- confirmed visible on a real A6/9
+  // screenshot, the real bug report this fixes). Not the same case as
+  // the `formula.extensions.includes('13')` check above -- that branch
+  // exists specifically because real per-voicing data sometimes spells
+  // a chord's natural 13th as literal "6" (a data quirk, not a real
+  // 6th); this check only runs for whatever's LEFT, i.e. a chord whose
+  // own formula genuinely has no 13th, so "6" here really is the 6th
+  // degree (an add6/6-chord's own real token). Given its own dedicated
+  // tint (--interval-6th) rather than left in "ext" -- deliberately the
+  // lightest step of the same ~325deg/~26%-saturation family as ext-9/
+  // -11/-13 (a 6th and a 13th are the same pitch class, so visually
+  // "belonging to that family" is the right signal), but NOT the exact
+  // same hex as ext-13 -- a chord can never show both a 6 and a 13 at
+  // once, but OTHER UI contexts (filter chips, cross-chord lists) can
+  // show them near each other outside of any single chord's page, where
+  // an exact match would read as a bug, not a feature.
+  if (interval === '6') return 'sixth'
   return 'ext'
 }
 

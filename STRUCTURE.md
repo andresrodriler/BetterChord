@@ -102,6 +102,27 @@ BetterChord/
                                                    (rich media, UG info, capo-shape/
                                                    enharmonic "why differs" note --
                                                    Phase 4)
+                    SongFilters.jsx/.css        -- Phase 5 Part 5/7: collapsible artist/genre/
+                                                   capo/album-release-year filters above the
+                                                   Songs panel list, client-side against the
+                                                   already-fetched song list (lib/songFilters.js)
+                    AmbientFretboards.jsx/.css  -- Phase 5 Part 6/7, 5th-9th follow-ups:
+                                                   purely decorative, aria-hidden scattered
+                                                   fretboard sketches behind Home (data-driven,
+                                                   generated at module scope via
+                                                   generateShapes() -- stratified sampling +
+                                                   skewedRandom() density gradient + real
+                                                   minimum-spacing rejection sampling, not a
+                                                   hardcoded shape list). Positioned relative to
+                                                   Home.jsx's `.home-page` wrapper, negative
+                                                   z-index. See CLAUDE.md's Phase 5 Part 6/7
+                                                   entry for the forward-looking note about
+                                                   possibly swapping to real voicing data once
+                                                   vertical fretboard orientation lands
+                    DetectionBadge.jsx/.css     -- Phase 5 Part 6/7: "BetterChord detected X!"
+                                                   pulsing scan-dot + sonar-ripple + animated
+                                                   bar flourish on Results, replaces the old
+                                                   static .badge markup for the fromAudio case
       context/     CaptureContext.jsx, FretboardPrefsContext.jsx           -- capture/record/upload state + fretboard phase
       lib/         api.js               -- backend fetch calls, incl. cached getChords(),
                                             getChordInfo() (Phase 5 Part 2/7)

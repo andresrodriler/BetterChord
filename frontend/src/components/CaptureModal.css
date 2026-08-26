@@ -1,7 +1,7 @@
 .capture-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 7, 4, 0.72);
+  background: var(--overlay-tint);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
@@ -10,9 +10,21 @@
   padding: 20px;
 }
 
+/* Phase 5 Part 6/7: same rivet + bevel-border treatment as .panel (App.css)
+   -- duplicated here rather than added via the shared class, since this
+   element already carries its own width-variant rules (.capture-modal--
+   preview/--wide) that would otherwise fight .panel's cascade position. */
 .capture-modal {
-  background: var(--brown-900);
+  background-color: var(--brown-900);
+  background-image: radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px);
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  background-position: 8px 8px, calc(100% - 8px) 8px, 8px calc(100% - 8px), calc(100% - 8px) calc(100% - 8px);
   border: 1px solid var(--border);
+  border-top-color: var(--bevel-light);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 24px;
@@ -21,6 +33,7 @@
   max-height: 90vh;
   overflow-y: auto; /* safety net only -- sizing below is chosen so this shouldn't engage at normal viewport heights */
   transition: width 0.2s ease;
+  position: relative;
 }
 
 /* A touch wider once there's something to preview -- leaves headroom for
@@ -100,7 +113,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 7, 4, 0.72);
+  background: var(--overlay-tint);
   backdrop-filter: blur(2px);
   border-radius: var(--radius-sm);
   padding: 20px;
@@ -115,6 +128,7 @@
   padding: 24px 28px;
   background: var(--brown-900);
   border: 1px solid var(--border);
+  border-top-color: var(--bevel-light);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   max-width: 320px;

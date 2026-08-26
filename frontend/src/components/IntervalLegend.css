@@ -16,6 +16,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  line-height: normal;
 }
 
 .interval-legend__swatch {

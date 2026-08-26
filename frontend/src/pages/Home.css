@@ -1,22 +1,223 @@
+/* Phase 5 Part 6/7, Home polish follow-up: `position: relative` so
+   AmbientFretboards (now a child of THIS element, not `.home-hero`,
+   see Home.jsx) has this box as its containing block for vertical
+   extent -- the whole page (hero + teaser row + margins) now, not just
+   the hero section. No z-index needed here: AmbientFretboards uses a
+   NEGATIVE z-index (-1), which paints behind ordinary in-flow content
+   regardless of that content's own z-index (auto). */
+.home-page {
+  position: relative;
+}
+
 .home-hero {
   text-align: center;
-  gap: 8px;
+  /* Phase 5 Part 6/7, 8th follow-up: was a uniform `gap: 8px` -- replaced
+     with explicit per-element margins below (each one a real gap
+     measured directly off the mockup's own getBoundingClientRect, where
+     a mockup equivalent exists), since this hero's real rhythm genuinely
+     varies (3px/12px/16px/5px/10px between different pairs) and a single
+     shared gap can't reproduce that. */
+  gap: 0;
   max-width: 620px;
   margin: 0 auto 8px;
 }
 
-.home-hero p {
-  font-size: 17px;
-  @media (max-width: 700px) {
-    font-size: 15px;
-  }
+/* Phase 5 Part 6/7, 6th follow-up: the mockup's own h1 is meaningfully
+   smaller than the shared index.css default (32px vs 46px) -- scoped
+   here to Home's hero specifically, NOT changed in the shared `h1` rule,
+   since About/HowItWorks's own page-title h1 usage is explicitly out of
+   scope for this round and was never audited against a mockup here.
+   8th follow-up: h1's own shared margin-bottom (index.css, 12px) is
+   reused as-is for h1 -> tagline below -- no override needed, it already
+   matches the real mockup's own h1 -> next-content gap. */
+.home-hero h1 {
+  font-size: 32px;
 }
+
+/* Phase 5 Part 6/7, 9th follow-up: the mockup's own real value for this
+   specific large-heading accent instance (rgba(200,155,92,0.5) 0 0 18px)
+   -- a one-off literal, not tokenized, since nothing else in the app
+   uses this exact glow/alpha combination (--brass-dim is a different,
+   lower 0.16 alpha, used for hover/focus rings, a different role). */
+.home-hero__heading-glow {
+  text-shadow: 0 0 18px rgba(200, 155, 92, 0.5);
+}
+
+/* Phase 5 Part 6/7, 8th follow-up -- new hero content, real copy adopted
+   from the mockup (see CLAUDE.md for the full per-element mapping). */
+.home-hero__eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
+     exhaustive diff -- same recurring line-height bug, never checked
+     here before. */
+  line-height: normal;
+  letter-spacing: 0.2em;
+  color: var(--moss);
+  opacity: 0.85;
+  margin-bottom: 3px; /* real mockup gap: eyebrow -> h1 */
+}
+
+/* Phase 5 Part 6/7, 14th follow-up: real value from the decoded mockup
+   source -- the REAL H1 ("Hear it. Chord it. Find it again.", which
+   this tagline paragraph corresponds to content-wise, deliberately at a
+   smaller scale since live has an extra real H1 of its own above it,
+   see the 9th follow-up's own reasoning, unchanged/not revisited here)
+   fills its non-accent text with a subtle vertical gradient via
+   `background-clip: text`, not a flat color -- `linear-gradient(#fbf5ea,
+   #dcccb3)`. Ported as a real style technique independent of the font-
+   size difference (32px real vs. our own deliberate 19px). "Chord it."
+   itself keeps its own separate italic/brass/glow treatment via
+   `.brand__accent` + `.home-hero__heading-glow`, unaffected -- the
+   gradient-fill only applies to the plain surrounding text. */
+.home-hero__tagline {
+  font-family: var(--heading);
+  font-size: 19px;
+  line-height: 1.2;
+  font-style: italic;
+  background: linear-gradient(#fbf5ea, #dcccb3);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0 0 10px;
+}
+
+/* "Chord it." inside the tagline reuses .brand__accent directly (App.css)
+   -- already correctly sized/weighted for whatever text surrounds it,
+   no glow -- so nothing extra needed here beyond the shared class. Its
+   own `color: var(--brass)` overrides the parent's gradient-fill
+   `color: transparent` correctly (a nested element's own `color` always
+   wins over an inherited value, gradient-fill or otherwise). */
+
+/* Phase 5 Part 6/7, 14th follow-up: real values from the decoded mockup
+   source -- was 17px (15px under a 700px breakpoint never confirmed
+   against anything real); real paragraph is 12px, line-height 1.35,
+   max-width 460px, margin 12px auto 0. The 700px breakpoint's own 15px
+   step is removed -- redundant now that the real base size (12px) is
+   already smaller than what that breakpoint used to step down to. */
+.home-hero__description {
+  font-size: 13px;
+  line-height: 1.35;
+  max-width: 460px;
+  margin: 12px auto 0;
+}
+
+/* Phase 5 Part 6/7, Home polish follow-up (2nd round): real, measured
+   centering -- the stat line + confidence pill are now ONE group
+   (.home-hero__stats-group, Home.jsx), and this is the ONE value that
+   positions that whole group within the gap between the capture box
+   above and the first teaser card below (was two separately-tuned
+   margins on the two children, .home-hero__tags 12px + .home-hero__
+   confidence 28px, that happened to land close to centered by
+   coincidence, not by calculation).
+
+   Real getBoundingClientRect() measurements this was calculated from
+   (identical at all 4 required breakpoints -- this part of the page
+   doesn't reflow across 1280-1920px, confirmed directly, not assumed):
+     capture box bottom edge:        625.84px
+     first teaser card top edge:     722.84px
+     gap size:                       97.00px  (722.84 - 625.84)
+     gap midpoint:                   674.34px (625.84 + 97.00/2)
+     group's own outer height:       77.00px  (tags-row top to pill
+                                      bottom, internal 28px gap unchanged)
+   Required margin-top so the group's own vertical CENTER lands exactly
+   on the gap midpoint: 674.34 - 77.00/2 - 625.84 = 10.00px (was
+   effectively 12px via the old .home-hero__tags margin -- the group
+   needed to move up 2px, not down further). Re-measured after applying
+   this value: group center landed at 674.34px, exactly on the
+   midpoint (0.0px offset, was +2.0px), at all 4 breakpoints. */
+.home-hero__stats-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* THE TWO REAL ADJUSTMENT KNOBS FOR THIS GROUP (the "Real voicings..."
+     stat line + the "91%..." pill below it), for future hand-editing:
+       - `gap` = space BETWEEN the two children (smaller = closer
+         together vertically).
+       - `margin-top` = position of the WHOLE group as a unit (smaller =
+         higher up the page, larger = lower).
+     Real, requested change this round: tightened `gap` further (10px ->
+     6px) and moved the whole group up (`margin-top` 19px -> 12px) --
+     unlike the previous round, this one does NOT try to preserve the
+     total outer space between the capture box and the teaser row below
+     (that constraint isn't in effect this round); the outer gap shrinks
+     some as a real, expected consequence of both a smaller `gap` and a
+     smaller `margin-top`. Re-measured after (not assumed): total outer
+     space (capture box bottom to first teaser card top) went from
+     86.00px to 75.00px at all 4 required breakpoints -- a real, visible
+     tightening, not just the internal spacing. */
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.home-hero__tags {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  /* Phase 5 Part 6/7, 12th follow-up: same recurring line-height bug,
+     found via the exhaustive diff -- affects this element's own span
+     children too, by inheritance. */
+  line-height: normal;
+  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
+     exhaustive diff -- was var(--muted) (rgb(169,156,135), a cooler
+     grey-tan), mockup's own real value here is a warmer, brassier tan
+     (rgb(179,151,112)) -- a literal, not the shared --muted token,
+     since it doesn't match any existing token and --muted is used
+     app-wide elsewhere (changing the token itself would be a much
+     bigger, unverified change). */
+  color: rgb(179, 151, 112);
+}
+
+.home-hero__tags-dot {
+  opacity: 0.4;
+}
+
+.home-hero__confidence {
+  align-self: center; /* .section's own align-items: stretch would otherwise
+                          force this inline-flex pill to full width;
+                          .home-hero__stats-group (the new parent) has
+                          its own align-items: center already, but this
+                          stays as a harmless belt-and-suspenders in case
+                          that ever changes. */
+  /* Real spacing from .home-hero__tags now lives on the shared parent's
+     `gap: 28px` (.home-hero__stats-group, above) -- this was that same
+     28px value as a margin-top before the two were grouped into one
+     block; unchanged in value, just relocated so the group's own
+     position (margin-top on the group) and the group's own internal
+     spacing (gap on the group) aren't two different properties fighting
+     for the same conceptual job. */
+}
+
+.home-hero__confidence-value {
+  color: var(--scan);
+  font-weight: 600;
+}
+
+/* Phase 5 Part 6/7, 15th follow-up: .home-hero__cnn-panel rule removed --
+   the hero-featured CNN card it styled is gone (see Home.jsx), a
+   deliberate reversal of an earlier round's dual-placement decision, not
+   a bug fix. The teaser row below (.home-teasers) is untouched. */
 
 .home-teasers {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-top: 8px;
+  /* THE REAL ADJUSTER for "space between the audio box and the CNN/teaser
+     row" -- `margin-top` here is the space ABOVE this whole row (was
+     8px, real, requested increase to 28px this round). This is a
+     genuinely different lever from `.home-hero__stats-group`'s own
+     `margin-top`/`gap` above: that one only controls the space ABOVE and
+     WITHIN the stat-line/pill group; this one controls the space AFTER
+     that group ends and BEFORE the teaser cards begin -- the two stack
+     additively (audio box -> stats-group's own margin-top -> stats-group
+     itself -> `.home-hero`'s own 8px margin-bottom (unchanged, index.css/
+     Home.css, shared bottom edge of the whole hero section) -> THIS
+     margin-top -> teaser row). To make the box-to-teaser-row gap bigger
+     or smaller without touching the stat-line/pill's own internal
+     spacing, this is the one to change. */
+  margin-top: 28px;
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
   }
@@ -26,11 +227,23 @@
   display: block;
   text-align: left;
   text-decoration: none;
-  transition: border-color 0.15s ease, transform 0.05s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Phase 5 Part 6/7, Home polish follow-up: real, requested hover
+   treatment -- was border-color only, no lift, no shadow change, out of
+   step with the rest of the page's own established "you can interact
+   with this" language. Reuses the SAME recipe already used elsewhere
+   rather than inventing a new one, combining both halves of it: the
+   translateY(-1px) lift + brightened shadow already used on the search
+   button (`.manual-search .btn-primary:hover`, ManualSearch.css), and
+   the brass glow ring already used on the dropzone/record button
+   (`--brass-dim` box-shadow ring, App.css/CapturePanel.css) -- both
+   real, existing tokens, no new hover language introduced. */
 .home-teaser:hover {
-  border-color: var(--brass-border);
+  border-color: var(--brass);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow), 0 0 0 3px var(--brass-dim);
 }
 
 .home-teaser h3 {

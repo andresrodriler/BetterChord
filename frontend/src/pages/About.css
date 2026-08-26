@@ -1,40 +1,234 @@
+/* Phase 5 Part 6/7, 16th follow-up: real layout ported from the About
+   mockup -- hero copy, a 4-item stat strip, a "why this exists" section,
+   a 3-card "under the hood" row, and two full-width panels (bio, source).
+   Reuses the existing .panel treatment (rivets/bevel/shadow, App.css) for
+   every card here, rather than a new visual language. */
 .about-page {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
+  gap: 0;
+}
+
+.about-hero-copy {
+  font-size: 17px;
+  line-height: 1.65;
+  max-width: 64ch;
+  margin: 0 0 40px;
+}
+
+/* -- Stat strip -- */
+/* 18th follow-up: real convergence-loop finding -- this strip's real
+   height was 150px, not the mockup's real 102px (48px too tall). Root
+   cause: `.about-stats`'s own `padding: 0` (below) and the mockup's
+   real "no rivets on this specific strip" difference from every other
+   `.panel` on this page were both being silently overridden by the
+   shared `.panel` rule's own `padding: 24px` + rivet background-image --
+   `.panel` and `.about-stats` are both single-class selectors (equal
+   specificity), so which one wins depends on CSS import/bundle order,
+   not intent (the same class of bug already found and fixed on
+   `a.about-github-link` above -- About.css loads before App.css's own
+   `.panel` rule in the real bundle, confirmed via reading the import
+   lists directly). Doubled class name is the same specificity-bump
+   trick used there. */
+.about-stats.about-stats {
+  display: flex;
+  margin-bottom: 56px;
+  overflow: hidden;
+  padding: 0;
+  background-image: none;
+}
+
+.about-stats__item {
+  flex: 1;
+  text-align: center;
+  padding: 22px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.about-stats__item:last-child {
+  border-right: none;
+}
+
+.about-stats__value {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.about-stats__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--moss);
+  margin-top: 6px;
+  line-height: normal;
+}
+
+/* -- Section headings, matching the mockup's own eyebrow-style h2 -- */
+.about-section {
+  margin-bottom: 56px;
+}
+
+/* 18th follow-up: real exhaustive-diff finding -- every h2 on this page
+   (Why this exists / What's under the hood / Who's behind this / Source)
+   wants a smaller eyebrow treatment (13px/1.3px letter-spacing) than the
+   shared global h2 rule (15px/1.6px, used elsewhere e.g. Home's own
+   eyebrow labels) -- scoped here rather than changing the shared rule,
+   since Home's own h2 usage was already separately verified against its
+   own mockup at the shared size. Also picks up the same line-height-
+   inheritance fix already applied elsewhere (h1/nav-link/record-btn/
+   CapturePanel) -- this page's h2/h3/stat text never had their own
+   line-height set, so they inherited :root's resolved 26.1px unchanged. */
+.about-section h2,
+.about-section-card h2 {
+  margin-bottom: 16px;
+  font-size: 13px;
+  letter-spacing: 1.3px;
+  line-height: normal;
+}
+
+.about-section > p {
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 66ch;
+}
+
+.about-section > p + p {
+  margin-top: 16px;
+}
+
+/* -- "Under the hood" 3-card row -- */
+.about-hood-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
 }
 
-.about-block {
+/* Doubled class -- same `.panel` import-order specificity fix as
+   `.about-stats.about-stats` above (this override's own `padding: 22px`
+   was silently losing to `.panel`'s later-loaded `padding: 24px`,
+   confirmed via direct computed-style measurement, not assumed). */
+.about-hood-card.about-hood-card {
+  padding: 22px;
   text-align: left;
 }
 
-.about-block p {
-  font-size: 16px;
+/* 18th follow-up: real exhaustive-diff finding -- this card's own h3 is
+   smaller (12px/0.96px letter-spacing) than the shared global h3 rule
+   (14px/1.2px) -- scoped override, plus the same missing line-height fix. */
+.about-hood-card h3 {
+  color: var(--parchment);
+  font-size: 12px;
+  letter-spacing: 0.96px;
+  line-height: normal;
 }
 
-.about-block p + p {
-  margin-top: 12px;
+.about-hood-card p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0;
 }
 
-.about-stack {
+/* -- Bio / Source full-width panels -- */
+/* Doubled class -- same `.panel` import-order specificity fix (this
+   override's own `padding: 32px` was silently losing to `.panel`'s
+   later-loaded `padding: 24px`). */
+.about-section-card.about-section-card {
+  text-align: left;
+  padding: 32px;
+  margin-bottom: 24px;
+}
+
+.about-section-card p {
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 66ch;
+  margin: 0;
+}
+
+.about-section-card p + p {
+  margin-top: 14px;
+}
+
+.about-source-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 24px 0 28px;
+}
+
+.about-source-grid__label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  margin-bottom: 12px;
+  line-height: normal;
+}
+
+.about-source-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 9px;
+  font-size: 13.5px;
 }
 
-.about-stack__label {
-  display: block;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+.about-source-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: normal;
+}
+
+.about-source-list__mark--yes {
   color: var(--brass);
-  margin-bottom: 4px;
 }
 
-.about-github-link {
+.about-source-list__mark--no {
+  color: var(--placeholder);
+}
+
+/* 18th follow-up: real exhaustive-diff finding -- the mockup's own GitHub
+   link is a distinct brass pill (no border, fully-rounded, real drop
+   shadow, dark text, tighter/bolder mono type), not the shared .btn/
+   .btn-primary treatment (used elsewhere for regular rectangular buttons)
+   -- scoped override matching the mockup's real values exactly, same
+   pattern as Home's own scoped search/record-button overrides rather
+   than changing the shared .btn rule app-wide. */
+/* `a.about-github-link` (element+class, specificity 0,1,1) rather than
+   bare `.about-github-link` (0,1,0) -- needed to reliably beat the
+   shared `.btn`/`.btn-primary` rules (App.css, same 0,1,0 specificity
+   each), whose actual win-or-lose on equal specificity would otherwise
+   depend on CSS import order (About.jsx imports About.css before
+   App.jsx's own `import './App.css'` line -- confirmed via reading the
+   import lists directly, not assumed), not something to rely on. */
+a.about-github-link {
   display: inline-block;
-  margin-top: 14px;
   text-decoration: none;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  line-height: normal;
+  color: var(--brown-900);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 800px) {
+  .about-stats {
+    flex-wrap: wrap;
+  }
+  .about-stats__item {
+    flex: 1 1 50%;
+  }
+  .about-hood-grid {
+    grid-template-columns: 1fr;
+  }
+  .about-source-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -8,6 +8,16 @@
   margin-bottom: 24px;
 }
 
+/* 18th follow-up: this panel's own bare <h2>Chord Overview</h2> has no
+   line-height of its own, inheriting the shared global h2 rule's own
+   gap (index.css sets font-size/color/etc but never line-height either)
+   -- same bug class as the kicker labels below, fixed here rather than
+   widening the shared global h2 rule's own scope beyond what this round
+   tested. */
+.chord-overview h2 {
+  line-height: normal;
+}
+
 .chord-overview__grid {
   display: grid;
   grid-template-columns: 1.05fr 1.15fr 0.8fr;
@@ -43,8 +53,18 @@
   }
 }
 
+/* 18th follow-up: real exhaustive-diff finding -- this kicker had no
+   font-size/color/letter-spacing of its own, silently inheriting the
+   shared global `h3` rule (14px, `--muted`, 1.2px letter-spacing,
+   index.css) instead of the mockup's own smaller eyebrow treatment.
+   Also picks up the same missing-line-height fix already applied
+   elsewhere on this page. */
 .chord-overview__kicker {
   margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--moss);
+  letter-spacing: 0.6px;
+  line-height: normal;
 }
 
 .chord-overview__desc {
@@ -72,11 +92,16 @@
   font-size: 11px;
   font-family: var(--mono);
   color: var(--muted);
+  line-height: normal;
 }
 
 /* A solid-fill circle, same interval-color tokens the fretboard dots and
    IntervalLegend swatches already use (getIntervalStyle, live in JS) --
-   never a second hardcoded palette. */
+   never a second hardcoded palette. Phase 5 Part 6/7: glow + hover-lift
+   added, matching the mockup's treatment -- the glow color still comes
+   from the same per-interval `style` object as the fill/border (passed
+   as an inline custom property, `getIntervalStyle` already returns a
+   `glow` value alongside fill/text/stroke). */
 .chord-overview__ball {
   display: inline-flex;
   align-items: center;
@@ -88,12 +113,21 @@
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 600;
+  filter: drop-shadow(0 0 3px var(--chord-overview-ball-glow, transparent));
+  transition: transform 0.2s ease, filter 0.2s ease;
+  line-height: normal;
+}
+
+.chord-overview__ball:hover {
+  transform: translateY(-2px);
 }
 
 .chord-overview__formula {
   font-family: var(--heading);
   font-size: 22px;
   color: var(--parchment);
+  text-shadow: 0 0 16px var(--brass-dim);
+  line-height: normal;
 }
 
 .chord-overview__bass-note {

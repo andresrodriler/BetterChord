@@ -1,13 +1,36 @@
+/* Phase 5 Part 6/7: same rivet + bevel-border treatment as .panel
+   (App.css), duplicated here for the same reason as .capture-modal --
+   this rule already carries its own size-variant padding overrides that
+   would fight .panel's cascade position if combined via a shared class. */
 .capture-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  background: var(--brown-900);
+  /* Phase 5 Part 6/7, 6th follow-up: real audit finding -- was 18px,
+     mockup measures 10px between the dropzone/OR/search-row/OR/record
+     stack. Contributed real height to the capture_panel-vs-mockup
+     height gap the audit also flagged. */
+  gap: 10px;
+  background-color: var(--brown-900);
+  background-image: radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px);
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  background-position: 8px 8px, calc(100% - 8px) 8px, 8px calc(100% - 8px), calc(100% - 8px) calc(100% - 8px);
   border: 1px solid var(--border);
+  border-top-color: var(--bevel-light);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  /* Phase 5 Part 6/7, 6th follow-up: real audit finding -- this widget
+     has its OWN deeper shadow recipe in the mockup (6 layers, 2 of them
+     inset), distinct from the plain shared --shadow every other .panel
+     uses -- not just a "make it deeper" guess, the exact mockup values. */
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5), 0 14px 34px -10px rgba(0, 0, 0, 0.65),
+    0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -14px 20px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(200, 155, 92, 0.06);
   padding: 24px;
   text-align: left;
+  position: relative;
 }
 
 /* -- Upload: the largest, most prominent piece of the box -- */
@@ -15,17 +38,52 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Phase 5 Part 6/7, 13th follow-up: real, confirmed mechanism
+     difference, found via the item-3 convergence loop after every
+     individual row (OR/search/OR/record) below the dropzone already
+     matched the mockup exactly -- the mockup's own dropzone isn't
+     content-driven-height at all, it's a FIXED `height: 160px`
+     (content-box) with `justify-content: center` vertically centering
+     its (shorter) real content inside that fixed space. A prior round
+     (6th follow-up) deliberately chose content-driven auto-height
+     specifically to avoid "a fragile fixed width/height" that could
+     clip longer content -- `min-height` (not `height`) keeps that same
+     protection while producing the mockup's identical centered result
+     for the current real content: 190px is the mockup's own real total
+     OUTER height (border-box-equivalent, i.e. content-box's 160px +
+     26px padding + ~2-4px border, measured directly, not recomputed by
+     hand) -- if a future content change ever needs more room, this
+     grows instead of clipping, which a plain `height` could not do. */
+  min-height: 190px;
+  justify-content: center;
   text-align: center;
   cursor: pointer;
-  padding: 44px 24px;
+  /* Phase 5 Part 6/7, 6th follow-up: real audit finding -- was 44px 24px,
+     mockup measures 13px 24px. */
+  padding: 13px 24px;
   border: 2px dashed var(--brown-700);
   border-radius: var(--radius);
-  background: var(--brown-800);
+  /* Real audit finding: the mockup layers a soft brass glow anchored at
+     the dropzone's own bottom-center over the flat fill, plus a 2-layer
+     inset shadow (a top highlight + a general inset depth) -- neither
+     existed here before. */
+  background: radial-gradient(140px 60px at 50% 100%, rgba(200, 155, 92, 0.1), transparent), var(--brown-800);
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.02);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Phase 5 Part 6/7, 6th follow-up: real, not just cosmetic -- the mockup's
+   dropzone hover switches the border from dashed to SOLID brass and
+   starts the same breathing pulse .capture-panel__dropzone--dragging
+   already uses (confirmed via the audit tool's animationName check, not
+   assumed) -- hover previously only changed border-color, staying
+   dashed and static. This makes hover read as "actively inviting a
+   drop," matching drag-over, just one notch quieter. */
 .capture-panel__dropzone:hover {
-  border-color: var(--brass-border);
+  border-style: solid;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px var(--brass-dim), inset 0 4px 12px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+  animation: dropzone-breathe 1.4s ease-in-out infinite;
 }
 
 .capture-panel__dropzone:focus-visible {
@@ -52,37 +110,135 @@
   }
 }
 
+/* Phase 5 Part 6/7 follow-up: real drawn icon (ring + arrow), replacing a
+   plain upload-tray emoji -- sized in px like the emoji it replaces (was
+   font-size-driven, now width/height-driven on the <svg> itself), same
+   icon-glow animation unchanged. Stroke color/width live here, not
+   inline, so the icon stays token-driven like everything else. */
 .capture-panel__dropzone-icon {
-  font-size: 36px;
-  line-height: 1;
-  margin-bottom: 12px;
+  display: block;
+  width: 36px;
+  height: 36px;
+  /* Phase 5 Part 6/7, continued round: real audit finding -- was 12px,
+     mockup's own icon-to-headline gap measures 4px. Part of a real,
+     confirmed dropzone-height mismatch, alongside the line-height fixes
+     above and the headline margin fix below. */
+  margin: 0 auto 4px;
   opacity: 0.9;
+  animation: icon-glow 2.6s ease-in-out infinite;
 }
 
+.capture-panel__icon-ring {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.5;
+}
+
+.capture-panel__icon-arrow {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* -- Mini waveform flourish -- see MINI_WAVE_BAR_HEIGHTS in the JSX. -- */
+.capture-panel__mini-wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 10px;
+  margin-top: 8px;
+  opacity: 0.75;
+}
+
+.capture-panel__mini-wave-bar {
+  width: 3px;
+  height: var(--mini-wave-h);
+  background: var(--loudness-mid);
+  /* Phase 5 Part 6/7, 12th follow-up: real audit findings, from the
+     exhaustive diff -- radius was 2px, mockup's own bars are fully
+     rounded (50%, reading as pill-capped at this width); also added the
+     mockup's own subtle top-edge highlight, matching the same "raised"
+     bevel language used elsewhere. Per-bar loudness-ramp COLOR variation
+     (nth-child rules below) is left as-is -- a real, already-documented
+     deliberate choice (reuses Waveform.jsx's own real audio-level
+     palette so this flourish reads as "this widget listens to audio"),
+     not touched. */
+  border-radius: 50%;
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
+  transform-origin: bottom;
+  animation: copper-bar 1.1s ease-in-out infinite;
+}
+
+.capture-panel__mini-wave-bar:nth-child(2),
+.capture-panel__mini-wave-bar:nth-child(6) {
+  background: var(--loudness-high);
+}
+
+.capture-panel__mini-wave-bar:nth-child(4) {
+  background: var(--loudness-peak);
+  filter: drop-shadow(0 0 2px var(--loudness-peak));
+}
+
+/* Phase 5 Part 6/7, continued round: real, confirmed instance of the same
+   line-height-inheritance bug already documented for h1/nav-link/
+   record-btn (index.css/App.css) -- none of the 4 text rules below (nor
+   `.capture-panel__or span`, below) set their own line-height, so they
+   all inherited :root's `font: 18px/145%` as an already-RESOLVED 26.1px
+   PIXEL value regardless of their own much smaller font-size (confirmed
+   directly: every one of these measured a literal computed
+   `lineHeight: "26.1px"`), padding the dropzone's real height well past
+   the mockup's own -- this was the dominant contributor to a real,
+   confirmed 36px dropzone-height mismatch (measured via
+   getBoundingClientRect against the mockup, not eyeballed). Fixed with
+   `line-height: normal` on all 5, matching the established fix pattern
+   for this exact bug class elsewhere in the codebase. */
 .capture-panel__headline {
   font-family: var(--heading);
   font-weight: 500;
-  font-size: 21px;
+  /* Phase 5 Part 6/7, continued round: real audit finding -- was 21px,
+     mockup measures 16px. */
+  font-size: 16px;
+  line-height: normal;
   color: var(--parchment);
-  margin: 0 0 8px;
+  /* Phase 5 Part 6/7, continued round: real audit finding -- was 8px,
+     mockup's own headline-to-body-text gap measures 3px. */
+  margin: 0 0 3px;
 }
 
 .capture-panel__primary-text {
   color: var(--muted);
-  font-size: 15px;
+  /* Phase 5 Part 6/7, continued round: real audit finding -- was 15px,
+     mockup measures 12px. 13th follow-up: this rule now covers the
+     WHOLE merged sentence (see capture-panel__browse-link below) --
+     values already matched the mockup's own real paragraph styling
+     (color rgb(169,156,135) = --muted exactly, font-size 12px),
+     unchanged by the merge itself. */
+  font-size: 12px;
+  line-height: normal;
   margin: 0;
 }
 
-.capture-panel__secondary-text {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 4px 0 0;
+/* Phase 5 Part 6/7, 13th follow-up: the inline "or click to browse"
+   portion of the merged sentence above -- real, measured mockup value
+   (rgb(179, 151, 112), a warm brass-tan), the same literal already used
+   for .home-hero__tags last round (confirmed via direct computed-style
+   extraction on the mockup's own <span>, not guessed or reused from
+   --brass, which is a slightly different, more saturated value). Plain
+   text, not a nested interactive element -- the whole dropzone is
+   already the real click target (role="button" + onClick), so this is
+   styled-only, matching the mockup's own plain (non-anchor) span. */
+.capture-panel__browse-link {
+  color: rgb(179, 151, 112);
 }
 
 .capture-panel__formats {
   margin-top: 14px;
   font-family: var(--mono);
   font-size: 11px;
+  line-height: normal;
   letter-spacing: 0.6px;
   color: var(--muted);
   opacity: 0.7;
@@ -96,26 +252,54 @@
   color: var(--muted);
 }
 
-.capture-panel__or::before,
+/* Phase 5 Part 6/7, 14th follow-up: real values from the decoded mockup
+   source -- these lines aren't a flat --border color, they're a subtle
+   gradient from --border toward a lighter warm tone (#a8875a) at each
+   line's own outer/far end. Direct literals, not tokenized -- no other
+   existing element uses this specific 2-stop combination. */
+.capture-panel__or::before {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to left, #7d5b37, #a8875a);
+}
+
 .capture-panel__or::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--border);
+  background: linear-gradient(to right, #7d5b37, #a8875a);
 }
 
 .capture-panel__or span {
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 1.5px;
+  line-height: normal;
+  /* Phase 5 Part 6/7, continued round: real audit finding -- was 1.5px,
+     mockup measures 1.76px. */
+  letter-spacing: 1.76px;
   color: var(--moss);
+  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
+     exhaustive diff -- mockup's own "OR" text is at 0.8 opacity, live had
+     none (1.0). */
+  opacity: 0.8;
 }
 
 /* -- Size variants: same structure everywhere, proportions only differ. -- */
 
-/* default: Home -- full-size, the page's primary focus */
+/* default: Home -- full-size, the page's primary focus.
+   Phase 5 Part 6/7, 6th follow-up: real audit findings -- padding was
+   24px (mockup: 13px), and there was no max-width at all (the widget
+   just filled .home-hero's own 620px column). The mockup wraps this
+   widget in its OWN narrower 480px column, distinct from the wider
+   600px hero-text column above it -- confirmed via the audit tool's
+   real measured width (480px), not assumed. Centering it independently
+   here (rather than narrowing .home-hero itself, which would also
+   narrow the h1/p above it) reproduces that same two-width composition. */
 .capture-panel--default {
-  padding: 24px;
+  padding: 13px;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 /* compact: inside CaptureModal's "choose a different source" panel */
@@ -129,7 +313,8 @@
 }
 
 .capture-panel--compact .capture-panel__dropzone-icon {
-  font-size: 28px;
+  width: 28px;
+  height: 28px;
   margin-bottom: 8px;
 }
 
@@ -149,7 +334,8 @@
 }
 
 .capture-panel--mini .capture-panel__dropzone-icon {
-  font-size: 22px;
+  width: 22px;
+  height: 22px;
   margin-bottom: 6px;
 }
 
@@ -162,12 +348,142 @@
   font-size: 13px;
 }
 
-.capture-panel--mini .capture-panel__secondary-text,
-.capture-panel--mini .capture-panel__formats {
+/* Phase 5 Part 6/7, 13th follow-up: `.capture-panel__secondary-text`
+   (the old "or click to browse" paragraph) is gone -- that text is now
+   an inline span (.capture-panel__browse-link) nested inside
+   .capture-panel__primary-text, see that rule's own comment. Hiding
+   just the span here preserves mini's original intent (keep "Drag &
+   drop your audio here" visible, drop the click-to-browse hint to save
+   space) without leaving a broken half-sentence. */
+.capture-panel--mini .capture-panel__browse-link,
+.capture-panel--mini .capture-panel__formats,
+.capture-panel--mini .capture-panel__mini-wave {
   display: none;
 }
 
 .capture-panel--mini .record-btn--block {
   padding: 10px 16px;
   font-size: 12px;
+}
+
+/* header: Results, mounted top-right beside the page title -- a real,
+   previously-missing feature (Phase 5 Part 6/7 Results convergence
+   follow-up, see RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md). Unlike every
+   size above, this is a genuinely different LAYOUT, not just smaller
+   proportions of the same vertical flow: dropzone on the left, search +
+   record stacked to its right, no "OR" dividers at all -- confirmed
+   directly from the mockup's own real markup (CapturePanel.jsx branches
+   its JSX for this size specifically, rather than reusing the flat
+   dropzone/OR/search/OR/record structure the CSS below still targets).
+
+   Phase 5 Part 6/7, Results follow-up (literal-extraction rebuild): this
+   whole block had already been through 3 rounds of individual-property
+   fixes/checks (initial build, vertical-stacking confirmation, ambient
+   lighting) without the OVERALL proportions ever fully converging --
+   per CLAUDE.md's own plateau guidance ("if a single component plateaus
+   after 2-3 real patch attempts without meaningfully closing the gap,
+   stop patching and do a full literal-extraction rebuild"), every
+   dimension below was re-measured directly from the mockup's real
+   rendered `getBoundingClientRect()` (not the source markup, not
+   memory) and rebuilt together in one pass -- see
+   RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md for the full before/after
+   measurement table. Real, confirmed root causes found this round that
+   the prior narrower patches never caught: the search input had NO
+   scoped font-size at all for this size (silently inheriting the shared
+   `.text-input` base's 16px, not the mockup's real 12px -- the actual
+   cause of the previously-reported truncation, not a width problem);
+   the outer widget/dropzone/record-button proportions and the internal
+   gaps (dropzone-to-actions, search-to-record) were all measurably off
+   by real, non-trivial amounts, not just "off by a few px." One real
+   mockup-export nuance accounted for rather than reproduced literally:
+   the mockup's own outer widget div is `box-sizing: content-box` with
+   an explicit `padding: 12px` NOT absorbed into its declared
+   `width: 528px` (a real, confirmed, already-documented Design-tool
+   export quirk -- see the 10th follow-up's identical finding for the
+   Home-page capture panel) -- its REAL RENDERED size is 554px wide, and
+   that rendered 554px (not the misleading 528px source value) is what
+   this rebuild targets, since this app's own global `box-sizing:
+   border-box` reset means declaring `width: 554px` here reproduces the
+   mockup's actual on-screen size directly, with no further correction
+   needed. `max-width` (not a fixed `width`) so this still degrades
+   gracefully (wraps below the dropzone) at narrower viewports instead
+   of overflowing the header row -- re-confirmed safe at all 4 required
+   breakpoints after this rebuild, not just assumed. */
+.capture-panel--header {
+  flex-direction: row;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px;
+  max-width: 554px;
+}
+
+.capture-panel--header .capture-panel__dropzone {
+  flex: 0 0 auto;
+  width: 224px;
+  /* Real, confirmed mechanism difference: the mockup's dropzone here has
+     NO padding at all (`padding: 0` in its own real computed style) --
+     content is centered via flex `align-items`/`justify-content` inside
+     a plain fixed 224x102px box, not a padding-driven auto-height the
+     way every other size variant works. Reproduced literally (min-height
+     instead of a plain `height`, so a future longer content change still
+     grows instead of clipping, same established reasoning as the
+     shared `.capture-panel__dropzone` rule's own `min-height`). */
+  min-height: 102px;
+  padding: 0;
+  justify-content: center;
+}
+
+.capture-panel--header .capture-panel__dropzone-icon {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 4px;
+}
+
+.capture-panel--header .capture-panel__headline {
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.capture-panel--header .capture-panel__primary-text {
+  font-size: 11px;
+}
+
+/* Same reasoning as the 'mini' size above -- no room for the full
+   "...or click to browse"/formats text at this size. Unlike 'mini', the
+   mockup's own header widget DOES show the mini-wave flourish, so that
+   one is deliberately left visible here (not added to this hide list). */
+.capture-panel--header .capture-panel__browse-link,
+.capture-panel--header .capture-panel__formats {
+  display: none;
+}
+
+/* The search input + record button, stacked to the right of the
+   dropzone -- a real, distinct group the mockup positions as its own
+   column, with no "OR" divider between the two (confirmed from the
+   mockup's own markup, not assumed). Real, measured vertical gap
+   between the two (15px, was 6px -- a real, confirmed mismatch, not
+   just a rounding difference). `flex: 1 1 auto` (not a fixed width) so
+   this column naturally fills whatever the fixed 224px dropzone + 14px
+   gap + 12px padding leave inside the widget's own 554px max-width
+   (~292px at full width, close to the mockup's own real ~287-290px
+   record-button/search-input width -- confirmed after rebuilding, not
+   assumed from the arithmetic alone). `min-width` still guards against
+   the column getting squeezed illegibly narrow before the whole widget
+   wraps at a narrow viewport. */
+.capture-panel__header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+
+.capture-panel--header .record-btn--block {
+  /* Real, measured target: 36px tall (was 31px) -- padding tuned to hit
+     that with this button's own 10px font-size + `line-height: normal`
+     (the shared `.record-btn--block` rule), not guessed. */
+  padding: 11px 14px;
+  font-size: 10px;
 }

@@ -217,6 +217,7 @@ const BUCKET_TO_DEGREE = {
   third: 'third',
   fifth: 'fifth',
   seventh: 'seventh',
+  sixth: 'sixth',
   ext9: 'ninth',
   ext11: 'eleventh',
   ext13: 'thirteenth',
