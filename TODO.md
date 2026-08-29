@@ -15,6 +15,12 @@
 **Frontend + backend (the big one)**
 - Build the actual UI on top of the now-proven recording pipeline: show the identified chord + fretboard voicings + matching songs, instead of raw JSON dumped on the page
 - API_URL is currently hardcoded to 127.0.0.1:8000 in App.jsx -- needs to become configurable (env variable) before deployment, otherwise every real visitor's browser tries to reach their own machine instead of the actual backend
+  - Now also the blocker for real-device mobile testing: Phase 6's mobile
+    pass (hamburger nav, modal collapse, touch affordances -- see
+    CLAUDE.md's Phase 6 entry) was verified via Playwright device
+    emulation ONLY. A genuine check on the person's own phone (actual
+    mobile Chrome, over their LAN) can't happen until API_URL is
+    configurable. Remind the person to do this once Phase 7 wraps.
 - Deploy: frontend on Vercel/Netlify, backend on Railway/Render/Fly.io
 - Whatever backend host gets picked needs ffmpeg actually available in its environment -- pip install can't install it, it's a system-level dependency, not a Python package. Probably needs a Dockerfile step or checking if the platform supports system packages some other way. Same dependency just fixed locally, will need solving again for deployment
 
@@ -29,12 +35,13 @@
   Phase 8 entry for full reasoning.
 
 **UX**
-- ffmpeg missing popup -- if a user doesn't have ffmpeg locally, show something like Audacity's "unsupported format" popup with a quick pointer on where to grab it, instead of just failing. (This is a real, confirmed failure mode, not theoretical -- hit this exact thing testing Phase 1 before ffmpeg was installed)
+- ~~ffmpeg missing popup -- if a user doesn't have ffmpeg locally, show something like Audacity's "unsupported format" popup with a quick pointer on where to grab it, instead of just failing.~~ -- **done (reframed), Phase 6 item 2. See CLAUDE.md's Phase 6 entry.** The original framing assumed the person running BetterChord locally; on a deployed app the visitor never touches ffmpeg (it's a server dependency), so telling them to install it would be wrong. Instead: a decode failure on `/identify` now returns a friendly generic message ("We couldn't process that recording...") instead of a raw exception dump, plus a dev-facing `reason` field (`"ffmpeg_unavailable"` / `"audio_decode_failed"`) in the response body + console for whoever's debugging the server. Also confirmed MP3 no longer needs ffmpeg at all (libsndfile >= 1.1) -- only browser WebM/Opus does, which narrows the Phase 7 deploy requirement.
 
 **Later / nice to have**
 - Wire the guide-tone explanation text into the actual UI (bold the two chord names, currently just returned as plain text + a list of what to bold) -- formally scoped as **Phase 3 Part 3/6**, see CLAUDE.md's Phase 3 entry, not started (This is now done with Phase 3 part 3/6)
 - Make the model even better, more data (biggest thing that can help), tweaking the model a bit, messing with CNN layers, etc.
-- No handling yet for denied mic permission (fails silently, no on-page feedback) or cleanup if a user navigates away mid-recording (mic stream could stay open) -- fine for the Phase 1 test page, worth real handling once Phase 2 builds the actual UI
+- ~~No handling yet for denied mic permission (fails silently, no on-page feedback)~~ -- **done, Phase 6 item 3. See CLAUDE.md's Phase 6 entry.** CaptureModal's arming screen now shows a real failed-state headline + cause-specific copy per `err.name` (`NotAllowedError` / `NotFoundError` / `NotReadableError` / generic) + a "Try again" button, instead of staying stuck on "Requesting microphone access..." with the raw exception text.
+  The other half -- cleanup if a user navigates away mid-recording (mic stream could stay open) -- was explicitly NOT built, by decision: browsers revoke mic access on tab close on their own, so it isn't worth the complexity.
 - ~~Surface `chord_info.py`'s dormant chord-info data (interval
   breakdown, per-quality "feeling" description, related chords) in the
   actual UI~~ -- **substantially done.** What started as a Phase 5 Part

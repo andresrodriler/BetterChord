@@ -220,3 +220,16 @@
 }
 
 
+
+/* Touch: teaser cards + the hero CTA already carry a visible border at
+   rest; add a pressed state so a tap registers visibly. */
+@media (hover: none) {
+  .home-teaser:active {
+    border-color: var(--brass);
+  }
+
+  .home-hero__cta:active {
+    border-color: var(--brass);
+    background: var(--brown-700);
+  }
+}

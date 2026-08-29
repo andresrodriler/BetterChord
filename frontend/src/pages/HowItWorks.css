@@ -889,7 +889,11 @@
      then text. */
   .hiw-stage,
   .hiw-stage--reverse {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not plain 1fr -- a wide fixed-size illustration
+       (the CNN diagram) otherwise pushes this single column past the
+       viewport instead of letting the illustration scroll inside itself
+       (see the <=480px block at the end of this file). */
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
   .hiw-stage__illustration,
@@ -916,4 +920,43 @@
   }
   /* .hiw-voicing-grid's base rule (auto-fit/minmax) already adapts at
      this breakpoint -- no fixed column count forced here. */
+
+  /* Stacked layout: the horizontal spine-connector nubs (34px, drawn at
+     right/left: -34px) now point at nothing -- the spine is on the left.
+     They also poked ~16px past the viewport. Drop them here. */
+  .hiw-stage__illustration .hiw-illustration::after,
+  .hiw-stage__text::before,
+  .hiw-stage--reverse .hiw-stage__illustration .hiw-illustration::before,
+  .hiw-stage--reverse .hiw-stage__text::after {
+    content: none;
+  }
+}
+
+/* Phone: the dense fixed-width stage illustrations (esp. the CNN
+   diagram -- an absolute-positioned, literal-mockup-px layout that
+   can't reflow) scroll their own contents horizontally inside the
+   panel rather than widening the page. */
+@media (max-width: 480px) {
+  .hiw-stage__illustration,
+  .hiw-stage--reverse .hiw-stage__illustration {
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .hiw-illustration.hiw-illustration {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .hiw-illustration--cnn.hiw-illustration--cnn {
+    width: 100%;
+  }
+
+  .hiw-cnn-diagram {
+    overflow-x: auto;
+  }
+
+  .hiw-illustration__tag {
+    white-space: normal;
+  }
 }

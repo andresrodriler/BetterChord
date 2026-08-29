@@ -218,6 +218,108 @@
   box-shadow: 0 0 10px 2px var(--scan-border);
 }
 
+/* -- Mobile nav: hamburger + collapsed dropdown (<=480px) --
+   Above the breakpoint the toggle is hidden and .app-nav is the normal
+   inline row. */
+.app-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--brown-700);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.app-nav-toggle:hover,
+.app-nav-toggle[aria-expanded='true'] {
+  border-color: var(--brass-border);
+  color: var(--brass);
+}
+
+.app-nav-toggle__icon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 16px;
+}
+
+.app-nav-toggle__icon span {
+  display: block;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+@media (max-width: 480px) {
+  .app-nav-toggle {
+    display: flex;
+  }
+
+  .app-nav {
+    position: absolute;
+    top: 100%;
+    right: 12px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    min-width: 190px;
+    margin-top: 6px;
+    padding: 8px;
+    background: var(--brown-900);
+    border: 1px solid var(--border);
+    border-top-color: var(--bevel-light);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    z-index: 40;
+  }
+
+  .app-nav--open {
+    display: flex;
+  }
+
+  .app-nav__link {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  /* AccessibilityMenu sits inside the dropdown; give its trigger the same
+     row padding. Its own sub-panel is too wide to fit anchored to a
+     trigger near the screen edge, so anchor it to the viewport instead
+     (still a DOM child of .accessibility-menu, so its click-outside
+     check is unaffected). */
+  .app-nav .accessibility-menu {
+    padding: 4px 10px;
+  }
+
+  .app-nav .accessibility-menu__panel.panel {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    z-index: 50;
+  }
+}
+
+/* Touch devices: :hover mostly doesn't fire, so give the brand lockup and
+   nav links a real pressed-state signal on tap. */
+@media (hover: none) {
+  .brand:active {
+    color: var(--brass);
+  }
+
+  .app-nav__link:active {
+    color: var(--brass);
+  }
+}
+
 /* Site-wide handedness toggle -- pill treatment matching .tag/.badge, but
    interactive. Uses the brass accent (not scan) when active: brass is the
    app's "active control/primary" color, scan is reserved specifically for

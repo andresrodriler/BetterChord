@@ -6,6 +6,21 @@ import RecordingInfo from './RecordingInfo'
 import IdentifyingStatus from './IdentifyingStatus'
 import './CaptureModal.css'
 
+// Cause-specific copy for a failed getUserMedia, keyed by the
+// DOMException name CaptureContext stores in `armError`. Kept in the
+// app's plain, concise voice -- and never tells the visitor to touch a
+// server dependency.
+const MIC_ERROR_COPY = {
+  NotAllowedError:
+    "Microphone access is blocked. Check your browser's site permissions for the microphone, then try again.",
+  NotFoundError:
+    'No microphone was found. Plug one in and try again, or upload an audio file instead.',
+  NotReadableError:
+    'Your microphone is being used by another app or browser tab. Close that, then try again.',
+  default:
+    'Something went wrong reaching your microphone. Try again, or upload an audio file instead.',
+}
+
 // Renders as a fixed overlay on top of whatever page is mounted underneath
 // (Home or Results) -- no route change happens while this is open. Internal
 // views driven by CaptureContext state: "recording" (mic is live, just a
@@ -30,6 +45,7 @@ function CaptureModal() {
   const {
     open,
     armed,
+    armError,
     recording,
     blob,
     audioUrl,
@@ -37,6 +53,7 @@ function CaptureModal() {
     waveformData,
     identifying,
     error,
+    armRecording,
     beginRecording,
     stopRecording,
     handleContinue,
@@ -83,8 +100,19 @@ function CaptureModal() {
 
         {!armed && !recording && !blob && (
           <div className="capture-modal__body capture-modal__body--centered">
-            <h2>Requesting microphone access...</h2>
-            {error && <p className="status-text status-text--error">Error: {error}</p>}
+            {armError ? (
+              <>
+                <h2>Couldn&rsquo;t access your microphone</h2>
+                <p className="status-text status-text--error">
+                  {MIC_ERROR_COPY[armError] || MIC_ERROR_COPY.default}
+                </p>
+                <button className="btn btn-primary" onClick={armRecording}>
+                  Try again
+                </button>
+              </>
+            ) : (
+              <h2>Requesting microphone access...</h2>
+            )}
           </div>
         )}
 

@@ -85,3 +85,19 @@
    an attached bar in an extended margin (see FretboardDiagram.jsx's
    drawCapoAttachment) -- no extra layout classes here, just the one
    `ref` div with the fixed DIAGRAM_ASPECT_RATIO. */
+
+/* Touch: no :hover, so the expandable voicing card needs a resting cue
+   that it's tappable (a faint brass border, replacing .panel--recessed's
+   default) plus a pressed state. Doubled class (0,2,0) to beat
+   `.panel--recessed`'s own border-color (0,1,0) regardless of dev-server
+   CSS injection order -- same specificity pattern used elsewhere in the
+   app (.hiw-illustration.hiw-illustration, .about-stats.about-stats). */
+@media (hover: none) {
+  .fretboard-diagram.fretboard-diagram--interactive {
+    border-color: var(--brass-border);
+  }
+
+  .fretboard-diagram--interactive:active {
+    box-shadow: var(--shadow-inset), 0 0 0 1px var(--brass);
+  }
+}

@@ -28,6 +28,8 @@ export function CaptureProvider({ children }) {
 
   const [open, setOpen] = useState(false)
   const [armed, setArmed] = useState(false) // mic granted, waiting for explicit "Start Recording"
+  const [arming, setArming] = useState(false) // getUserMedia request in flight
+  const [armError, setArmError] = useState(null) // failed getUserMedia's err.name (e.g. 'NotAllowedError'), or null
   const [recording, setRecording] = useState(false)
   const [blob, setBlob] = useState(null)
   const [filename, setFilename] = useState(null)
@@ -135,10 +137,12 @@ export function CaptureProvider({ children }) {
   // not at the moment they've committed to "go").
   async function armRecording() {
     setError('')
+    setArmError(null)
     setBlob(null)
     setOpen(true)
     setArmed(false)
     setRecording(false)
+    setArming(true)
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -153,7 +157,11 @@ export function CaptureProvider({ children }) {
       deviceLabelRef.current = stream.getAudioTracks()[0]?.label || null
       setArmed(true)
     } catch (err) {
-      setError(err.message || 'Could not access the microphone.')
+      // Store the DOMException name so CaptureModal can show cause-specific
+      // copy (NotAllowedError / NotFoundError / NotReadableError / other).
+      setArmError(err.name || 'UnknownError')
+    } finally {
+      setArming(false)
     }
   }
 
@@ -197,6 +205,8 @@ export function CaptureProvider({ children }) {
     releaseStream()
     deviceLabelRef.current = null // upload path -- no input device to disclose
     setError('')
+    setArmError(null)
+    setArming(false)
     setArmed(false)
     setRecording(false)
     setBlob(file)
@@ -212,6 +222,8 @@ export function CaptureProvider({ children }) {
     deviceLabelRef.current = null
     setOpen(false)
     setArmed(false)
+    setArming(false)
+    setArmError(null)
     setRecording(false)
     setBlob(null)
     setFilename(null)
@@ -242,6 +254,8 @@ export function CaptureProvider({ children }) {
   const value = {
     open,
     armed,
+    arming,
+    armError,
     recording,
     blob,
     audioUrl,

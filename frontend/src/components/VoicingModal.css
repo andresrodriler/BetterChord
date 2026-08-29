@@ -225,3 +225,13 @@
 /* Omittable-tones info lives inline in `.voicing-modal__row-3col` (see
    VoicingModal.jsx), reusing that row's own item/separator styling, so
    no dedicated rule is needed here. */
+
+/* Phone: the plain (no-tones) modal also needs to fit -- the
+   `--with-tones` variant already has its own <=760px rule above, this
+   just covers the base `.voicing-modal` width. */
+@media (max-width: 760px) {
+  .voicing-modal {
+    width: 92vw;
+    max-width: 480px;
+  }
+}

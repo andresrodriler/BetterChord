@@ -269,16 +269,27 @@ function Waveform({ channelData, audioRef }) {
     ctx.textAlign = 'right'
     ctx.fillText('QUIET', width - 4, quietY - 3)
 
-    const clipY = CENTER_Y - dbToHalfExtent(CLIP_DB, domainTop)
-    ctx.strokeStyle = clipLine
-    ctx.globalAlpha = 0.6
-    ctx.beginPath()
-    ctx.moveTo(0, clipY)
-    ctx.lineTo(width, clipY)
-    ctx.stroke()
-    ctx.globalAlpha = 0.95
-    ctx.fillStyle = clipLine
-    ctx.fillText('CLIP', width - 4, clipY - 3)
+    // A clip flagged quiet (its own peak below QUIET_PEAK_THRESHOLD)
+    // cannot contain any sample at/above CLIP_DB -- QUIET_DB is well below
+    // CLIP_DB by construction -- so the CLIP line would only be drawn and
+    // then clamped by dbToHalfExtent() to the same near-top position as
+    // the QUIET line, and their right-aligned labels collide into
+    // unreadable text. Skip it entirely for such a clip. Uses this
+    // component's own already-computed peak (overallMaxRef), the same
+    // value that drives the adaptive height-domain ceiling -- not a
+    // separate "quiet" prop.
+    if (overallMaxRef.current >= QUIET_PEAK_THRESHOLD) {
+      const clipY = CENTER_Y - dbToHalfExtent(CLIP_DB, domainTop)
+      ctx.strokeStyle = clipLine
+      ctx.globalAlpha = 0.6
+      ctx.beginPath()
+      ctx.moveTo(0, clipY)
+      ctx.lineTo(width, clipY)
+      ctx.stroke()
+      ctx.globalAlpha = 0.95
+      ctx.fillStyle = clipLine
+      ctx.fillText('CLIP', width - 4, clipY - 3)
+    }
     ctx.restore()
 
     const audio = audioRef.current

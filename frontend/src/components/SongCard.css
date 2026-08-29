@@ -198,3 +198,15 @@
   font-size: 11px;
   opacity: 0.8;
 }
+
+/* Touch: no :hover, so give the song row a real pressed state on tap.
+   (The chevron + spelling badge already signal "expandable" at rest.) */
+@media (hover: none) {
+  .song-card__summary:active {
+    background: var(--brown-700);
+  }
+
+  .song-list .song-card:active {
+    border-color: var(--brass-border);
+  }
+}

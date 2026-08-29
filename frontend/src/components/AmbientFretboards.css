@@ -26,7 +26,13 @@
   transform: translateX(-50%);
   z-index: -1;
   pointer-events: none;
-  overflow: visible;
+  /* `clip` (not `visible`) so a shape whose random offset lands past this
+     97vw box doesn't count toward the document's scrollWidth -- relying on
+     `:root { overflow-x: hidden }` alone hid the scrollbar but still left
+     scrollWidth > clientWidth on narrow (phone) viewports. `clip` on a
+     positioned, fixed-dimension decorative layer has no scroll-container
+     side effects. */
+  overflow: clip;
 }
 
 .ambient-fretboards__item {

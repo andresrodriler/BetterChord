@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Link, NavLink, Route, Routes } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { AccessibilityPrefsProvider } from './context/AccessibilityPrefsContext'
 import { CaptureProvider } from './context/CaptureContext'
 import { FretboardPrefsProvider } from './context/FretboardPrefsContext'
@@ -64,6 +64,29 @@ function App() {
     return () => window.removeEventListener('resize', setScrollbarWidth)
   }, [])
 
+  // Collapsed mobile nav (<=480px, see App.css). Closes on route change and
+  // on click-outside / Escape -- same pattern as AccessibilityMenu.
+  const [navOpen, setNavOpen] = useState(false)
+  const location = useLocation()
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
+  useEffect(() => {
+    if (!navOpen) return
+    const onDown = (e) => {
+      if (!e.target.closest('.app-header')) setNavOpen(false)
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setNavOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [navOpen])
+
   return (
     <AccessibilityPrefsProvider>
       <FretboardPrefsProvider>
@@ -74,7 +97,23 @@ function App() {
                 + nav links, no consolidation was required. */}
             <header className="app-header">
               <Link to="/" className="brand">Better<span className="brand__accent">Chord</span></Link>
-              <nav className="app-nav">
+              {/* Hamburger -- only shown <=480px (App.css); toggles .app-nav
+                  into a dropdown. */}
+              <button
+                type="button"
+                className="app-nav-toggle"
+                aria-expanded={navOpen}
+                aria-controls="app-nav"
+                aria-label={navOpen ? 'Close menu' : 'Open menu'}
+                onClick={() => setNavOpen((v) => !v)}
+              >
+                <span className="app-nav-toggle__icon" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+              </button>
+              <nav id="app-nav" className={`app-nav${navOpen ? ' app-nav--open' : ''}`}>
                 <NavLink to="/how-it-works" className="app-nav__link">How It Works</NavLink>
                 <NavLink to="/about" className="app-nav__link">About</NavLink>
                 <a

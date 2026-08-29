@@ -7,7 +7,17 @@ export async function identifyAudio(blob, filename) {
   formData.append('file', blob, filename)
   const res = await fetch(`${API_BASE}/identify`, { method: 'POST', body: formData })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `identify failed (${res.status})`)
+  if (!res.ok) {
+    // `data.reason` ("ffmpeg_unavailable" | "audio_decode_failed" | absent)
+    // and `data.error` are server-side concerns -- log them for dev (they
+    // also show in the Network response), but the visitor never touches
+    // ffmpeg, so the thrown message stays a generic, friendly one.
+    console.warn('[identify] failed', { status: res.status, error: data.error, reason: data.reason })
+    const err = new Error("We couldn't process that recording. Please try again with a different one.")
+    err.reason = data.reason
+    err.rawError = data.error
+    throw err
+  }
   return data
 }
 

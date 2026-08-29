@@ -11,6 +11,7 @@ Then open http://127.0.0.1:8000/docs
 
 import json
 import os
+import shutil
 import tempfile
 
 from fastapi import FastAPI, UploadFile, File
@@ -144,6 +145,44 @@ async def chords():
     return {"chords": CHORD_SUGGESTIONS, "root_aliases": ROOT_ALIASES}
 
 
+def _identify_error_reason(exc):
+    """Classify an /identify exception into a short `reason` slug (same
+    convention as the 400 responses' `reason`), or None for anything not
+    recognized as an audio-decode failure.
+
+    Verified directly (ffmpeg hidden from PATH): a browser-recorded
+    webm/opus with no ffmpeg raises audioread.exceptions.NoBackendError
+    (empty message) whose __context__ is a soundfile.LibsndfileError
+    "Format not recognised" -- and a genuinely corrupt file raises the
+    IDENTICAL pair even WITH ffmpeg present. So the two are told apart by
+    shutil.which("ffmpeg"), not by the exception itself. librosa wraps
+    the real error, so the whole __cause__/__context__ chain is walked.
+    """
+    seen = set()
+    cur = exc
+    is_decode_failure = False
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        name = type(cur).__name__
+        module = type(cur).__module__ or ""
+        message = str(cur).lower()
+        if (
+            name in ("NoBackendError", "LibsndfileError", "DecodeError", "SoundFileRuntimeError")
+            or module.startswith("audioread")
+            or "format not recognised" in message
+            or "format not recognized" in message
+        ):
+            is_decode_failure = True
+        cur = cur.__cause__ or cur.__context__
+
+    if not is_decode_failure:
+        return None
+    # ffmpeg absent is a server-dependency problem (the real deploy risk);
+    # ffmpeg present + still undecodable means the uploaded file itself is
+    # corrupt or an unsupported codec.
+    return "ffmpeg_unavailable" if shutil.which("ffmpeg") is None else "audio_decode_failed"
+
+
 @app.post("/identify")
 async def identify(file: UploadFile = File(...)):
     suffix = os.path.splitext(file.filename or "")[1] or ".wav"
@@ -154,10 +193,11 @@ async def identify(file: UploadFile = File(...)):
     try:
         result = identify_from_audio(tmp_path)
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"{type(e).__name__}: {e}" if str(e) else type(e).__name__},
-        )
+        content = {"error": f"{type(e).__name__}: {e}" if str(e) else type(e).__name__}
+        reason = _identify_error_reason(e)
+        if reason:
+            content["reason"] = reason
+        return JSONResponse(status_code=500, content=content)
     finally:
         os.remove(tmp_path)
 

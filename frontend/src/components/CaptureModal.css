@@ -130,3 +130,28 @@
   box-shadow: var(--shadow);
   max-width: 320px;
 }
+
+/* min-width: 0 lets the fixed-px width variants below actually be clamped
+   by `max-width: 100%` in the flex overlay (a flex item's default
+   `min-width: auto` otherwise pins it to its content's min-content). */
+.capture-modal {
+  min-width: 0;
+}
+
+/* Phone: every width variant (420 / 520 / 900px) collapses to the full
+   available width, and the two-column split body already stacks at 760px
+   (see .capture-modal__body--split). Pin to the top so a tall modal's
+   header stays reachable while its own overflow-y scrolls. */
+@media (max-width: 600px) {
+  .capture-overlay {
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .capture-modal,
+  .capture-modal--preview,
+  .capture-modal--wide {
+    width: 100%;
+    padding: 18px;
+  }
+}
