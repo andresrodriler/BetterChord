@@ -47,7 +47,9 @@ BetterChord/
     src/
       main.jsx, App.jsx, App.css, index.css   -- app shell, design-system tokens
       pages/       Home.jsx/.css, Results.jsx/.css, About.jsx/.css,
-                    HowItWorks.jsx/.css
+                    HowItWorks.jsx/.css, NotFound.jsx   -- catch-all 404
+                                                           (path="*"), inline
+                                                           styles only, no .css
       components/  CapturePanel.jsx/.css       -- unified upload/drag-drop/record/search
                     CaptureModal.jsx/.css       -- record/preview overlay (preview body stays
                                                    mounted -- blurred -- under a floating

@@ -9,6 +9,7 @@ import Home from './pages/Home'
 import Results from './pages/Results'
 import About from './pages/About'
 import HowItWorks from './pages/HowItWorks'
+import NotFound from './pages/NotFound'
 import './App.css'
 
 const GITHUB_URL = 'https://github.com/andresrodriler/BetterChord'
@@ -96,6 +97,7 @@ function App() {
                 <Route path="/chord/:chordName" element={<Results />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
           </div>
