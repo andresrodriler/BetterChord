@@ -1,8 +1,7 @@
-/* Phase 5 Part 6/7 -- reuses the scan/cyan detection accent exclusively
-   (never brass, since this announces what BetterChord found, not a
-   control) and the same pill/dot vocabulary as .badge (App.css), just
-   with real motion (pulse-scan/scan-bar, index.css) instead of a single
-   static dot. */
+/* Uses the scan/cyan detection accent exclusively (never brass, since
+   this announces what BetterChord found, not a control) and the same
+   pill/dot vocabulary as .badge (App.css), with real motion
+   (pulse-scan/scan-bar, index.css) instead of a static dot. */
 .detection-badge {
   display: inline-flex;
   align-items: center;
@@ -17,10 +16,9 @@
   padding: 9px 18px 9px 14px;
 }
 
-/* 18th follow-up: real mockup detail -- wraps the dot + its 3 ripple
-   pings in one small relatively-positioned box, sized exactly to the
-   dot itself, so the ripples (absolutely positioned, inset:0) expand
-   outward from precisely the dot's own center with no extra math. */
+/* Wraps the dot + its 3 ripple pings in a box sized to the dot, so the
+   ripples (absolutely positioned, inset:0) expand from the dot's center
+   with no extra math. */
 .detection-badge__dot-wrap {
   position: relative;
   display: inline-flex;

@@ -1,23 +1,15 @@
-// Shared coordinate math for BetterChord's small, bespoke, non-svguitar
+// Shared coordinate math for BetterChord's small, bespoke (non-svguitar)
 // vertical fretboard sketches -- How It Works' MiniFretDiagram
-// (EXAMPLE_VOICINGS) and, as of Phase 5 Part 7's Item 3, Home's
-// AmbientFretboards. Extracted from HowItWorks.jsx (where this logic was
-// first built and debugged, across 2 real sessions of alignment bugfixes)
-// specifically so a second independent implementation never has to
-// re-derive it -- and never has a chance to reintroduce the same class of
-// bug the first implementation shipped with.
+// (EXAMPLE_VOICINGS) and Home's AmbientFretboards. One implementation so
+// the two can't drift.
 //
-// Both consumers already reserve a real inset around the playable fret
-// area in their own CSS (a top margin for a mute/open-string marker row,
-// side margins for visual breathing room) -- these functions rescale a
-// string index / fret row into that SAME inset sub-rectangle, rather than
-// the raw, un-inset 0-100% box. See HowItWorks.jsx's own git history
-// (Phase 5 Part 7, the 2 sessions immediately preceding this one) for the
-// full real-bug writeup this design fixes: dots correctly targeted their
-// own line's position even before that fix, but the lines themselves
-// (vlines/hlines) didn't span a consistent rectangle relative to each
-// other, so an outer-string or baseline-fret dot could land outside
-// where the shorter perpendicular lines actually reached.
+// Both consumers reserve an inset around the playable fret area in their
+// own CSS (a top margin for the mute/open-string marker row, side margins
+// for breathing room). These functions rescale a string index / fret row
+// into that SAME inset sub-rectangle, not the raw 0-100% box -- so dots
+// and the vlines/hlines they sit on span one consistent rectangle
+// relative to each other, and an outer-string or baseline-fret dot can't
+// land past where the shorter perpendicular lines reach.
 export const GRID_LEFT = 7
 export const GRID_WIDTH = 86
 export const GRID_TOP = 15
@@ -49,14 +41,11 @@ export function fretCellY(row, rows) {
 }
 
 // Is this voicing anchored at the nut (baseline=1, real nut drawn), or a
-// moveable shape positioned higher up the neck (baseline=its own lowest
-// fretted note, a "Nfr" label drawn instead)? True only if the voicing
-// has a genuine open string, or its lowest fretted note IS fret 1 --
-// NOT a comparison against the visible window size, which is wrong
-// whenever a moveable shape's own span happens to fit within that window
-// without actually starting at fret 1 (the real bug this fixed: a real
-// fret-3 Gm barre shape was drawn as if open-position, since its span
-// happened to fit within the fixed 5-row window).
+// moveable shape higher up the neck (baseline = its own lowest fretted
+// note, an "Nfr" label instead)? True only if there's a genuine open
+// string or the lowest fretted note IS fret 1 -- NOT a comparison against
+// the window size, which wrongly reads a compact moveable shape (e.g. a
+// fret-3 Gm barre that fits in a 5-row window) as open-position.
 export function isAnchoredAtNut(frets) {
   const hasOpenString = frets.includes('0')
   const numeric = frets.filter((f) => f !== 'X' && f !== '0').map(Number)

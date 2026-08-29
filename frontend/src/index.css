@@ -277,6 +277,99 @@
   --interval-6th-border: #8a697c; /* deeper shade of --interval-6th (darken 0.72) */
   --interval-6th-glow: rgba(191, 146, 172, 0.55);
 
+  /* --- Colorblind-safe interval palette (Phase 5 Part 7/8, item #14) ---
+     Real, deliberate REPLACEMENT of the standard palette's hues for all 8
+     interval buckets, activated when `<html data-colorblind="true">` is
+     set (AccessibilityPrefsContext.jsx) -- attribute-selector specificity
+     on :root beats the base `:root { }` block above regardless of source
+     order, so redefining just these custom properties here is the whole
+     mechanism; every real consumer (intervalColors.js's getIntervalStyle,
+     used by fretboard dots, IntervalLegend, ChordTonePanel, ChordOverview,
+     AmbientFretboards, HowItWorks' example voicings) reads these same
+     property names live via getComputedStyle, so nothing downstream needs
+     its own colorblind-aware branch.
+
+     Built from the Okabe-Ito palette -- the standard, peer-reviewed
+     categorical palette specifically designed to stay distinguishable
+     under deuteranopia and protanopia (the two by far most common forms
+     of color vision deficiency, both red-green axis) by relying on hue
+     separations that survive collapsing the red/green channels, not on a
+     red-vs-green distinction itself. Also reasonably tritanopia-tolerant
+     (no pure-red/pure-green pair anywhere in the 8), though tritanopia
+     (blue-yellow) is a much rarer real-world case and wasn't independently
+     re-verified against a tritanopia simulator this round -- flagged
+     honestly rather than overclaiming a third axis was fully checked.
+     root/3rd/5th/7th/6th each get one clearly separated Okabe-Ito hue;
+     ext-9/-11/-13 (the "family" extension tones) get the 3 remaining
+     Okabe-Ito hues rather than lightness-steps of one hue (unlike the
+     standard palette's own ~325deg family design) -- lightness-only
+     steps are exactly the kind of subtle distinction color-vision
+     deficiency erodes first, so a colorblind-safe palette needs real hue
+     separation between ALL 8 buckets, not just some of them. --interval-
+     ext (the generic, unlabeled catch-all bucket) is deliberately left
+     UNCHANGED (still var(--muted), a plain achromatic warm grey) -- an
+     achromatic color has no hue to confuse for any form of color
+     blindness, so it needs no colorblind-specific variant.
+
+     Text/border/glow for all 8 computed the exact same way as the
+     standard palette above (WCAG relative luminance against real white
+     #ffffff and dark --brown-950 #3d2b1e, picking whichever clears the
+     4.5:1 AA minimum; border = darken(fill, 0.72); glow = rgba(fill,
+     0.55)) -- every one of the 8 below clears real AA with its assigned
+     text color, computed directly, not eyeballed:
+       root    #b54f00 vs white  -> 5.14:1 (AA, white text)
+       3rd     #0072b2 vs white  -> 5.19:1 (AA, white text)
+       5th     #e69f00 vs dark   -> 5.97:1 (AA, dark text)
+       7th     #00ad7e vs dark   -> 4.66:1 (AA, dark text)
+       6th     #e085b7 vs dark   -> 5.25:1 (AA, dark text)
+       ext-9   #56b4e9 vs dark   -> 5.82:1 (AA, dark text)
+       ext-11  #f0e442 vs dark   -> 10.16:1 (AAA, dark text)
+       ext-13  #9c9c9c vs dark   -> 4.89:1 (AA, dark text) */
+}
+
+:root[data-colorblind="true"] {
+  --interval-root: #b54f00;
+  --interval-root-text: #ffffff;
+  --interval-root-border: #7e3700;
+  --interval-root-glow: rgba(181, 79, 0, 0.55);
+
+  --interval-3rd: #0072b2;
+  --interval-3rd-text: #ffffff;
+  --interval-3rd-border: #004f7c;
+  --interval-3rd-glow: rgba(0, 114, 178, 0.55);
+
+  --interval-5th: #e69f00;
+  --interval-5th-text: var(--brown-950);
+  --interval-5th-border: #a16f00;
+  --interval-5th-glow: rgba(230, 159, 0, 0.55);
+
+  --interval-7th: #00ad7e;
+  --interval-7th-text: var(--brown-950);
+  --interval-7th-border: #007958;
+  --interval-7th-glow: rgba(0, 173, 126, 0.55);
+
+  --interval-6th: #e085b7;
+  --interval-6th-text: var(--brown-950);
+  --interval-6th-border: #9c5d80;
+  --interval-6th-glow: rgba(224, 133, 183, 0.55);
+
+  --interval-ext-9: #56b4e9;
+  --interval-ext-9-text: var(--brown-950);
+  --interval-ext-9-border: #3c7da3;
+  --interval-ext-9-glow: rgba(86, 180, 233, 0.55);
+
+  --interval-ext-11: #f0e442;
+  --interval-ext-11-text: var(--brown-950);
+  --interval-ext-11-border: #a89f2e;
+  --interval-ext-11-glow: rgba(240, 228, 66, 0.55);
+
+  --interval-ext-13: #9c9c9c;
+  --interval-ext-13-text: var(--brown-950);
+  --interval-ext-13-border: #6d6d6d;
+  --interval-ext-13-glow: rgba(156, 156, 156, 0.55);
+}
+
+:root {
   /* --- Loudness ramp (Waveform.jsx, Phase 5 Part 3/7 5th polish pass) ---
      A genuinely new token family -- not a one-off hex value. Neither
      --brass nor --error fit "how loud is this moment": --brass is the
@@ -782,4 +875,80 @@ button {
   50% {
     transform: scaleY(1);
   }
+}
+
+/* --- Reduced motion (Phase 5 Part 7/8, item #14) --------------------- */
+/* Full audit of every `animation:`/`@keyframes` declaration in this
+   codebase before writing this rule, not assumed complete from memory:
+   `dropzone-breathe` (App.css/CapturePanel.css -- the record button and
+   dropzone's own idle breathing loop), `pulse-record` (App.css -- the
+   record dot's rest-state pulse, always-on per Phase 5 Part 6/7),
+   `icon-glow`/`copper-bar` (CapturePanel.css -- the dropzone icon glow
+   and mini-waveform bars), `ambient-scan-sweep`/`copper-bar` again
+   (AmbientFretboards.css -- the featured-shape scanline sweep and its
+   own mini-wave bars), `sig-ripple`/`pulse-scan`/`scan-bar`
+   (DetectionBadge.css -- the "sonar ping" ripple dots and animated
+   confidence bars), `pulse-scan` again (IdentifyingStatus.css -- the
+   loading-state dots), `home-cta-arrow-bounce` (Home.css -- the CTA's
+   continuous arrow bounce) -- every one of these is a genuinely
+   continuous (`infinite`) or attention-drawing loop, exactly the kind
+   `prefers-reduced-motion` exists for. Plus every plain hover/focus
+   `transition:` throughout the app (nav links, buttons, panels, the
+   fretboard-diagram interactive hover, etc.) -- not individually
+   enumerated here since there are dozens, all caught by the same
+   blanket rule below rather than patched one at a time.
+
+   ONE blanket rule, not per-animation overrides -- the standard,
+   widely-used technique (the same approach Tailwind's/WordPress's own
+   reduced-motion resets use): force every animation to a single,
+   near-zero-duration, single-iteration run and every transition to
+   near-instant, rather than trying to enumerate and individually
+   neutralize each keyframe (which silently misses anything added later,
+   exactly the risk this task's own "audit for every animation... don't
+   assume a specific list is complete" instruction was warning about).
+   `animation-iteration-count: 1` (not `0`, which some quick
+   implementations mistakenly use) matters specifically for the
+   `infinite` loops above -- it lets each settle into ONE cycle's own
+   rest frame almost instantly rather than yanking every animated
+   property to its literal 0%-keyframe value, which can look more
+   broken (e.g. snapping a glow to its dimmest frame) than simply
+   stopping. `!important` is required here -- this needs to win over
+   every per-component `animation`/`transition` shorthand declared
+   throughout the app, matching the one other place this codebase
+   already uses `!important` for the identical reason (overriding an
+   otherwise-unreachable declaration, see FretboardDiagram.css's own
+   documented precedent).
+
+   TWO triggers for the identical rule, matching the task's own "two
+   ways to trigger the same state" framing -- neither is a fallback for
+   the other, both are real and independently sufficient:
+     1. `@media (prefers-reduced-motion: reduce)` -- pure CSS, the real,
+        automatic OS-level signal, applies even before any JS has run.
+     2. `:root[data-reduced-motion="true"]` -- set by
+        AccessibilityPrefsContext.jsx whenever EITHER the OS query OR
+        the manual in-app toggle is on (the two are OR'd together in JS,
+        not two competing sources of truth for one persisted value) --
+        this is what makes the manual toggle actually take effect (the
+        OS media query alone has no way to know about an in-app-only
+        preference), and it's also what keeps the reduced state applied
+        consistently even if this component tree re-renders in a way
+        the bare media query wouldn't itself re-trigger a repaint for. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-reduced-motion='true'] *,
+:root[data-reduced-motion='true'] *::before,
+:root[data-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }

@@ -7,44 +7,28 @@ const SUPPORTED_FORMATS = ['MP3', 'WAV', 'WEBM', 'OGG', 'M4A']
 
 // Purely decorative -- a small static waveform-shaped flourish inside the
 // dropzone, animated with the shared copper-bar keyframe and colored with
-// the existing loudness-ramp tokens (Waveform.jsx's own real audio-level
-// palette, not a second hardcoded color set) so it reads as "this widget
-// listens to audio" without needing any real audio data before a file is
-// ever chosen.
+// the loudness-ramp tokens (Waveform.jsx's audio-level palette) so it
+// reads as "this widget listens to audio" before any file is chosen.
 const MINI_WAVE_BAR_HEIGHTS = [40, 90, 60, 100, 55, 80, 35]
 
-// The single, unified "how do I get a chord in front of BetterChord"
-// component -- upload/drag-and-drop, manual search, and record all live
-// in one continuous box (dropzone, then an "OR" rule, then search, then
-// another "OR" rule, then a full-width record button) rather than three
-// separate cards, so it reads as one tool with three ways in rather than
-// three different features. Recording and uploading both just feed
+// The unified "how do I get a chord in front of BetterChord" component --
+// upload/drag-and-drop, manual search, and record in one continuous box
+// (dropzone, "OR" rule, search, "OR" rule, full-width record button)
+// rather than three separate cards. Recording and uploading both feed
 // CaptureContext (armRecording / selectFile); this component holds no
-// capture state of its own, so whichever path the user takes lands on
-// the exact same CaptureModal preview.
+// capture state, so every path lands on the same CaptureModal preview.
 //
-// `size` controls proportions only -- same structure everywhere it's
-// used, per CLAUDE.md Phase 3: the popup/embedded versions should be
-// instantly recognizable as the same component, differing only in size.
+// `size` controls proportions only -- same structure everywhere -- with
+// ONE exception:
 //   'default' -- Home: the full, most prominent presentation.
 //   'compact' -- inside CaptureModal's "choose a different source" panel.
 //   'mini'    -- de-emphasized, nestled below other page content.
-//   'header'  -- Results: a real, previously-missing feature (Phase 5
-//                Part 6/7 Results convergence follow-up -- the mockup's
-//                own top-right "Analyze Your Chord" widget, sized to sit
-//                beside the page title, was missed by an earlier
-//                inventory pass and only caught on a second look; see
-//                RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md for the note on
-//                why this is worth extra care going forward). Unlike
-//                every other size, this one is a genuinely different
-//                LAYOUT (dropzone on the left, search + record stacked
-//                to its right, no "OR" dividers at all -- confirmed
-//                directly from the mockup's own real markup, not
-//                guessed), not just smaller proportions of the same
-//                vertical flow -- so the two JSX branches below share
-//                every piece of actual upload/record/search logic and
-//                markup (dropzoneNode/searchNode/recordNode), differing
-//                only in how those three pieces are arranged.
+//   'header'  -- Results, beside the page title: a genuinely different
+//                LAYOUT (dropzone left, search + record stacked to its
+//                right, no "OR" dividers), matched from the mockup. The
+//                two JSX branches below share the upload/record/search
+//                pieces (dropzoneNode/searchNode/recordNode), differing
+//                only in how they're arranged.
 function CapturePanel({ size = 'default', onSearchSubmit }) {
   const { armRecording, selectFile } = useCapture()
   const fileInputRef = useRef(null)
@@ -116,13 +100,10 @@ function CapturePanel({ size = 'default', onSearchSubmit }) {
         tabIndex={-1}
         onChange={handleFileChange}
       />
-      {/* Phase 5 Part 6/7 follow-up: real line-art icon (a thin arrow in
-          a ring), replacing a plain upload-tray emoji -- matches the
-          mockups' own drawn icon instead of a system glyph whose look
-          varies by OS/browser. Stroke color/width live in
-          CapturePanel.css (var(--brass)), not set inline, so it stays
-          consistent with every other token-driven color in this file.
-          icon-glow (unchanged) still targets this same class. */}
+      {/* Line-art SVG icon (a thin arrow in a ring) rather than a
+          system emoji whose look varies by OS/browser. Stroke color/
+          width live in CapturePanel.css (var(--brass)), not inline;
+          icon-glow targets this class. */}
       <svg
         className="capture-panel__dropzone-icon"
         viewBox="0 0 32 32"
@@ -132,24 +113,11 @@ function CapturePanel({ size = 'default', onSearchSubmit }) {
         <path className="capture-panel__icon-arrow" d="M16 21V11M16 11L11 16M16 11L21 16" />
       </svg>
       <p className="capture-panel__headline">Analyze Your Chord</p>
-      {/* Phase 5 Part 6/7, 13th follow-up: real, confirmed content/DOM
-          structure fix -- this used to be two separate <p> elements
-          (primary-text + secondary-text), a real structural difference
-          from the mockup's own single sentence with "or click to
-          browse" as an inline brass-colored span, flagged and
-          deliberately left unfixed for several rounds while chasing
-          spacing complaints via CSS-only patches on the old structure.
-          Merged into the mockup's real structure: one paragraph, one
-          inline span, matching its real measured styling (paragraph
-          color/size = --muted/12px; span color rgb(179,151,112), the
-          same real brass-tan literal already used for
-          .home-hero__tags -- confirmed via direct computed-style
-          extraction, not guessed). The span is decorative-only text,
-          not a second click target -- the whole dropzone is already
-          role="button" with its own onClick, so a nested interactive
-          element here would be a real, separate a11y problem (nested
-          interactive controls), which the mockup's own plain
-          (non-anchor) <span> doesn't have either. */}
+      {/* One paragraph with an inline "or click to browse" span, matching
+          the mockup. The span is decorative-only text, not a second
+          click target -- the whole dropzone is already role="button"
+          with its own onClick, so a nested interactive element here
+          would be an a11y problem. */}
       <p className="capture-panel__primary-text">
         Drag &amp; drop your audio here <span className="capture-panel__browse-link">or click to browse</span>
       </p>
@@ -170,26 +138,20 @@ function CapturePanel({ size = 'default', onSearchSubmit }) {
 
   const recordNode = (
     <button className="record-btn record-btn--block" onClick={armRecording}>
-      {/* Phase 5 Part 6/7 follow-up: reuses the same .record-btn__dot
-          already used by the armed/recording states elsewhere (App.css)
-          instead of a microphone emoji -- the mockups' own record
-          button uses this exact plain dot, not a mic icon. */}
+      {/* Reuses .record-btn__dot (App.css), the same dot the armed/
+          recording states use, not a mic emoji. */}
       <span className="record-btn__dot" aria-hidden="true" />
-      {/* 'header' is real-estate-tight (mounted beside the page title,
-          not given its own row) -- the mockup's own header widget uses
-          the short "Record" label, not "Record Your Own Piece". Every
-          other size keeps the full label, unchanged. */}
+      {/* 'header' is real-estate-tight (beside the page title), so it
+          uses the short "Record" label. */}
       {size === 'header' ? 'Record' : 'Record Your Own Piece'}
     </button>
   )
 
   if (size === 'header') {
-    // Real, distinct 2-column layout confirmed directly from the mockup's
-    // own markup: dropzone on the left, search input + record button
-    // stacked to its right, with NO "OR" dividers anywhere (unlike every
-    // other size's single vertical flow) -- so this branch composes the
-    // same three shared pieces differently rather than reusing the flat
-    // dropzone/OR/search/OR/record structure below.
+    // 2-column layout (from the mockup): dropzone left, search input +
+    // record button stacked right, no "OR" dividers -- so this branch
+    // composes the shared pieces differently rather than reusing the
+    // flat dropzone/OR/search/OR/record structure below.
     return (
       <div className={`capture-panel capture-panel--${size}`}>
         {dropzoneNode}

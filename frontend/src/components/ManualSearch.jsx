@@ -105,15 +105,14 @@ function ManualSearch({ onSubmit }) {
     setHighlightedIndex(-1)
   }
 
-  // `fromSuggestion` (Phase 5 Part 2/7 follow-up, Task 2): true whenever
-  // `chordName` came from a canonical suggestion (mouse click or
-  // arrow-key-select + Enter), false for a raw typed-then-submit value.
-  // Threaded into route state so Results.jsx's conditional "why" teaser
-  // can tell "the URL differs because of a genuine spelling substitution"
-  // (typed+submit) apart from "the URL differs because a dropdown pick
-  // completed a partial prefix" (e.g. typing "Cmaj" and clicking
-  // "Cmaj7") -- both leave `searchedAs` != the final chord, but only the
-  // former is a real substitution worth teasing.
+  // `fromSuggestion`: true when `chordName` came from a canonical
+  // suggestion (click, or arrow-select + Enter), false for a raw
+  // typed-then-submit value. Threaded into route state so Results.jsx
+  // can tell "the URL differs because of a spelling substitution"
+  // (typed+submit) from "the URL differs because a dropdown pick
+  // completed a partial prefix" (e.g. "Cmaj" -> "Cmaj7") -- both leave
+  // `searchedAs` != the final chord, but only the former is worth
+  // explaining.
   function goToChord(chordName, searchedAs, fromSuggestion) {
     onSubmit?.()
     setIsOpen(false)
@@ -128,11 +127,10 @@ function ManualSearch({ onSubmit }) {
     }
     const chord = value.trim()
     if (!chord) return
-    // Typing a full chord and hitting Search without ever opening/selecting
-    // the dropdown must still land on the same canonical chord as a
-    // suggestion click would -- normalize root AND bass here (this
-    // follow-up: a real bug had this only normalizing the root, so a
-    // slash chord's bass note reached Results un-canonicalized).
+    // Typing a full chord and hitting Search without touching the
+    // dropdown must still land on the same canonical chord a suggestion
+    // click would -- normalize root AND bass here, so a slash chord's
+    // bass note reaches Results canonicalized.
     const { normalized } = normalizeAliases(chord, rootAliases)
     goToChord(normalized, value, false)
   }
@@ -179,22 +177,15 @@ function ManualSearch({ onSubmit }) {
           {isOpen && (
             <div className="manual-search__suggestions-panel">
               {rootNorm.root && (
-                // Pinned header row inside the same floating panel as the
-                // suggestions -- not a list option: no role="option", not
-                // part of arrow-key navigation (that only ever indexes into
-                // `suggestions`, never this row), and its mousedown does
-                // nothing beyond staying inside the panel (no navigation).
-                // Only ever rendered attached to an open, non-empty
-                // dropdown -- never floats on its own. See CLAUDE.md Phase
-                // 3 Part 4/6 follow-up notes: a zero-match alias query
-                // (e.g. "D#zzz") is a real, reachable case, and by this
-                // same gating (isOpen implies suggestions.length > 0) the
-                // caption is deliberately suppressed then too, not just
-                // when non-alias.
-                // Gated on `rootNorm.root` specifically, not the broader
-                // `rootNorm.changed` (this follow-up: normalizeAliases now
-                // also flags a bass-only change) -- this typing caption is
-                // deliberately root-only, see enharmonicCaption's comment.
+                // Pinned header row inside the suggestions panel -- not a
+                // list option: no role="option", not in arrow-key nav
+                // (that only indexes into `suggestions`), and its
+                // mousedown just keeps focus in the panel. Only rendered
+                // with an open, non-empty dropdown, so a zero-match alias
+                // query (e.g. "D#zzz") suppresses it too. Gated on
+                // `rootNorm.root` (root only), not `rootNorm.changed`
+                // which also flags a bass-only change -- see
+                // enharmonicCaption's comment.
                 <div
                   className="manual-search__enharmonic-note"
                   onMouseDown={(e) => e.preventDefault()}

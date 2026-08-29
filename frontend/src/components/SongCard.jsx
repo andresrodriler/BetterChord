@@ -1,21 +1,22 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import ChordName from './ChordName'
+import { enharmonicRootNote } from '../lib/chordAlias'
 import { useAlbumThumb } from '../lib/useAlbumThumb'
 import './SongCard.css'
 
-// Phase 4: rich media + UG metadata on the Songs panel. Collapsed by
-// default (album art thumbnail + title + artist + spelling tag -- roughly
-// what the plain <li> used to show, plus the thumbnail), click to expand
+// Rich media + UG metadata on the Songs panel. Collapsed by default
+// (album-art thumbnail + title + artist + spelling tag), click to expand
 // into artist image, Spotify/YouTube embeds, and UG info. One card per
-// song per spelling, same key scheme the old flat <li> list used.
+// song per spelling.
 //
 // Data-source note (see CLAUDE.md Phase 4 entry): album_image_url/
-// artist_image_url are Deezer-sourced, display only. preview_url is NOT
-// used anywhere here -- real playback is the Spotify embed iframe, which
-// already has its own "listen in Spotify" affordance built in.
-function SongCard({ song, spelling }) {
-  const [expanded, setExpanded] = useState(false)
-
+// artist_image_url are Deezer-sourced, display only. preview_url is not
+// used -- real playback is the Spotify embed iframe.
+// `expanded`/`onToggleExpanded` are lifted to Results.jsx so only one
+// card is expanded at a time across the panel. `rootAliases` (the
+// raw->canonical root map from /chords) is threaded down so the "UG tags
+// X as Y" note can explain a plain root respelling.
+function SongCard({ song, spelling, rootAliases, expanded, onToggleExpanded }) {
   const {
     title,
     artist,
@@ -34,36 +35,34 @@ function SongCard({ song, spelling }) {
     capo_shape: capoShape,
   } = song
 
-  // Confidence-gated per CLAUDE.md's Phase 4 scope: only "high" renders an
-  // embed. Any other value (real data only ever has "low" otherwise, but
-  // null/anything-else is treated the same way) hides it entirely -- no
-  // fallback link.
+  // Only "high" confidence renders a YouTube embed -- any other value
+  // ("low", null, anything) hides it entirely, no fallback link.
   const showYoutube = youtubeConfidence === 'high' && !!youtubeId
   const showTuning = ugTuning && ugTuning !== 'Standard'
 
-  // artist_genres is a real comma-separated string (e.g. "Pop, International
-  // Pop, Rock"), not a JSON array -- one chip showing just the primary
-  // (first) genre, not one chip per genre, to keep this a single small tag
-  // like the key/capo chips beside it, not a chip explosion for artists
-  // with several tagged genres.
+  // artist_genres is a comma-separated string (e.g. "Pop, Rock"), not a
+  // JSON array -- one chip showing just the primary (first) genre, so
+  // this stays a single small tag like the key/capo chips.
   const primaryGenre = artistGenres ? artistGenres.split(',')[0].trim() : null
   const hasArtistInfo = !!(artistImage || primaryGenre || ugKey || ugCapo > 0)
 
-  // Phase 4 follow-up: replaces the plain <img src={albumImage}> with a
-  // fetch+retry+fallback chain -- see useAlbumThumb.js for why a plain
-  // <img onError> can't catch this (Deezer's CDN placeholder redirect is a
-  // normal, successful load, not a network error). Scoped to the album
-  // thumbnail only -- Part 1's investigation found artist images aren't
-  // affected by this issue, so song-card__artist-img below is unchanged.
+  // Replaces a plain <img src={albumImage}> with a fetch+retry+fallback
+  // chain -- see useAlbumThumb.js for why <img onError> can't catch
+  // Deezer's CDN placeholder redirect. Scoped to the album thumbnail
+  // only (artist images aren't affected).
   const thumbContainerRef = useRef(null)
   const { src: thumbSrc } = useAlbumThumb(albumImage, artistImage, thumbContainerRef)
+
+  // Null when there's nothing to explain (roots identical, or a
+  // quality/bass difference rather than a root respelling).
+  const enharmonicNote = rawChord ? enharmonicRootNote(spelling, rawChord, rootAliases) : null
 
   return (
     <li className={`song-card${expanded ? ' song-card--expanded' : ''}`}>
       <button
         type="button"
         className="song-card__summary"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={onToggleExpanded}
         aria-expanded={expanded}
       >
         <span ref={thumbContainerRef} className="song-card__thumb-wrapper">
@@ -75,12 +74,9 @@ function SongCard({ song, spelling }) {
         </span>
         <span className="song-card__summary-text">
           <span className="song-title">{title}</span>
-          {/* Phase 5 Part 6/7, Results convergence pass: real, confirmed
-              mismatch -- the real mockup shows title/artist stacked with
-              no separator at all, relying on font-weight/size/color alone
-              to distinguish them (matching the title/artist pairing
-              already used the same way on the artist-image row below).
-              Dropped the hardcoded "- " prefix to match. */}
+          {/* Title/artist stacked with no separator, distinguished by
+              weight/size/color alone (matching the artist-image row
+              below). */}
           <span className="song-card__artist">{artist}</span>
         </span>
         <span className="tag">{spelling}</span>
@@ -89,13 +85,9 @@ function SongCard({ song, spelling }) {
 
       {expanded && (
         <div className="song-card__detail">
-          {/* Phase 4 follow-up: the artist image used to sit alone with
-              empty space beside it -- genre/key/capo now fill that space
-              as chips next to the image, reusing the existing .tag
-              treatment. Key/capo moved up from the tuning block below
-              (was "ug-info", now tuning-only) rather than duplicating them
-              in both places. Each piece renders only if that song actually
-              has it -- no empty/placeholder chips. */}
+          {/* Genre/key/capo chips beside the artist image, reusing the
+              .tag treatment. Each renders only if that song has it -- no
+              placeholder chips. */}
           {hasArtistInfo && (
             <div className="song-card__artist-info">
               {artistImage && (
@@ -109,26 +101,22 @@ function SongCard({ song, spelling }) {
             </div>
           )}
 
-          {/* Phase 4 follow-up: explains why the chord name shown here
-              (`spelling`) can differ from what's literally printed on the
-              UG tab -- two genuinely separate reasons, computed backend-
-              side in songs.py (see that file for the real chord math).
-              Only rendered when there's actually something to explain --
-              a song with neither difference renders nothing here, not an
-              empty note. */}
+          {/* Explains why the chord name shown here (`spelling`) can
+              differ from what's on the UG tab -- two reasons, computed in
+              songs.py. Only rendered when there's something to explain. */}
           {(capoShape || rawChord) && (
             <p className="song-card__why-differs">
               {/* Cause-before-effect (NOTE_STYLE_GUIDE.md): the capo fact
-                  leads, "shown here as X" follows -- same idiom as every
-                  other note family that renames a single result. Uses the
-                  shared ChordName atom (Phase 5 Part 2/7) instead of a
-                  hand-rolled span -- same visual result as before, one
-                  fewer place the readout treatment could drift. */}
+                  leads, "shown here as X" follows. Uses the shared
+                  ChordName atom rather than a hand-rolled span. */}
               {capoShape && (
                 <>Capo on fret {ugCapo} -- shown here as <ChordName>{spelling}</ChordName>, played as the <ChordName>{capoShape}</ChordName> shape. </>
               )}
               {rawChord && (
-                <>UG tags <ChordName>{spelling}</ChordName> as <ChordName>{rawChord}</ChordName>.</>
+                <>
+                  UG tags <ChordName>{spelling}</ChordName> as <ChordName>{rawChord}</ChordName>
+                  {enharmonicNote ? ` (${enharmonicNote}).` : '.'}
+                </>
               )}
             </p>
           )}
@@ -137,35 +125,19 @@ function SongCard({ song, spelling }) {
             <iframe
               className="song-card__spotify"
               title={`Spotify player - ${title}`}
-              // theme=0 -- Spotify's embed defaults to a light theme whose
-              // page background is white; confirmed via direct screenshot
-              // comparison this switches the widget's own chrome from
-              // teal-on-white to dark, matching our theme.
+              // theme=0 switches Spotify's embed chrome from its
+              // light-theme default (white page background) to dark.
               //
-              // height=84 (not Spotify's documented 152, and not CSS) --
-              // real investigation, not a guess: even with theme=0, the
-              // leftover space below the widget stays a HARD white block
-              // regardless of theme (the iframe's own <body> is transparent
-              // -- confirmed via direct computed-style check -- and a
-              // transparent iframe body paints as opaque browser-default
-              // white, which theme params can't touch). Within THIS app,
-              // specifically, Spotify's widget consistently (8/8 real runs,
-              // 2 different tracks, after ruling out a resource-contention
-              // false reading) renders its shorter ~80px "compact" track
-              // layout rather than the ~152px layout their own docs assume
-              // -- confirmed via the actual rendered widget height, not the
-              // iframe box height (which stayed a fixed 152 regardless).
-              // Isolated standalone reproductions of the same exact markup
-              // never reproduced the compact layout (always rendered
-              // 152px there), so the specific trigger inside this app
-              // wasn't fully isolated -- but the in-app result itself was
-              // 100% consistent across every clean test run. Sized to 84
-              // (80 plus a small buffer) to match what actually renders
-              // here rather than reserving space nothing fills. Checked
-              // for a documented postMessage-based dynamic-resize API
-              // (Spotify's iframe only posts `{type:"ready"}`, no resize
-              // event was observed over a 9s window) -- no official hook
-              // available to size this dynamically instead.
+              // height=84, not Spotify's documented 152: even with
+              // theme=0, the space below the widget stays a hard white
+              // block (the iframe's own <body> is transparent, painting
+              // as browser-default white, which theme params can't
+              // touch). In this app Spotify consistently renders its
+              // ~80px compact track layout rather than the documented
+              // 152px one, so 84 matches what actually renders rather
+              // than reserving space nothing fills. No postMessage
+              // resize API is available (the iframe only posts
+              // `{type:"ready"}`).
               src={`https://open.spotify.com/embed/track/${spotifyId}?theme=0`}
               width="100%"
               height="84"
@@ -199,8 +171,9 @@ function SongCard({ song, spelling }) {
           )}
 
           {ugUrl && (
-            <a className="song-card__ug-link" href={ugUrl} target="_blank" rel="noreferrer">
+            <a className="song-card__ug-link" href={ugUrl} target="_blank" rel="noopener noreferrer">
               View tab on Ultimate Guitar
+              <span className="song-card__ug-ext" aria-hidden="true">↗</span>
             </a>
           )}
         </div>

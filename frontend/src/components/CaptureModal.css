@@ -10,10 +10,10 @@
   padding: 20px;
 }
 
-/* Phase 5 Part 6/7: same rivet + bevel-border treatment as .panel (App.css)
-   -- duplicated here rather than added via the shared class, since this
-   element already carries its own width-variant rules (.capture-modal--
-   preview/--wide) that would otherwise fight .panel's cascade position. */
+/* Same rivet + bevel-border treatment as .panel (App.css), duplicated
+   here rather than via the shared class since this element carries its
+   own width-variant rules (.capture-modal--preview/--wide) that would
+   fight .panel's cascade position. */
 .capture-modal {
   background-color: var(--brown-900);
   background-image: radial-gradient(circle, var(--rivet) 1.4px, transparent 1.6px),
@@ -57,11 +57,10 @@
   margin-bottom: 8px;
 }
 
-/* Preview's title, merged onto the same row as Close (was its own row
-   above the waveform) -- overrides h2's default block margin so it sits
-   correctly inline in this flex row instead of adding its own vertical
-   gap. Empty (zero-width) string content on every other modal state, so
-   Close still ends up flush right via space-between either way. */
+/* Preview's title, on the same row as Close -- overrides h2's default
+   block margin so it sits inline in this flex row. Empty string content
+   on every other modal state, so Close still ends up flush right via
+   space-between. */
 .capture-modal__title {
   margin: 0;
 }
@@ -99,14 +98,12 @@
   min-width: 0;
 }
 
-/* -- Loading overlay: reuses .capture-overlay's exact tint+blur (same
-   rgba/backdrop-filter values) one layer further in -- dims/blurs the
-   frozen preview content underneath instead of replacing it, per this
-   pass's explicit ask. `position: absolute` against the body's own
-   `position: relative` (set inline in CaptureModal.jsx) keeps this fully
-   scoped to the modal's own content area -- no second `position: fixed`
-   backdrop, no separate z-index stack beyond sitting after its siblings
-   in normal DOM order. -- */
+/* Loading overlay: reuses .capture-overlay's tint+blur one layer further
+   in, dimming/blurring the preview content underneath rather than
+   replacing it. `position: absolute` against the body's `position:
+   relative` (set inline in CaptureModal.jsx) scopes it to the modal's
+   content area -- no second `position: fixed` backdrop, no separate
+   z-index stack. */
 .capture-modal__loading-overlay {
   position: absolute;
   inset: 0;

@@ -163,11 +163,10 @@ QUALITY_INTERVALS = {
     '13#9': {"notes": [0, 3, 4, 5, 7, 9, 10], "required": [0, 3, 4, 9, 10]},
     '13b9#11': {"notes": [0, 1, 4, 6, 7, 9, 10], "required": [0, 1, 4, 6, 9, 10]},
 
-    # -- Added to fill the 37 voicing gaps closed this session; generated
-    # directly from quality_registry.json for guaranteed consistency with
-    # voicings.db / songs.py. Excludes 4 extremely rare qualities
+    # -- Generated directly from quality_registry.json for consistency
+    # with voicings.db / songs.py. Excludes 4 extremely rare qualities
     # (7no3, add11no5, m7no5, sus2add13no5 -- 1 real song occurrence each)
-    # that were also excluded from the voicing scrape for the same reason.
+    # that the voicing scrape also excluded.
     '#9': {"notes": [0, 3, 4, 7], "required": [0, 3, 4], "aliases": ['(#9)']},
     '11': {"notes": [0, 2, 4, 5, 7, 10], "required": [0, 4, 5, 10]},
     '6add11': {"notes": [0, 4, 5, 7, 9], "required": [0, 4, 5, 9], "aliases": ['6add4']},
@@ -281,9 +280,8 @@ def score_quality(active_intervals, quality, note_probs, root_idx):
         # Required notes get an extra multiplier -- this same effective
         # weight (iw * rw) must be used for BOTH the numerator (score) and
         # the denominator (total_weight), otherwise total_weight undercounts
-        # relative to what score can actually accumulate, letting raw_score
-        # exceed 1.0. (Real bug, produced e.g. confidence=1.024 -- see
-        # CLAUDE.md Phase 5 Part 1/6.)
+        # relative to what score can accumulate, letting raw_score exceed
+        # 1.0 (e.g. a confidence of 1.024).
         rw = 1.5 if interval in required_notes else 1.0
         w  = iw * rw
 

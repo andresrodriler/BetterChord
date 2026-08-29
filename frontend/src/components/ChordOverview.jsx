@@ -1,36 +1,28 @@
 import ChordName from './ChordName'
+import { useAccessibilityPrefs } from '../context/AccessibilityPrefsContext'
 import { buildAltSpellingSentence, buildSynonymText } from '../lib/chordAlias'
 import { getIntervalStyle } from '../lib/intervalColors'
 import { renderChordNote } from '../lib/renderChordNote'
 import './ChordOverview.css'
 
-// chord_info.py's `short` interval labels mostly already overlap with
-// intervalColors.js's recognized vocabulary (both independently settled
-// on things like "3"/"b3"/"5"/"b7"/"maj7"/"dim7") -- the one real gap is
-// the root, labeled "R" here vs. the "1" classifyInterval()/voicings.db
-// actually use everywhere else. Anything else this doesn't recognize
-// (bare "4"/"6", altered extensions) already falls through to the
-// generic "ext" bucket by design, same graceful default every other
-// caller of getIntervalStyle relies on when it doesn't have a `formula`
-// to disambiguate sus tones with (see intervalColors.js's own comment).
-// A sus2's own bare "2" label is handled by classifyInterval() itself now
-// (Phase 5 Part 7), not here -- see that function's own comment.
+// chord_info.py's `short` interval labels mostly overlap with
+// intervalColors.js's vocabulary ("3"/"b3"/"5"/"b7"/"maj7"/"dim7"); the
+// one gap is the root, labeled "R" here vs. the "1" used everywhere
+// else. Anything else this doesn't recognize (altered extensions) falls
+// through to the generic "ext" bucket, same as any getIntervalStyle
+// caller without a `formula` to disambiguate sus tones.
 function toIntervalColorToken(short) {
   return short === 'R' ? '1' : short
 }
 
-// Task 3 (this follow-up): builds the unified "Similar Chords" list --
-// TRUE SYNONYMS (identical notes, different quality name, e.g. aug7 <->
-// 7#5) from /chord-info's `quality_synonyms` (each already paired with
-// its own real "why" reason -- see chord_info.explain_quality_synonym()
-// and NOTE_STYLE_GUIDE.md), and OVERLAP relations (shares required
-// notes, one commonly omits a tone the other has, e.g. 7add13 <-> 13)
-// from songs.py's `related_notes`. A chord can have BOTH kinds at once
-// (e.g. Ab7#5/Abaug7 has a real aug7 synonym AND a real 7b13 overlap) --
-// this returns them as ONE combined list, synonyms first, never assuming
-// only one kind applies. Exported so Results.jsx doesn't need to
-// duplicate this "is there anything real to show" check for any future
-// use.
+// Builds the unified "Similar Chords" list -- true synonyms (identical
+// notes, different quality name, e.g. aug7 <-> 7#5) from /chord-info's
+// `quality_synonyms` (each with its own "why" reason from
+// chord_info.explain_quality_synonym()), plus overlap relations (one
+// commonly omits a tone the other has, e.g. 7add13 <-> 13) from
+// songs.py's `related_notes`. A chord can have both -- returned as one
+// list, synonyms first. Exported so Results.jsx needn't duplicate the
+// "anything real to show" check.
 export function buildSimilarChords(chordInfoData, relatedNotes) {
   const entries = []
   if (chordInfoData?.chord) {
@@ -47,51 +39,37 @@ export function buildSimilarChords(chordInfoData, relatedNotes) {
   return entries
 }
 
-// Phase 5 Part 2/7 follow-up: rebuilt as a "Chord Overview" card
-// (renamed from OverallChordInfo -- the redesign changes its role enough
-// to warrant it), positioned ABOVE the Voicings/Songs grid rather than
-// below, per a real HTML/CSS mockup (frontend/design-reference, layout/
-// structure only -- palette and type come from the app's own tokens, see
-// CHORD_INFO_AUDIT.md and RESULTS_ENTRY_PATHS.md for the full history).
+// The "Chord Overview" card, above the Voicings/Songs grid. Layout is
+// from a mockup (frontend/design-reference); palette and type come from
+// the app's tokens (see CHORD_INFO_AUDIT.md, RESULTS_ENTRY_PATHS.md).
 //
-// Structure, top to bottom -- each piece hides individually when it has
-// nothing to show:
-//   - A 3-column strip (what this chord IS, its notes as colored balls,
-//     its interval formula + bass note) -- all from chord_info.py via
-//     /chord-info, unchanged data.
-//   - "Why this spelling" -- ONE flowing chord-fact sentence, ROOT/BASS
-//     ENHARMONIC SPELLING ONLY (see buildAltSpellingSentence) -- rendered
-//     whenever there's alt-spelling data, EXCEPT when `showWhySpelling`
-//     is false (a later follow-up's Task 2: suppressed for dropdown
-//     picks specifically, since the typing-time dropdown caption already
-//     explained the same root/bass substitution while it was being
-//     picked -- re-explaining it here would be redundant. Still renders
-//     for typed submissions and direct URL visits, where nothing
-//     explained it beforehand). The bar sits directly below the title,
-//     unscrolled, always in view when it renders -- an earlier
-//     title-level "teaser" link pointing down at it was removed
-//     (same follow-up's Task 1) once that stopped being necessary.
-//   - "Similar Chords" -- REPLACES the old "Overlapping chords" banner
-//     entirely: a plain list (not a bordered Songs-style banner) naming
-//     every true synonym AND overlap relation together, each its own
-//     one-sentence theory fact, songs clause only when real (see
-//     buildSimilarChords above).
+// Structure (each piece hides when it has nothing to show):
+//   - A 3-column strip: description, notes as interval-colored balls,
+//     interval formula + bass note -- all from chord_info.py via
+//     /chord-info.
+//   - "Why this spelling?" -- one flowing chord-fact sentence, root/bass
+//     enharmonic spelling only (see buildAltSpellingSentence). Suppressed
+//     when `showWhySpelling` is false (dropdown picks -- the typing-time
+//     caption already explained the substitution); still renders for
+//     typed submissions and direct URL visits.
+//   - "Similar Chords" -- a plain list (not a bordered banner) of every
+//     true synonym and overlap relation, each its own theory sentence,
+//     songs clause only when real (see buildSimilarChords above).
 // Deliberately NOT included: chord_info.py's `related` dict (relative
-// minor/parallel/tritone-sub/"resolves from (V7)"/simpler-version) --
-// confirmed out of scope for this card, not wired up at all rather than
-// half-built and hidden.
-// `formula` (Phase 5 Part 7 addition) is the /voicings/{chord} response's
-// own `formula` field -- the SAME object IntervalLegend/ChordTonePanel
-// already use, passed through here purely so this card's note balls can
-// disambiguate a sus2/sus4 chord's characteristic tone the same way every
-// other interval-colored surface in the app already does (see
-// intervalColors.js's classifyInterval). Optional and additive: `voicings`
-// can still be null/loading/failed when this card renders (chord-theory
-// content is deliberately never gated on song/voicing availability, per
-// this file's own history) -- omitting `formula` just means a sus tone
-// falls back to the generic "ext" bucket, exactly the pre-existing
-// behavior, not a regression.
+// minor/parallel/tritone-sub/etc) -- out of scope, not wired up.
+//
+// `formula` is the /voicings/{chord} response's `formula` field (the
+// same object IntervalLegend/ChordTonePanel use), passed so the note
+// balls can disambiguate a sus2/sus4 chord's characteristic tone (see
+// intervalColors.js's classifyInterval). Optional -- `voicings` can be
+// null/loading/failed when this card renders (chord theory is never
+// gated on voicing availability); without `formula` a sus tone falls
+// back to the generic "ext" bucket.
 function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true, formula = null }) {
+  // See IntervalLegend.jsx's identical comment -- subscribes this
+  // component to the colorblind toggle so it re-renders (and re-reads
+  // getIntervalStyle's cleared cache) when the palette changes.
+  useAccessibilityPrefs()
   const info = chordInfo?.ok ? chordInfo.data : null
   const altSentence = showWhySpelling ? buildAltSpellingSentence(info) : null
   const similarChords = buildSimilarChords(info, relatedNotes)
@@ -137,12 +115,10 @@ function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true, formul
           <div className="chord-overview__col">
             <h3 className="chord-overview__kicker">Interval formula</h3>
             <div className="chord-overview__formula">{info.intervals.map((iv) => iv.short).join(' · ')}</div>
-            {/* Bass called out separately (Task 1's explicit ask) rather
-                than folded into the formula string above -- the formula
-                is about the chord's own stacked intervals; the bass note
-                is a genuinely different fact (which string sounds
-                lowest), conflating them would misrepresent the formula
-                as including a tone it doesn't structurally have. */}
+            {/* Bass called out separately, not folded into the formula
+                string -- the formula is the chord's stacked intervals;
+                the bass note is a different fact, and conflating them
+                would misrepresent the formula. */}
             {info.slash_bass && (
               <p className="chord-overview__bass-note">
                 <ChordName>{info.slash_bass}</ChordName> is the bass

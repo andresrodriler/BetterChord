@@ -1,23 +1,17 @@
-/* Phase 4: replaces the old plain .song-list <li> text row. Kept minimal --
-   proving the data + interaction works, not a final visual pass (see
-   CLAUDE.md's Phase 4 scope). Reuses existing tokens/.tag treatment rather
-   than inventing new ones. */
-/* Higher specificity than Results.css's .song-list li (class+element) so
-   the card's own layout (padding lives on .song-card__summary/__detail
-   instead) actually wins regardless of CSS import order. */
+/* Replaces the plain .song-list <li> text row; reuses existing
+   tokens/.tag. Selector is `.song-list .song-card` (higher specificity
+   than Results.css's `.song-list li`) so the card's own layout wins
+   regardless of CSS import order -- padding lives on
+   .song-card__summary/__detail. */
 .song-list .song-card {
   display: block;
-  /* .song-list is a flex column with max-height + overflow-y: auto (see
-     Results.css). A flex item's automatic min-height resolves to 0 when
-     its own overflow isn't 'visible' (CSS Flexbox min-height:auto rule) --
-     `overflow: hidden` just below (needed to clip the card's rounded
-     corners) triggers exactly that. At high item counts (real, confirmed
-     bug: chord "Dm", 5269 songs) the flex-shrink algorithm has nothing to
-     stop it once that floor is 0, so every card gets crushed toward ~2px
-     to force-fit inside max-height -- confirmed via direct measurement
-     before this fix (every sampled card, from index 0 to 1000+, measured
-     the same ~2px). flex-shrink: 0 opts every card out of that shrinking
-     entirely, regardless of how many songs are in the list. */
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* .song-list is a flex column with max-height + overflow-y: auto. A
+     flex item's auto min-height resolves to 0 when its overflow isn't
+     'visible' -- `overflow: hidden` below (to clip the rounded corners)
+     triggers that, so at high song counts the flex-shrink algorithm
+     crushes every card toward ~2px to fit inside max-height.
+     `flex-shrink: 0` opts every card out of that. */
   flex-shrink: 0;
   padding: 0;
   background: var(--brown-800);
@@ -38,12 +32,27 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
-/* Phase 4 follow-up: wraps the thumb so useAlbumThumb's IntersectionObserver
-   has a stable element to watch regardless of whether the current render
-   shows the real <img> or the placeholder box -- sizing lives here now,
-   the inner elements just fill it. */
+/* A clickable affordance for the row, reusing the app's brass-glow
+   "you can click this" language (.home-teaser:hover,
+   .fretboard-diagram--interactive:hover). The border/shadow ring lives
+   on the outer .song-card (via :has()) so the whole card's outline
+   glows, not just the button's rectangle; a slight background lighten on
+   the button reads as pressable before the border catches the eye. */
+.song-card__summary:hover {
+  background: var(--brown-700);
+}
+
+.song-list .song-card:has(.song-card__summary:hover) {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-dim);
+}
+
+/* Wraps the thumb so useAlbumThumb's IntersectionObserver has a stable
+   element to watch whether the render shows the real <img> or the
+   placeholder box -- sizing lives here, the inner elements fill it. */
 .song-card__thumb-wrapper {
   display: block;
   width: 40px;
@@ -60,9 +69,8 @@
   background: var(--brown-700);
 }
 
-/* Phase 5 Part 6/7: diagonal-stripe "no artwork" pattern, matching the
-   design mockup's cover placeholder -- a real material-looking fallback
-   instead of a flat fill, still pure CSS (no new element/markup). */
+/* Diagonal-stripe "no artwork" pattern from the mockup -- a
+   material-looking fallback instead of a flat fill, pure CSS. */
 .song-card__thumb--placeholder {
   background: repeating-linear-gradient(45deg, var(--brown-700) 0 6px, var(--brown-800) 6px 12px);
   border: 1px solid var(--brown-700);
@@ -97,11 +105,9 @@
   padding: 0 12px 14px;
 }
 
-/* Phase 4 follow-up: fills the empty space that used to sit next to a lone
-   artist image -- genre/key/capo chips now sit beside it instead of below.
-   Row layout so the image and chips share the same line at normal card
-   width; chips wrap onto their own line via flex-wrap if the card is
-   narrow or a song has several chips at once. */
+/* Row layout so the artist image and its genre/key/capo chips share a
+   line at normal card width; chips wrap to their own line via flex-wrap
+   if the card is narrow or a song has several chips. */
 .song-card__artist-info {
   display: flex;
   align-items: center;
@@ -137,12 +143,10 @@
   gap: 6px;
 }
 
-/* Phase 4 follow-up: explains a real discrepancy between the chord name
-   shown here and what's literally on the UG tab (capo shape and/or root/
-   quality normalization -- see songs.py). Same recessed-aside treatment
-   Results.css already uses for .related-note (moss left border, --brown-800
-   well) rather than inventing a new visual language for "explanatory
-   callout". */
+/* Explains a discrepancy between the chord name shown here and the UG
+   tab (capo shape and/or root/quality normalization -- see songs.py).
+   Reuses Results.css's .related-note recessed-aside treatment (moss left
+   border, --brown-800 well). */
 .song-card__why-differs {
   margin: 0;
   font-size: 13px;
@@ -159,8 +163,38 @@
   font-size: 13px;
 }
 
+/* A control that navigates away, styled as the app's brass bordered
+   pill (same recipe as .home-hero__cta / .handedness-toggle) rather
+   than a bare text link. Was --scan (the detection accent) -- wrong
+   role for a navigation control; --brass is the control accent. Mono
+   label matches the .tag chips it sits below; --brass-border pill +
+   hover glow ring is the established "you can trigger this" language. */
 .song-card__ug-link {
-  color: var(--scan);
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   width: fit-content;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--brass);
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid var(--brass-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.song-card__ug-link:hover {
+  border-color: var(--brass);
+  background: var(--brown-700);
+  box-shadow: 0 0 0 3px var(--brass-dim);
+}
+
+/* Trailing external-link glyph -- this opens a new tab on a different
+   site, distinct from the in-app "→" continue arrows used elsewhere. */
+.song-card__ug-ext {
+  font-size: 11px;
+  opacity: 0.8;
 }

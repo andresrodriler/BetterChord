@@ -85,7 +85,117 @@
   Site chrome (persistent header, About/How-it-works/GitHub pages) --
   done, see CLAUDE.md's Phase 3 Part 6/6 entry. **Phase 3 is fully closed.**
 
+**Visual fidelity -- tracked residuals (Phase 5 Part 6/8)**
+
+Folded in from `frontend/HIW_VISUAL_FIDELITY_OPEN_ITEMS.md` and
+`frontend/RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md` when those append-only
+tracking files were retired (Phase 5 Part 7/8 cleanup). These are the
+real, still-unresolved-or-deliberately-deferred items from the mockup-
+fidelity passes; the "fixed" history in those files is fully captured in
+CLAUDE.md's Phase 5 Part 6/8 entries. Reference mockups (kept):
+`frontend/design-reference/How_It_Works_dc.html` and `Chord Results - G9
+(Audio Identified).dc.html`. Verification tooling (kept, untracked):
+`test_scripts/visual_diff.py`, `converge.py`, `style_audit.py`,
+`hiw_full_sweep.py`, `results_converge_driver.py`, `verify_hiw_mockup.py`.
+
+- **How It Works -- CNN Classification illustration, residual crop-diff
+  ~27.79%.** After a full literal-extraction rebuild of the panel (CNN
+  diagram is one flat CSS grid, not a repeated Conv/Pool component; Pool
+  labels + Flatten bars + connector arrows are individually absolute-
+  positioned at literal mockup px), `converge.py` sits at ~27.79% (down
+  from a flat 47-48% before the rebuild). Panel size 442x241 live vs.
+  442x242 mockup -- 1px height gap, not run down. The remaining ~28% is
+  characterised (not hand-waved): the spectrogram thumbnail is an
+  identical image asset that reads as fully "different" under a 1px sub-
+  pixel crop misalignment, plus thin text/edge-outline artifacts of the
+  same misalignment -- not a further structural bug. Re-open the
+  *characterisation* only if a future round finds a genuinely new
+  distinct cause, don't just re-measure the percentage.
+- **How It Works -- audio player width delta ~4%** (mockup 408px vs.
+  live 392px, 4.01% crop mismatch). Not chased; plausible container-
+  width variance, not re-measured to confirm the exact cause.
+- **How It Works -- residual whole-page cascading vertical offset**,
+  whole-page `visual_diff.py` ~13.09% at 1440x4000. Characterised as
+  real per-stage content-length variance + the audio-player width delta
+  propagating forward + ordinary font-rendering differences between the
+  mockup's renderer and live Chromium -- not a hidden aggregate bug.
+- **How It Works -- DEFERRED: mockup's page-local grain + plain b/w
+  vignette background layers, deliberately not reproduced.** The grain
+  reuses the exact periodic 3px-tile `radial-gradient` recipe already
+  root-caused and rejected during Home's grid-seam saga (would risk
+  reintroducing that bug class); the b/w vignette is redundant with, and
+  would compete against, the shared `:root` vignette this page already
+  inherits. Keep deferred unless the reasoning changes.
+- **Results -- header padding: mockup 16px vertical vs. live's 12px**
+  (`.app-header`, `App.css`; height gap mockup 57px / live 50px).
+  `.app-header` is a shared cross-page component already tuned against
+  Home's own mockup; changing it from Results' export alone risks the
+  cross-page inconsistency that tuning fixed. A future fix must compare
+  Home's, About's, and How It Works' own real mockup header values
+  together before picking one number.
+- **Results -- chord-title glow: mockup `0 0 28px rgba(111,227,214,0.2)`
+  vs. live's shared `.readout` `0 0 18px var(--scan-dim)` (0.14 alpha).**
+  `.readout` is broadly reused (voicing-modal chord names, badges); not
+  changed unilaterally from one page's export. Minor, not visually
+  broken.
+- **Results -- `ChordOverview` has a `<h2>Chord Overview</h2>` panel
+  title the mockup omits.** Kept deliberately: every other panel
+  (Voicings, Songs) has its own `<h2>` in both mockup and live, so
+  keeping this one is more internally consistent than matching the
+  mockup's single omission.
+- **Results -- 9th/extension note-ball colour** (the tracking file cited
+  mockup `#b6788a` mauve vs. live `--interval-ext-9` `#c8bfb2`). Was the
+  same already-adjudicated "keep the WCAG-tuned shipped token" decision
+  as the voicing cards. NOTE: the interval-colour token system was
+  overhauled across several Phase 5 Part 7/8 sessions, so the specific
+  hex values here are stale -- re-verify against the current
+  `--interval-*` tokens before acting, if a future round revisits this.
+- **Results -- mockup's SECOND repeating set of 4 corner glows tiled
+  every 1800px down the page**, deliberately not reproduced (the ambient-
+  lighting fix was scoped to the header/top region only). Accounts for a
+  real, small, gradually-growing diffuse background mismatch below the
+  header (up to ~20 combined-RGB units by y~=900 near the left margin).
+- **Results -- ~68-79px vertical offset between the mockup's header/
+  hero-row height and live's**, independent of DetectionBadge presence.
+  Likely the same shared `.app-main` page-wide padding mechanism as the
+  deferred Home `header -> eyebrow` gap. A proper fix needs to determine
+  whether it's that shared mechanism or Results-specific first, so it
+  isn't chased from one page alone.
+- **Not bugs, recorded so they aren't re-chased:** Results' Voicings-
+  panel-header height gap (18px mockup vs. 32px live) is live's real
+  handedness-toggle control, which the mockup's Voicings panel never
+  modelled; the mockup's "142" song count / "24" voicing count are
+  fictional illustrative content; DetectionBadge was checked fresh via a
+  real audio-upload flow and already closely matches.
+- **Likely already resolved -- confirm before treating as open:** the
+  tracking file flagged the shared `.song-list`/`.voicing-list`
+  `max-height: 440px` as showing a ~1.5-card cut-off, deferred until the
+  vertical fretboard rebuild. That rebuild has since landed (Phase 5
+  Part 7/8) and retuned this value to 590px (2 full vertical-card rows +
+  sticky section header) -- see CLAUDE.md's Phase 5 Part 7 vertical-
+  orientation entry. This item is very likely closed; verify against the
+  current `Results.css` value.
+
+Process, if any of the above gets picked up: verify the reference
+mockup's provenance byte-level first -> component inventory -> whole-page
+`visual_diff.py` as primary signal -> `converge.py` per flagged region ->
+full literal-extraction rebuild over patching only if a component
+plateaus after 2-3 real attempts. Low-contrast/diffuse mismatches
+(ambient lighting, gradient position) need eyes-on side-by-side review
+every round, not just the heatmap/percentage.
+
 **Site chrome**
+- ~~A slim footer for the bottom of every page~~ -- done. Built in two
+  passes: the disclaimer row + GitHub issues link (Dump Notes item #23,
+  see CLAUDE.md's Phase 5 Part 7/8 entry), then this entry's own second
+  row -- About/How It Works/GitHub links (same destinations as the top
+  nav) plus a "© 2026 BetterChord" credit line, visually separated from
+  the disclaimer row by a subtle divider, same slim/muted styling
+  throughout, no multi-column sitemap footer added (per this entry's own
+  explicit scoping below, honored). Renders via the one shared `Footer`
+  component on all 4 pages. See CLAUDE.md's Phase 5 Part 7/8 entry for
+  the full build/verification history. Original scoping note, kept for
+  context:
 - A slim footer for the bottom of every page. Raised during a Phase 5
   Part 6/7 Results follow-up session (real trigger: once the bottom-of-
   page mini capture panel moved into the header row and the panel-height
@@ -93,7 +203,9 @@
   anymore -- the page just ends). **This is new-feature scope, not part
   of the visual-fidelity pass** -- no mockup shows a footer for this
   exact page state, this is a genuinely new idea raised in chat, not a
-  mockup-fidelity gap being tracked in `RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md`.
+  mockup-fidelity gap (it was never a tracked visual-fidelity residual --
+  see the "Visual fidelity -- tracked residuals" section above for what
+  those actually were).
   Deliberately scoped SMALL -- discussed and explicitly rejected: a full
   sitemap-style, multi-column link-directory footer. BetterChord doesn't
   have the page count or site scale that would justify one (three real

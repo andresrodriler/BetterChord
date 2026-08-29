@@ -152,5 +152,4 @@ BetterChord/
                     identifyFacts.js     -- Phase 5 Part 3/7: real pipeline facts (condensed
                                             from HowItWorks.jsx) rotated by IdentifyingStatus
                                             while /identify is in flight
-      assets/      hero.png (unused leftovers: react.svg, vite.svg from the Vite template)
 ```

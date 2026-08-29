@@ -1,0 +1,131 @@
+/* Shared colorblind/reduced-motion settings menu. The trigger button
+   reuses .app-nav__link's font/size/letter-spacing so it reads as a nav
+   item; the dropdown panel reuses the app's .panel treatment (rivets/
+   bevel/shadow, App.css), same as every other floating panel here. */
+.accessibility-menu {
+  position: relative;
+}
+
+.accessibility-menu__trigger {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  line-height: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.accessibility-menu__trigger:hover,
+.accessibility-menu__trigger[aria-expanded='true'] {
+  color: var(--brass);
+}
+
+/* This element carries both `accessibility-menu__panel` and the shared
+   `panel` class. App.css's base `.panel { position: relative; ... }` and
+   this rule were both single-class selectors, so which won for
+   `position` came down to source order in the served stylesheet -- and
+   Vite's dev-server CSS injection order (a JS-driven <style> tag per
+   component module, in execution order) is not deterministic across
+   route entry points. With `position: relative` winning, `top:
+   calc(100% + 12px)` resolves against the element's own height and
+   pushes the panel in-flow, inflating `.app-header`. Fixed with a
+   compound selector (0,2,0) that always beats the base `.panel` rule --
+   the same specificity fix used for VoicingModal's
+   `.voicing-modal__diagram-box.panel`. */
+.accessibility-menu__panel.panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 280px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 4px;
+}
+
+.accessibility-menu__option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.accessibility-menu__option-label {
+  font-size: 13px;
+  color: var(--parchment);
+  font-weight: 500;
+}
+
+/* Small pill switch, same visual family as .handedness-toggle's own
+   pressed-state brass fill (App.css) -- a real on/off track+knob instead
+   of a native checkbox, matching this app's own control language. */
+.accessibility-menu__switch {
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--brown-700);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.accessibility-menu__switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.accessibility-menu__switch--on {
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.accessibility-menu__switch--on::after {
+  transform: translateX(16px);
+  background: var(--brown-950);
+}
+
+.accessibility-menu__hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.accessibility-menu__status {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--moss);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+@media (max-width: 700px) {
+  .accessibility-menu__panel {
+    width: 240px;
+  }
+}

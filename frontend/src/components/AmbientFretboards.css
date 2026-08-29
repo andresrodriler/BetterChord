@@ -1,42 +1,21 @@
-/* Phase 5 Part 6/7, 5th follow-up -- scattered decorative fretboard
-   sketches behind Home's hero. Originally positioned relative to
-   `.home-hero` alone (only ~625px of the page); using plain `inset: 0`
-   here would cluster every shape inside that narrow column, losing the
-   mockup's actual composition (shapes scattered near the page's own
-   left/right edges). The standard "break out of a centered container"
-   trick instead: centered via left:50% + a transform, but given its OWN
-   wider width, independent of the parent's.
+/* Scattered decorative fretboard sketches behind Home's hero. Positioned
+   against `.home-page` (Home.jsx's `position: relative` outer wrapper) so
+   `top/bottom: 0` spans the whole page -- hero, hero-to-teaser gap,
+   teaser row, bottom margin -- matching the `top` values
+   AmbientFretboards.jsx's SHAPES array uses.
 
-   Phase 5 Part 6/7, Home polish follow-up: real, requested extension --
-   moved from `.home-hero` to `.home-page` (Home.jsx's new outer
-   wrapper, `position: relative`) so `top/bottom: 0` now spans the WHOLE
-   page (hero + the hero-to-teaser gap + the teaser row + the page's own
-   bottom margin), not just the hero section -- the new shapes in
-   AmbientFretboards.jsx's own `SHAPES` array use `top` values in this
-   same full-page coordinate system. Negative z-index so it paints
-   behind the real in-flow content (hero text/CapturePanel, and now also
-   the teaser cards) with no extra z-index bookkeeping needed on that
-   content. */
-/* Phase 5 Part 6/7, Home polish follow-up (3rd round): real, requested
-   fix -- `width: 1100px; max-width: 94vw` meant the effective width was
-   `min(1100px, 94vw)`, which STAYS AT 1100px for every viewport wider
-   than ~1170px (94vw exceeds 1100px past that point) -- confirmed
-   directly, not assumed: at 1920px this left a real, fixed ~410px
-   margin between the container's own edge and the true screen edge that
-   no percentage-based `left`/`right` offset in AmbientFretboards.jsx
-   could meaningfully close, however negative. Switched to a real
-   viewport-relative width (97vw) with a generous sanity cap far above
-   any tested breakpoint (2400px, not expected to bind at 1280-1920px)
-   instead of a fixed px value -- now the container itself tracks the
-   real viewport width, leaving only ~1.5vw margin per side, which is
-   what actually gives AmbientFretboards.jsx's negative `left`/`right`
-   values real room to land shapes close to the true edge at every
-   width, not just narrow ones. Re-verified `scrollWidth === clientWidth`
-   at all 4 required breakpoints after this change (see the chat
-   writeup) -- the shared `:root`/`body` `overflow-x: hidden` safety net
-   (index.css, from an earlier Home follow-up) still catches the rare
-   shape whose own negative offset lands it a few px past the true edge,
-   same as it already did before this specific change. */
+   Width is 97vw, not a fixed px: a fixed width (e.g. 1100px) stops
+   tracking the viewport past ~1170px wide, leaving a large fixed margin
+   at the screen edge that no percentage-based left/right offset in
+   AmbientFretboards.jsx can close. 97vw leaves ~1.5vw per side, room for
+   those negative offsets to land shapes near the true edge at any width;
+   the 2400px cap is a sanity bound not expected to bind at tested
+   widths. left:50% + translateX(-50%) + an independent wide width is the
+   standard "break out of a centered container" escape from `.home-page`'s
+   column. Negative z-index paints behind in-flow content (hero text,
+   CapturePanel, teaser cards) with no z-index bookkeeping on it.
+   `:root`/`body` `overflow-x: hidden` (index.css) catches any shape whose
+   offset lands a few px past the edge. */
 .ambient-fretboards {
   position: absolute;
   top: 0;
@@ -93,4 +72,141 @@
   font-size: 10px;
   letter-spacing: 0.03em;
   color: var(--muted);
+}
+
+/* When a shape is "scanning", only its dots and scanline go cyan -- the
+   outer box and corner brackets stay warm/neutral, keeping --scan
+   reserved as the "this is live" signal. */
+
+/* Corner-bracket framing (the reference's `.bracket` SVG paths, done here
+   as 4 small two-border "L" marks since these diagrams are HTML/CSS, not
+   SVG) -- a viewfinder/scan-target look, not a full border box. Colored
+   `--loudness-peak` (the bright, glowing orange also used for the
+   mini-wave bars below) rather than `--brass`, so it reads as "actively
+   scanning" rather than just another border; the glow reuses the same
+   same-color drop-shadow mechanism. */
+.ambient-fretboards__bracket {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-color: var(--loudness-peak);
+  border-style: solid;
+  border-width: 0;
+  opacity: 1;
+  filter: drop-shadow(0 0 3px var(--loudness-peak));
+  pointer-events: none;
+}
+
+.ambient-fretboards__bracket--tl {
+  top: -4px;
+  left: -4px;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.ambient-fretboards__bracket--tr {
+  top: -4px;
+  right: -4px;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+}
+
+.ambient-fretboards__bracket--bl {
+  bottom: -4px;
+  left: -4px;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.ambient-fretboards__bracket--br {
+  bottom: -4px;
+  right: -4px;
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+}
+
+/* The reference's `.scanline`/`@keyframes sweep`: a thin line that
+   translates from the grid's top to its bottom, fading in just after it
+   starts and out just before it loops. `--scan-travel` (set per-shape
+   inline in AmbientFretboards.jsx) is that shape's real pixel height, so
+   the sweep always travels exactly its own grid without over/undershoot. */
+.ambient-fretboards__scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1.5px;
+  background: var(--scan);
+  box-shadow: 0 0 4px var(--scan-border);
+  opacity: 0;
+  animation: ambient-scan-sweep 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ambient-scan-sweep {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(var(--scan-travel, 78px));
+    opacity: 0;
+  }
+}
+
+/* Feeding waveform, above the grid it feeds into (connected by a short
+   dashed line, see .ambient-fretboards__connector below). Same visual
+   language as CapturePanel's .capture-panel__mini-wave flourish,
+   recolored to the scan/cyan family since this is the "audio feeding the
+   CNN scan" moment, not a generic loudness readout. Reuses the shared
+   `copper-bar` keyframe (index.css). */
+.ambient-fretboards__mini-wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 14px;
+  margin-bottom: 5px;
+}
+
+/* 2-stop gradient: `--loudness-peak` (warmest step of the loudness-ramp
+   family, Waveform.jsx's audio-level palette) at the base fading to
+   `--scan` at the tip. Full opacity + a small per-bar glow so it reads
+   against the page's dark background. */
+.ambient-fretboards__mini-wave-bar {
+  width: 2px;
+  height: var(--mini-wave-h);
+  background: linear-gradient(180deg, var(--loudness-peak), var(--scan));
+  border-radius: 50%;
+  transform-origin: bottom;
+  animation: copper-bar 1.3s ease-in-out infinite;
+  opacity: 1;
+  filter: drop-shadow(0 0 2px rgba(242, 162, 104, 0.35));
+}
+
+/* Short dashed connector between the waveform and the grid it feeds --
+   reference's own `.connector` element, reproduced as a `repeating-
+   linear-gradient` dashed line rather than a literal border (crisper at
+   this small scale). */
+.ambient-fretboards__connector {
+  display: block;
+  width: 1px;
+  height: 8px;
+  margin: 0 auto;
+  background: repeating-linear-gradient(var(--scan-border) 0 2px, transparent 2px 4px);
+}
+
+.ambient-fretboards__guess {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--scan);
+  text-shadow: 0 0 6px var(--scan-dim);
 }

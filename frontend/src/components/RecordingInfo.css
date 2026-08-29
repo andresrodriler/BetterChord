@@ -67,10 +67,9 @@
   margin: 0;
 }
 
-/* -- Secondary meta panel (item 7): a clean "device readout" row, kept
-   visually separate from the level status above rather than crammed into
-   the same line. Mono eyebrow labels (moss) + mono values (parchment),
-   the same readout language used across the rest of the app. -- */
+/* Secondary meta panel -- a "device readout" row, kept visually separate
+   from the level status above. Mono eyebrow labels (moss) + mono values
+   (parchment), the same readout language used across the app. */
 .recording-meta {
   display: flex;
   flex-wrap: wrap;

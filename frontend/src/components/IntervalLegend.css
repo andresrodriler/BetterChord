@@ -1,6 +1,6 @@
-/* Interval-color legend (Phase 3 Part 5/6 follow-up) -- small monospace
-   row of swatch+label pairs, matching the app's existing .tag treatment
-   in spirit but not reusing it directly (a legend item isn't a pill). */
+/* Interval-color legend -- small monospace row of swatch+label pairs,
+   matching the app's .tag treatment in spirit but not reusing it (a
+   legend item isn't a pill). */
 .interval-legend {
   display: flex;
   flex-wrap: wrap;

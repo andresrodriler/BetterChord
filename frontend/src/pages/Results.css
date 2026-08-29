@@ -1,44 +1,11 @@
-/* Phase 5 Part 6/7, Results convergence follow-up: real, confirmed
-   ambient-lighting mismatch, found by direct pixel sampling (not
-   eyeballed) -- the mockup's header/hero region reads visibly warmer/
-   brighter than what the shared `:root` background (index.css, tuned
-   against HOME's own real decoded mockup, 14th follow-up) produces here.
-   Root-caused, not guessed: `:root`'s vignette is
-   `radial-gradient(62.5vw 70vh at 50% 40%, transparent 55%,
-   rgba(0,0,0,0.4) 100%)` -- centered 40% DOWN the viewport. Results' own
-   real mockup source (`Chord Results - G9 (Audio Identified).dc.html`)
-   has a DIFFERENT vignette for this page specifically:
-   `radial-gradient(ellipse 1100px 800px at 50% 0%, transparent 45%,
-   rgba(0,0,0,0.4) 100%)` -- centered at the very TOP edge, not 40% down.
-   Worked the math at a real sampled point, (200,65) in a 1440x1000
-   viewport, to confirm this actually explains the measured gap before
-   writing any CSS: `:root`'s own vignette (center 720,400) puts that
-   point at ~0.75 normalized distance -> ~18% black overlay; Results' own
-   vignette (center 720,0) puts the same point at ~0.48 normalized
-   distance -> ~2% black overlay -- a real, ~16-point alpha difference,
-   consistent with the measured RGB gap (mockup brighter by roughly
-   9-20 units per channel across several sampled header-region points,
-   largest near the widget's left edge, smallest near center -- exactly
-   what a repositioned-vignette explanation predicts, not a flat "add
-   more glow everywhere" one).
-   `:root`'s own vignette is independently correct for Home (verified
-   against Home's own real decoded source) and shared app-wide, so this
-   is a Results-page-scoped override, not a `:root` change: a full,
-   opaque repaint (grain + Results' own vignette, over the shared
-   `--brown-950` base) on a `.results-page::before` layer that sits
-   between `:root`'s background and this page's real content -- the
-   same "fully repaint over the shared background rather than try to
-   subtract from it" approach already used for `.app-header`'s own
-   opaque gradient fill. `position: absolute` (not `fixed`) so it
-   scrolls with the page like `:root`'s own background does, anchored to
-   this page's own top (matches the mockup's single-render page, where
-   the vignette also begins at the literal top of content). A linear
-   fade-out mask on the bottom edge blends back into `:root`'s own
-   background rather than ending in a hard, visible seam -- the exact
-   bug class already fixed twice elsewhere in this app (grain/vignette
-   layers scoped to a narrower box than the true page, Home's own 4th and
-   10th follow-ups) -- confirmed via the same before/after pixel-sampling
-   method used to find this issue in the first place, not assumed safe. */
+/* Results' mockup uses a vignette anchored at the top edge, distinct
+   from the shared :root vignette (centered 40% down, tuned for Home).
+   Reproduced as a page-scoped ::before layer that fully repaints (grain
+   + this vignette over --brown-950) between :root's background and the
+   page content -- the same approach as .app-header's opaque fill.
+   `position: absolute` (not fixed) so it scrolls with the page. A
+   bottom fade-out mask blends back into :root's background instead of
+   ending in a hard seam. */
 .results-page {
   position: relative;
 }
@@ -46,23 +13,12 @@
 .results-page::before {
   content: '';
   position: absolute;
-  /* Real, confirmed bug in the first version of this fix, caught by
-     re-sampling rather than trusting the CSS alone: `.results-page`
-     itself doesn't start at the true viewport top -- `.app-header`
-     (~50.09px, measured) and `.app-main`'s own 40px padding-top sit
-     above it, so `top: 0` here would actually start ~90.09px down the
-     real page. The first attempt tried compensating by shifting the
-     GRADIENT's own center coordinate upward instead of moving the
-     element -- that doesn't work: an element's background is clipped to
-     its own box regardless of where a gradient's center falls, so
-     nothing painted above y_local=0 (i.e. above the real page's own
-     ~90px mark) no matter what the gradient said. The actual fix is to
-     move the ELEMENT itself up by that same measured offset (the
-     header's own opaque fill already hides anything behind IT, so
-     extending this layer up to the true viewport top is safe -- nothing
-     else needed to see it there anyway), keeping the gradient's own
-     "50% 0%" center exactly matching the mockup's real "vignette
-     centered at the literal page top" value, unmodified. */
+  /* .results-page starts ~90px below the true viewport top (.app-header
+     ~50px + .app-main's 40px padding-top). Move the whole element up by
+     that offset so the vignette can start at the real page top -- a
+     background is clipped to its own box, so shifting the gradient's
+     center instead wouldn't paint above y=0. The header's opaque fill
+     covers anything behind it up there. */
   top: -90.09px;
   left: 50%;
   width: 100vw;
@@ -79,44 +35,28 @@
 
 .results-header {
   gap: 4px;
-  /* Phase 5 Part 6/7, Results convergence pass: the real, confirmed 24px
-     gap down to Chord Overview (matching that panel's own 24px
-     margin-bottom to the Voicings/Songs grid below IT) now lives on the
-     `.results-hero-row` wrapper instead of here -- this element is a
-     flex child of that row now (title column beside the new header
-     CapturePanel), not the last full-width block before ChordOverview
-     the way it was when this margin was first added. */
+  /* The 24px gap down to Chord Overview lives on .results-hero-row now
+     -- this element is a flex child of that row (beside the header
+     CapturePanel), not the last full-width block before ChordOverview. */
 }
 
 .results-header h1 {
   margin-bottom: 4px;
-  /* Phase 5 Part 6/7, Results convergence pass: real, confirmed bug --
-     this h1 was inheriting the shared global h1 rule's 46px/weight:500
-     (index.css), but the real Results mockup's chord title is a much
-     bigger 65px/weight:600 device-readout, deliberately larger than a
-     normal page heading since it's the single most important piece of
-     information on the page. Scoped here rather than raising the shared
-     h1 rule, which other pages (Home/About/How It Works) already tune
-     independently. line-height:1 matches the mockup's own real value
-     too (the shared rule's 1.2 multiplier is tuned for wrapping prose
-     headings, not a single short chord name). */
+  /* A large device-readout, bigger than a normal page heading -- it's
+     the most important thing on the page. Scoped here (other pages tune
+     h1 independently). line-height:1 for a single short chord name. */
   font-size: 65px;
   font-weight: 600;
   line-height: 1;
 }
 
-/* Task 3 (Phase 5 Part 2/7 follow-up): replaces the old
-   `.results-header__enharmonic-note` disclosure paragraph -- title-level
-   explanation text is gone entirely, this is just a small inline
-   parenthetical next to the title itself, not a separate block. */
+/* Small inline parenthetical next to the title, not a separate block. */
 .results-header__searched-as {
   font-size: 0.5em;
   font-weight: 400;
   color: var(--muted);
-  /* h1.readout's own text-shadow glow otherwise inherits down onto this
-     muted text too (text-shadow inherits by default) -- the nested
-     ChordName span re-applies its own glow correctly regardless, since
-     it matches .readout directly rather than relying on inheritance. */
+  /* h1.readout's text-shadow glow would otherwise inherit onto this
+     muted text; the nested ChordName span re-applies its own. */
   text-shadow: none;
 }
 
@@ -124,10 +64,8 @@
   font-size: 1em;
 }
 
-/* Task 4 (Phase 5 Part 2/7 follow-up): ambiguous-shorthand note --
-   plain, non-interactive text (nothing to link/scroll to), same small
-   size as the teaser so the two read as siblings, distinct color so
-   they're not mistaken for the same kind of note. */
+/* Ambiguous-shorthand note -- plain non-interactive text, sibling-sized
+   to the parenthetical, distinct color. */
 .results-header__ambiguity-note {
   margin: 0;
   font-size: 13px;
@@ -140,13 +78,9 @@
 
 .results-grid {
   display: grid;
-  /* minmax(0, 1fr), not plain 1fr -- plain 1fr columns still respect
-     their content's intrinsic min-width, so the Voicings column (full of
-     wide-ish diagram cards) was winning more than half the row even
-     though both tracks were nominally "1fr". minmax(0, ...) removes that
-     implicit auto-minimum, forcing a genuine 50/50 split regardless of
-     what's inside each column -- confirmed via real screenshot at
-     1400px: both panels measure the same width. */
+  /* minmax(0, 1fr), not plain 1fr -- plain 1fr respects content
+     min-width, so the diagram-filled Voicings column won more than half
+     the row. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
@@ -155,16 +89,9 @@
   }
 }
 
-/* Generic panel-header row: h2 label + a top-right control, same treatment
-   for any panel that needs it. Originally `.voicings-panel__header`
-   (Phase 3 Part 2 follow-up fix #5, moving the handedness toggle out of
-   the global app header to sit top-right of the "VOICINGS" heading it
-   actually affects) -- renamed/generalized (Phase 5 Part 5/7, 3rd
-   follow-up round, Step 1) when the Songs panel needed the exact same
-   "H2 + top-right control" row for its own Filters toggle, rather than
-   duplicating the same 3 CSS rules under a second, Songs-specific class
-   name. Both panels' headers are now genuinely the same treatment, not
-   two separately-maintained copies of it. */
+/* Generic panel-header row: h2 label + a top-right control. Shared by
+   the Voicings panel (handedness toggle) and the Songs panel (Filters
+   toggle). */
 .panel-header {
   display: flex;
   align-items: center;
@@ -172,22 +99,17 @@
   gap: 12px;
 }
 
-/* 18th follow-up: real exhaustive-diff finding -- the real mockup's
-   panel-header h2 (Voicings/Songs) is smaller (14px/1.4px letter-
-   spacing) than the shared global h2 rule (15px/1.6px) -- same pattern
-   already found and fixed on About's own section h2s and ChordOverview's
-   kicker labels this round. */
+/* Smaller than the shared global h2, matching the mockup -- same
+   pattern as About's section h2s and ChordOverview's kickers. */
 .panel-header h2 {
   margin-bottom: 0;
   font-size: 14px;
   letter-spacing: 1.4px;
 }
 
-/* Phase 5 Part 6/7, 16th follow-up: real element-count next to each panel
-   heading, matching the "Voicings  24" / "Songs  142" pairing in the
-   Results mockups -- wraps the h2 + count together so the existing
-   justify-content:space-between on .panel-header still puts the
-   Handedness/Filters control on the far right, unaffected. */
+/* Element count next to each panel heading ("Voicings 24" / "Songs
+   142"). Wraps h2 + count together so .panel-header's space-between
+   still pushes the control to the far right. */
 .panel-header__title {
   display: flex;
   align-items: baseline;
@@ -201,10 +123,9 @@
   line-height: normal;
 }
 
-/* Real "Showing N of M · scroll for more" caption under each scrollable
-   list -- Songs' version is a genuine incremental-batch count (see
-   Results.jsx), Voicings' is a real total with honest "scroll for more"
-   phrasing (every voicing is already mounted, just visually clipped). */
+/* "Showing N of M · scroll for more" caption under each scrollable list
+   -- a real batch count for Songs, an honest total for Voicings (every
+   voicing is already mounted, just visually clipped). */
 .results-list-caption {
   font-family: var(--mono);
   font-size: 10px;
@@ -220,41 +141,20 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 16px;
-  /* Capped and internally scrollable -- some chords have 30+ songs (or,
-     for voicings, 25+ across three types), and an uncapped list used to
-     stretch the whole page to match it, burying everything below
-     (including the mini CapturePanel) at the bottom of a mile-long
-     scroll. */
+  /* Capped and internally scrollable -- some chords have 25-30+ items,
+     and an uncapped list stretched the whole page, burying everything
+     below it. */
   overflow-y: auto;
   padding-right: 4px; /* keeps the scrollbar from overlapping item text */
   scrollbar-width: thin;
   scrollbar-color: var(--brown-700) transparent;
 }
 
-/* Phase 5 Part 7 (vertical fretboard orientation): retuned from 440px,
-   picking up exactly the deferred item this file itself flagged when
-   the shared 440px value was last set ("revisit this specific value
-   once the vertical rebuild lands, against the new card dimensions,
-   not before" -- Phase 5 Part 6/7's Results-follow-up entry). Vertical
-   cards are TALLER than the horizontal cards that 440px was tuned
-   against (measured directly, not assumed: 243.8px vs. the old 219px),
-   so 440px now cut off well into a 2nd row (~1.56 rows visible) rather
-   than the old design's deliberate "~1.9 rows, hints there's more"
-   cutoff. Retuned to fit exactly 2 full voicing-card rows (including
-   the sticky "MUST KNOW"-style section header above them) with no
-   partial 3rd row -- measured directly via real getBoundingClientRect()
-   on a live "MUST KNOW"/"C" page, not estimated (a first attempt at
-   540px, using only legend-height + 2 item-heights + 1 gap, undercounted
-   the section header's own real height and still showed a partial 3rd
-   row -- caught by re-measuring, not assumed correct from the math
-   alone): row 2's real bottom edge lands at 587.625px from the list's
-   own scroll-content top, rounded up to 590px for a small margin. Both
-   lists still share this ONE value on purpose -- same "Voicings/Songs
-   panels read as a matched pair" reasoning as before, just against the
-   new card height instead of the old one; Songs' own card design
-   (SongCard.jsx) is completely unaffected by this pass, its list
-   simply keeps the same real height as Voicings' for visual parity
-   between the two panels. */
+/* 590px fits exactly 2 vertical voicing-card rows plus the sticky
+   section header, with no partial 3rd row (measured on a live list, not
+   from card-height math alone). Both lists share this one value so the
+   Voicings and Songs panels read as a matched pair -- Songs' own card
+   design is unaffected. */
 .song-list,
 .voicing-list {
   max-height: 590px;
@@ -271,13 +171,9 @@
   border-radius: 4px;
 }
 
-/* Guide-tone explanation callouts (Phase 3 Part 3/6) -- sits above the
-   combined song list, explaining why fuzzy matching pulled in an extra
-   spelling. Recessed-well treatment (like .panel--recessed) plus a
-   moss-colored left border so it reads as "explanatory aside" distinct
-   from the song rows below, without inventing a new visual language.
-   Multiple entries stack as separate blocks (gap), never merged into one
-   paragraph. */
+/* Guide-tone explanation callouts, above the combined song list.
+   Recessed well + moss left border so it reads as an aside. Multiple
+   entries stack as separate blocks. */
 .related-notes {
   display: flex;
   flex-direction: column;
@@ -301,10 +197,48 @@
   font-size: 13px;
 }
 
-/* Phase 5 Part 1/6: genuine-no-songs quality fallback -- reuses
-   .voicing-list__section for each root's header (same "small uppercase
-   label" treatment already used for Must Know/Other/Capo) and .song-list
-   for each group's mini list, no new visual language. */
+/* Collapsible variant -- padding moves onto the toggle button/body so
+   the button's click target spans the card's full width, matching
+   SongFiltersToggle. */
+.related-note--collapsible {
+  padding: 0;
+}
+
+.related-note__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--parchment);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  padding: 10px 12px;
+  transition: color 0.15s ease;
+}
+
+.related-note__toggle:hover {
+  color: var(--brass);
+}
+
+.related-note__chevron {
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+  line-height: normal;
+}
+
+.related-note__body {
+  margin: 0;
+  padding: 0 12px 10px;
+}
+
+/* Genuine-no-songs quality fallback -- reuses .voicing-list__section
+   for each root's header and .song-list for its mini list. */
 .quality-fallback-group {
   margin-top: 12px;
 }
@@ -313,29 +247,17 @@
   margin-bottom: 6px;
 }
 
-/* Card background/border/radius/layout now live entirely in SongCard.css
-   (Phase 4 follow-up) -- SongCard.jsx's root element is a real <li>, so a
-   bare `.song-list li` rule here would still match it and fight its own
-   internal layout (this is exactly what broke the cards last session: a
-   leftover `display: flex; align-items: baseline` here collapsed
-   SongCard's column layout). If a future non-card `<li>` is ever added
-   directly under `.song-list`, scope its rule the same way SongCard.css
-   already scopes its own (`.song-list .song-card`), don't add a bare
-   `.song-list li` rule back. */
+/* SongCard's root is a real <li>, so a bare `.song-list li` rule here
+   would match it and fight its internal layout (this broke the cards
+   once). Any future non-card <li> under .song-list must be scoped like
+   SongCard.css does (`.song-list .song-card`). */
 
-/* Two voicings per row instead of one column (Phase 3 Part 2 follow-up)
-   -- horizontal-orientation diagrams are wider than tall now, so a single
-   column left a lot of unused width in the panel. Section headers span
-   both columns via grid-column: 1 / -1 (see .voicing-list__section
-   below) so a header always starts a fresh row regardless of where the
-   previous type group's item count left off. */
+/* Two voicings per row -- section headers span both columns
+   (grid-column: 1 / -1) so a header always starts a fresh row. */
 .voicing-list {
   display: grid;
-  /* Same minmax(0, 1fr) reasoning as .results-grid above -- now that
-     FretboardDiagram sizes itself off the grid cell's real width (CSS
-     aspect-ratio, not a fixed pixel value), each cell's own intrinsic
-     min-width is small, but minmax(0, ...) keeps the two columns
-     genuinely equal regardless. */
+  /* Same minmax(0, 1fr) reasoning as .results-grid -- keeps the two
+     columns genuinely equal. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   @media (max-width: 560px) {
@@ -343,12 +265,9 @@
   }
 }
 
-/* Each voicing now renders its own fretboard diagram (FretboardDiagram
-   already supplies its own recessed panel/background), so the list item
-   itself is just a layout wrapper, not a bordered row like song-list.
-   align-items: stretch (not center) so the diagram fills the full width
-   of its grid cell -- FretboardDiagram's own responsive sizing depends
-   on that width being real, not shrink-wrapped to content. */
+/* Just a layout wrapper -- FretboardDiagram supplies its own panel.
+   align-items: stretch so the diagram fills the cell width, which its
+   responsive sizing depends on. */
 .voicing-list__item {
   display: flex;
   flex-direction: column;
@@ -356,24 +275,16 @@
   gap: 6px;
 }
 
-/* Section header row (Must Know / Other / Capo) -- a separate <li> sibling
-   of .voicing-list__item (not nested inside one), so grid-column: 1 / -1
-   actually spans both columns of the grid instead of just filling one
-   cell. Extends the app's existing small-uppercase-monospace h2 treatment
-   with a centered divider line on each side, rather than inventing new
-   typography. */
-/* Phase 3 Part 5/6 follow-up: legend + section headers stack as two
-   sticky bars pinned to the TOP of .voicing-list's own internal scroll
-   (that list already has its own overflow-y: auto -- this is deliberately
-   NOT page-scroll sticky). Both need an opaque background matching the
-   panel (--brown-900) since voicing cards scroll underneath them; without
-   it the diagrams behind would show through. Legend pins to the very top
-   (z-index 3, highest -- it should never be covered), the current
-   section's header pins directly beneath it (top offset = the legend
-   bar's own fixed height, z-index 2 -- above the scrolling cards but
-   below the legend). LEGEND_HEIGHT is enforced via explicit height below
-   rather than left to content, specifically so the section header's
-   `top` offset is a reliable, hardcoded number instead of guessed. */
+/* Section header row (Must Know / Other / Capo) -- a separate <li>
+   sibling of .voicing-list__item so grid-column: 1 / -1 spans both
+   columns. Small-uppercase-monospace h2 with a centered divider line
+   on each side.
+   Legend + section headers stack as two sticky bars pinned to the top
+   of .voicing-list's own internal scroll (not the page). Both need an
+   opaque --brown-900 background since cards scroll under them. Legend
+   at z-index 3 (never covered); the section header pins directly below
+   it, at a `top` offset equal to the legend's fixed 40px height -- hence
+   the explicit height rather than content-driven. */
 .voicing-list__legend-row {
   grid-column: 1 / -1;
   position: sticky;
@@ -412,20 +323,15 @@
   background: var(--border);
 }
 
-/* The legend row is now the list's real first child, so the first
-   section header is the one immediately following it -- not
-   :first-child anymore. */
+/* Legend is the list's first child, so the first section header follows
+   it -- not :first-child. */
 .voicing-list__legend-row + .voicing-list__section-row .voicing-list__section {
   margin-top: 0;
 }
 
-/* Phase 3 Part 5/6: replaces the old equal-weight "base fret N" / "capo N"
-   pill pair (.voicing-list__tags, removed -- base fret is gone entirely,
-   redundant with the diagram's own "Nfr" label). This chip is smaller and
-   more integrated than a full .tag pill, deliberately less prominent, and
-   only rendered for Capo-type voicings (see Results.jsx's gating, matching
-   FretboardDiagram.jsx's existing capo-line condition). Full base-fret/
-   capo detail now lives in the click-to-expand VoicingModal instead. */
+/* Replaces the old "base fret N" / "capo N" pill pair. Smaller and less
+   prominent than a .tag; Capo-type rows only. Full detail lives in the
+   expand modal. */
 .voicing-list__capo-chip {
   align-self: center;
   font-family: var(--mono);
@@ -442,25 +348,17 @@
   line-height: normal;
 }
 
-/* Phase 4 follow-up: invisible marker row at the end of the currently-
-   rendered song batch -- IntersectionObserver (Results.jsx) watches this
-   to load the next batch as the user scrolls near it. flex-shrink: 0 for
-   the same reason SongCard.css needs it (see that file's comment) --
-   without it, a near-empty 1px row is still a flex item subject to the
-   same shrink-to-fit-in-max-height math. */
+/* Invisible marker at the end of the rendered song batch -- the
+   IntersectionObserver watches it to load the next batch. flex-shrink:
+   0 for the same reason SongCard.css needs it. */
 .song-list__sentinel {
   flex-shrink: 0;
   height: 1px;
 }
 
-/* Phase 5 Part 6/7, Results convergence follow-up: replaces the old
-   bottom-of-page `.results-capture` block (deleted) -- the real mockup
-   puts the "Analyze Your Chord" widget beside the title, not below the
-   Voicings/Songs grid. Matches the mockup's own real flex-row layout:
-   the title column flexes to fill remaining space (`flex: 1;
-   min-width: 260px`, its own real values), the CapturePanel size="header"
-   instance sits at its own natural width beside it, and the row wraps
-   below the title on narrow viewports instead of overflowing. */
+/* Places the "Analyze Your Chord" widget beside the title (not below
+   the grid). Title column flexes to fill; the CapturePanel sits at its
+   natural width; the row wraps on narrow viewports. */
 .results-hero-row {
   display: flex;
   gap: 24px;

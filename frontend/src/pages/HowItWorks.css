@@ -1,61 +1,21 @@
-/* Phase 5 Part 6/7, 16th follow-up: real 6-stage alternating pipeline
-   layout ported from the How It Works mockup -- a real CSS grid per
-   stage (illustration | numbered node | text), alternating sides, with a
-   connecting vertical spine. Deliberately flow-based (grid-template-
-   columns, not absolute pixel offsets) so it reflows correctly at every
-   tested width -- the mockup's own literal absolute-position labels
-   inside its CNN diagram were a landmine, not reproduced here. */
+/* 6-stage alternating pipeline: a CSS grid per stage (illustration |
+   numbered node | text), alternating sides, with a vertical spine.
+   Flow-based, not absolute px, so it reflows. */
 .how-it-works-page {
   max-width: 980px;
   margin: 0 auto;
   position: relative;
-  /* 28th follow-up: real, confirmed-missing element -- the mockup layers
-     2 colored ambient "spotlight" radial-gradients behind its content
-     (a repeating warm/cyan set every 1800px down the page, plus a denser
-     pair near the page's own bottom). Real mockup values (from source,
-     `<div style="position:absolute; inset:0;">`, both layers, applied
-     against the FULL viewport): a plain b/w top vignette (1100px 800px
-     at 50% 0%) and a periodic 3px-tile grain overlay were ALSO present
-     in the mockup but deliberately NOT reproduced here -- both are
-     redundant with, and would visually fight, the already-established
-     SHARED site-wide `:root` vignette/grain (ported from the Home
-     mockup, Phase 5 Part 6/7's 14th follow-up) -- see
-     HIW_VISUAL_FIDELITY_OPEN_ITEMS.md for the explicit DEFERRED entry.
-     Only the 2 colored spotlight layers below are page-specific, novel
-     content worth porting.
-
-     29th follow-up: real, confirmed regression from the 28th follow-up's
-     own fix, found via a real brightness-profile scan (not eyeballed) --
-     the background-image was originally applied directly to THIS 980px
-     `max-width` box. Even though each individual gradient layer is faint
-     (peak alpha 0.028-0.06), stacking 6 overlapping layers across most of
-     the box produced a uniformly darker "wash" INSIDE the 980px column
-     relative to the plain, untinted `:root` grain/vignette showing
-     OUTSIDE it -- a real, visible hard edge at exactly the column's own
-     boundary (measured: avg brightness ~40 outside the column, ~30
-     inside, a sharp step at x=230 on a 1440px viewport, not a gradual
-     falloff). This is the EXACT same bug class already root-caused and
-     fixed once before, for Home's own grain layer (moving it from
-     `.app-shell`-scoped to `:root`-scoped, 14th follow-up) -- scoping a
-     background to a box narrower than the visible page creates a seam
-     at that box's own edge. Fixed the same way: the background now
-     lives on a `::before` pseudo-element broken out to the full 100vw
-     viewport width (the same "break out of a centered container" CSS
-     trick `.app-header` already uses, 7th follow-up) instead of on this
-     980px box directly, so it extends smoothly to the real screen edges
-     with nothing left to create a boundary against. */
+  /* 2 colored ambient "spotlight" radial-gradients behind the content
+     (see ::before below). Applied to a full-100vw ::before, not this
+     980px box -- scoping a background to a box narrower than the page
+     creates a visible seam at the box edge (same bug fixed for Home's
+     grain). The mockup's own top vignette + grain overlay are not
+     reproduced: redundant with the shared :root background. */
   z-index: 0;
-  /* 19th follow-up: real, confirmed finding from the real mockup (the
-     stub replaced in this round never had this content) -- every
-     "nested" illustration surface (tag chips, the note-probability
-     bars well, the audio player, song rows, the root+bass+notes=Gm
-     summary row, the caption's own top rule) consistently uses a
-     dimmer, more-recessed two-shade palette than the outer panel's own
-     `--brown-950`/`--border` (confirmed via a raw grep: `#150e07`/
-     `#1c1209`/`#3a2a18`/`#4a3826` each appear 8-11 times throughout the
-     file, never once as a one-off). Scoped to this page (not promoted
-     to index.css) since nothing outside How It Works currently needs a
-     third depth step below --brown-950. */
+  /* Every nested illustration surface (tag chips, wells, audio player,
+     song rows, summary row) uses a dimmer, more-recessed palette than
+     the outer panel's --brown-950/--border. Scoped here -- nothing
+     outside this page needs a depth step below --brown-950. */
   --hiw-well-bg: #150e07;
   --hiw-well-border: #3a2a18;
   --hiw-tag-bg: #1c1209;
@@ -63,15 +23,10 @@
   --hiw-spectrogram-border: #4a3520;
 }
 
-/* 29th follow-up: the real ambient-spotlight background, broken out to
-   the full 100vw viewport width (see the fix note above, on
-   `.how-it-works-page` itself) -- `left: 50%` + `translateX(-50%)` +
-   `width: 100vw` is the standard "break out of a centered container"
-   technique, same one `.app-header` already uses (App.css, 7th
-   follow-up). Painted behind all real content via `z-index: -1` against
-   the parent's own `z-index: 0` stacking context (set above) -- normal-
-   flow children have an implicit `z-index: auto` (paints above any
-   negative-z-index sibling), so no z-index needed on the content itself. */
+/* The ambient-spotlight background, broken out to full 100vw
+   (`left: 50%` + `translateX(-50%)` + `width: 100vw`, same trick as
+   .app-header). z-index: -1 against the parent's z-index: 0 -- in-flow
+   children paint above it without their own z-index. */
 .how-it-works-page::before {
   content: '';
   position: absolute;
@@ -94,37 +49,15 @@
   background-position: top, top, top, top, bottom, bottom;
 }
 
-/* 18th follow-up: real, systemic finding from a direct computed-style
-   scan (no mockup DOM exists for the 6 illustration stages -- this
-   mockup file is a stub with only hero copy, the stage content was
-   built from the task's own inline description in the 16th follow-up --
-   so this was caught by scanning live output directly, not diffed
-   against a reference). 130 real text-bearing elements across this
-   page's illustrations (interval dots, chromatic-scale cells, CNN
-   diagram labels, spectrogram axis ticks, etc.) never set their own
-   line-height, all inheriting :root's already-resolved 26.1px pixel
-   value -- the exact same inheritance bug already found and fixed
-   individually on h1/nav-link/record-btn/CapturePanel/badge/About's own
-   text elements. A 26.1px line-height on a 6-9px-font label sitting in
-   a small fixed-size flex-centered box happened not to visibly break
-   anything (flex centering absorbs the extra height), but it's still a
-   real latent inconsistency worth fixing at the root rather than
-   leaving 130 individual selectors silently relying on a coincidence.
-   Fixed with one broad, LOW-specificity default (0,1,0 -- a single
-   class plus the universal selector) scoped to this page only: any
-   element that already sets its own real line-height (`.hiw-stage__text
-   p`'s 1.65, `.hiw-illustration__caption`'s 1.6, etc. -- all more
-   specific, class+element selectors) is completely unaffected and keeps
-   winning the cascade; this only fills the gap for the ones that never
-   set anything at all. */
+/* Many small labels across the illustrations never set their own
+   line-height and inherit :root's resolved 26.1px px value. One broad,
+   low-specificity default fixes them here; any element with its own
+   class+element line-height rule still wins the cascade. */
 .how-it-works-page * {
   line-height: normal;
 }
 
-/* 22nd follow-up: real mockup h1 values (44px/16px), found via the
-   per-stage exhaustive sweep on a cleanly-matched pair (both sides say
-   "How BetterChord Works", no alignment ambiguity) -- scoped to this
-   page only, not the shared global h1 rule. */
+/* Mockup h1 values, scoped to this page. */
 .how-it-works-page h1 {
   font-size: 44px;
   margin-bottom: 16px;
@@ -155,12 +88,8 @@
   z-index: 0;
 }
 
-/* 25th follow-up: real, confirmed missing detail -- the mockup caps the
-   spine with a small 9x9px dot at each end (same var(--border) color),
-   found via a real whole-page geometry check (this app's own per-stage
-   sweep tool structurally can't see anything outside a single stage's
-   own container, which is exactly why this was never caught before --
-   see CLAUDE.md). Verified via direct measurement, not eyeballed. */
+/* The mockup caps the spine with a 9x9px dot at each end
+   (var(--border)). */
 .hiw-pipeline__spine-dot {
   position: absolute;
   left: 50%;
@@ -189,24 +118,11 @@
   gap: 20px;
 }
 
-/* 27th follow-up: real, significant bug found via a whole-page pixel
-   diff's cascading-height-offset pattern, then root-caused via computed
-   `gridTemplateRows`, not guessed -- every REVERSE stage (illustration
-   in column 3, text in column 1) was silently expanding into 3 SEPARATE
-   implicit grid rows instead of 1. None of `.hiw-stage`'s 3 children had
-   an explicit `grid-row`, so CSS Grid's sparse auto-placement algorithm
-   was placing each one independently: the illustration (DOM-first, but
-   column 3) advances the placement cursor past column 3, so the number
-   circle (column 2, behind the cursor) drops to a new row, and the text
-   column (column 1, behind THAT) drops to a 3rd row -- confirmed via a
-   real computed `gridTemplateRows: "291.688px 44px 170.375px"` (3 real
-   row tracks, not 1) on a live Guide Tone stage, stage height 567px
-   where it should have been ~290px (matching its own tallest real
-   child). This only affected reverse stages -- non-reverse stages'
-   illustration-first DOM order happens to match ascending column order,
-   so sparse placement never needed a new row there. Fixed with an
-   explicit `grid-row: 1` on all 3 children, forcing them into one row
-   regardless of DOM/column order. */
+/* Explicit grid-row: 1 on all 3 children. Without it, reverse stages
+   (illustration in column 3, DOM-first) advanced the grid's
+   auto-placement cursor past column 3, dropping the number circle and
+   text column each to their own new implicit row -- a ~2x-too-tall
+   stage. Non-reverse stages happened to place in order and were fine. */
 .hiw-stage__illustration,
 .hiw-stage__number,
 .hiw-stage__text {
@@ -239,13 +155,8 @@
   border-radius: 50%;
   background: var(--brown-900);
   border: 2px solid var(--brass);
-  /* 26th follow-up: real mockup value -- the digit is plain brass (no
-     glow), matching the circle's own border. Previously used the shared
-     `.readout` class (scan color + glow), which doesn't fit here either
-     by mockup value OR by the app's own established readout convention
-     (reserved for actual detected/computed values -- an ordinal step
-     number 1-6 isn't one). `.readout` itself untouched, since it's
-     reused elsewhere. */
+  /* Plain brass digit, no glow -- matches the circle border. Not
+     .readout (scan + glow), which is reserved for detected values. */
   color: var(--brass);
   display: flex;
   align-items: center;
@@ -257,10 +168,7 @@
   z-index: 1;
 }
 
-/* 26th follow-up: real mockup value -- stage titles are moss (#8faf9b,
-   confirmed exact), not the inherited muted color live had (no explicit
-   rule existed before this). Systemic, confirmed identical across every
-   stage checked. */
+/* Stage titles are moss, per the mockup (no explicit rule before this). */
 .hiw-stage__text h3 {
   margin-bottom: 10px;
   color: var(--moss);
@@ -272,23 +180,11 @@
   margin: 0;
 }
 
-/* 28th follow-up: real, confirmed-missing element -- the mockup draws a
-   34px x 2px #7d5b37 connector line from the spine to EVERY panel on
-   every stage (verified via direct source grep: 10/10 real
-   style-before/style-after occurrences, identical values throughout).
-   Live had zero pseudo-element rules for this at all (confirmed via
-   grep before writing this). Direction is purely about which SCREEN
-   COLUMN a panel lands in (1 or 3), not which semantic role
-   (illustration vs. text) it plays -- confirmed the same real mockup
-   pattern holds for both non-reverse and reverse stages alike (10/10
-   instances: column-1 panel always gets a right-pointing line via
-   style-after, column-3 panel always gets a left-pointing line via
-   style-before). `.hiw-stage__text` is itself the bordered `.panel`
-   (see JSX, `className="panel hiw-stage__text"`); the illustration side's
-   bordered panel is the `.hiw-illustration` element nested one level
-   INSIDE `.hiw-stage__illustration` (that wrapper div carries no border
-   of its own), so the connector targets `.hiw-illustration` directly,
-   not the wrapper. */
+/* 34x2px connector line from the spine to every panel. Direction is by
+   screen column (1 or 3), not semantic role -- column-1 panels get a
+   right-pointing line, column-3 a left-pointing one. `.hiw-stage__text`
+   is itself the .panel; the illustration side's bordered element is the
+   nested `.hiw-illustration` (its wrapper has no border). */
 .hiw-illustration,
 .hiw-stage__text {
   position: relative;
@@ -316,9 +212,8 @@
   z-index: 0;
 }
 
-/* Reverse stages: illustration lands in column 3 (needs a LEFT-pointing
-   line instead), text lands in column 1 (needs a RIGHT-pointing line
-   instead) -- cancel each base pseudo-element and draw the swapped one. */
+/* Reverse stages: illustration is in column 3, text in column 1 -- swap
+   which pseudo-element each draws. */
 .hiw-stage--reverse .hiw-stage__illustration .hiw-illustration::after {
   content: none;
 }
@@ -350,13 +245,8 @@
 }
 
 /* -- Shared illustration panel -- */
-/* Doubled class -- same `.panel` import-order specificity bug already
-   found and fixed on About.css this pass (`.about-stats`/`.about-hood-
-   card`/`.about-section-card`): this element's own `padding: 22px` was
-   silently losing to `.panel`'s later-loaded `padding: 24px` (confirmed
-   via direct computed-style measurement -- both rules are single-class
-   selectors at equal specificity, so cascade order, not intent, was
-   deciding). */
+/* Doubled class -- same `.panel` import-order specificity fix as the
+   .about-* panels: this padding was losing to `.panel`'s. */
 .hiw-illustration.hiw-illustration {
   padding: 22px;
   text-align: left;
@@ -425,18 +315,10 @@
   color: var(--brass);
 }
 
-/* 28th follow-up: real, confirmed bug -- with `.hiw-spectrogram`'s own
-   `align-items: stretch`, the bare colorbar div (no own column wrapper)
-   stretched to match the FULL row height (image + gap + times-label row
-   below it), not the image alone -- measured live at 265.95px vs. the
-   image's own 247.95px, an 18px overshoot; the real mockup's own
-   colorbar (which uses a `padding-bottom` on its own wrapping column to
-   compensate for its own times-row height) measures only 2px taller
-   than its image (247.4px vs 245.4px, matching within a border-width).
-   Fixed the same way the mockup does it structurally -- give the
-   colorbar its own column with an invisible spacer matching
-   `.hiw-spectrogram__times`'s own real font metrics (not a guessed
-   fixed px value, which would drift if that row's font ever changes). */
+/* With `.hiw-spectrogram`'s align-items: stretch, a bare colorbar div
+   stretched to the full row height (image + times-label row). Its own
+   column with an invisible spacer matching .hiw-spectrogram__times's
+   font metrics keeps it the image's height. */
 .hiw-spectrogram__colorbar-wrap {
   display: flex;
   flex-direction: column;
@@ -456,11 +338,7 @@
   visibility: hidden;
 }
 
-/* Real, confirmed-missing element -- the mockup's colorbar has its own
-   +3/0/-3 tick-label column beside it (real value:
-   `font-size:10px; color:#7d5b37`). Confirmed still open as of the 27th
-   follow-up's own reporting; fixed here alongside the colorbar-height
-   bug since both live in the same real markup region. */
+/* The colorbar's +3/0/-3 tick-label column (mockup: 10px, #7d5b37). */
 .hiw-spectrogram__colorbar-ticks {
   display: flex;
   flex-direction: column;
@@ -497,12 +375,9 @@
   flex-shrink: 0;
 }
 
-/* 27th follow-up: real mockup icon shapes -- hand-drawn CSS, not text
-   glyphs. Icon color #1c1209 already exists as --hiw-tag-bg in this
-   page's own token set (exact match), reused rather than duplicated.
-   Play = a CSS border-triangle (6px/6px/9px, nudged 2px right to
-   optical-center it in the circle, matching the mockup's own
-   margin-left:2px); pause = 2 solid 3x11px bars, 2.5px gap. */
+/* Hand-drawn CSS icons, not glyphs. Play = a border-triangle nudged 2px
+   right to optical-center it; pause = 2 solid bars. Icon color reuses
+   --hiw-tag-bg. */
 .hiw-audio-player__icon-play {
   width: 0;
   height: 0;
@@ -546,46 +421,24 @@
   flex-shrink: 0;
 }
 
-/* Real playback engine only -- visually hidden, matching the mockup's
-   own `style="display:none"` real <audio>. The custom button/waveform/
-   time-label above are the only visible controls now. */
+/* Playback engine only -- hidden, like the mockup's own display:none
+   <audio>. The custom button/waveform/time label are the visible
+   controls. */
 .hiw-audio-player__native {
   display: none;
 }
 
 /* -- Stage 2: CNN architecture diagram -- */
-/* 31st follow-up: FULL REBUILD, not another patch. 4+ rounds of
-   targeted alignment/label fixes (20th-30th follow-ups) left
-   `converge.py`'s mismatch flat at 47-48% -- re-extracted the mockup's
-   real, literal markup (raw source, the real support.js-rendered
-   source already trustworthy for this page since the 21st follow-up)
-   before writing any code. The mockup is ONE single CSS grid for the
-   WHOLE diagram, not a reusable Conv/Pool column repeated 4 times --
-   `display:grid; grid-template-rows:36px 46px 34px; grid-auto-flow:
-   column` (real values, was `display:flex; gap:3px; padding:8px 0`,
-   neither of which exists in the real mockup at all). Every element
-   (labels, boxes, dims, even empty spacer columns reserved for arrow
-   gaps) is a direct grid child with its own explicit `grid-row`,
-   assigned inline in HowItWorks.jsx (JSX now mirrors the mockup's own
-   flat child list 1:1, not a `.map()` over a shared component) since
-   this diagram's real positioning (Pool label/dims and the Flatten
-   label/bars are individually `position:absolute` at literal mockup
-   px, 5 connector arrows are separate absolute SVG overlays) doesn't
-   reduce to a clean per-column abstraction -- reproducing it needed
-   real values in real places, not a generic column reused 4 times.
-   This whole panel has a real FIXED outer width (measured live and in
-   the mockup: 442px, confirmed unchanged across all 4 tested
-   breakpoints) well inside the page's own 980px column, so literal
-   px positioning here carries none of the real page-level reflow risk
-   the 16th follow-up's own landmine warning was about (that warning
-   is about the PAGE's own stage grid, a genuinely fluid layout -- this
-   one static, fixed-size illustration was never in that category). */
-/* Real mockup values -- this panel's own real padding (20px 14px 14px)
-   and width (442px) differ from the shared `.hiw-illustration` values
-   used by the other 5 illustration panels (22px padding, fluid width)
-   -- scoped override, not a change to the shared rule (unverified
-   whether the other 5 panels' own real mockup values agree with this
-   one, out of scope for this rebuild). */
+/* The whole diagram is ONE CSS grid (grid-template-rows: 36px 46px
+   34px; grid-auto-flow: column), not a repeated Conv/Pool column. Every
+   element is a direct grid child with an explicit grid-row assigned
+   inline in HowItWorks.jsx. Pool labels/dims and the Flatten label/bars
+   are position:absolute at literal mockup px; the 5 connector arrows
+   are separate absolute SVG overlays. The panel has a fixed 442px
+   width, so literal px here carries no page-reflow risk. */
+/* This panel's own padding/width differ from the shared
+   .hiw-illustration (used by the other 5 panels) -- scoped override,
+   doubled class for the same specificity reason as above. */
 .hiw-illustration--cnn.hiw-illustration--cnn {
   width: 442px;
   padding: 20px 14px 14px;
@@ -606,14 +459,9 @@
   position: relative;
 }
 
-/* 22nd follow-up: real, confirmed color -- a dimmer literal (#e2d9c9),
-   not the full-bright --parchment token, found via the real (support.js-
-   rendered) mockup DOM's own INPUT/Conv-1/etc label spans
-   (`color: rgb(226, 217, 201)`), not this session's earlier fixes, which
-   never checked label text color specifically. justify-self:center
-   centers each label within its own real grid column (whose width is
-   set inline per element, matching the mockup's own per-element widths
-   -- 46px for INPUT, 44px for Conv, 32px for Pool). */
+/* A dimmer literal (#e2d9c9), not --parchment -- the mockup's real
+   label color. justify-self: center within each label's own grid column
+   (width set inline per element). */
 .hiw-cnn-diagram__label {
   font-family: var(--mono);
   font-size: 9px;
@@ -626,23 +474,17 @@
   align-self: end;
 }
 
-/* Real mockup value -- the nested dims sub-line inside a label (e.g.
-   "Conv 1" / "32x84x119") is a dimmer, smaller, unbolded literal
-   (rgb(169,136,102)), distinct from `.hiw-cnn-diagram__dims`'s own
-   #a98866 (used for the INPUT/Flatten dims lines, which sit as their
-   OWN separate row-3 element rather than nested under a label). */
+/* The dims sub-line nested inside a Conv/Pool label -- dimmer/smaller,
+   distinct from .hiw-cnn-diagram__dims (used for INPUT/Flatten's own
+   row-3 dims). */
 .hiw-cnn-diagram__label-dims {
   font-weight: 400;
   color: rgb(169, 136, 102);
   font-size: 7.5px;
 }
 
-/* 19th follow-up: real mockup values -- this sub-label's own dedicated
-   dim tan (#a98866, distinct from --placeholder) and slightly larger
-   size/line-height, confirmed via the real exhaustive diff. Used for
-   INPUT's and Flatten's own row-3 dims lines (not nested under a
-   label the way Conv/Pool's dims are -- see .hiw-cnn-diagram__label-
-   dims above). */
+/* INPUT's and Flatten's own row-3 dims lines -- dedicated dim tan
+   (#a98866). */
 .hiw-cnn-diagram__dims {
   font-family: var(--mono);
   font-size: 8px;
@@ -679,9 +521,8 @@
   transform-origin: center center;
 }
 
-/* Real mockup values -- 5 separate absolutely-positioned overlay SVGs
-   (not flex-row siblings between grid columns), each `left` set inline
-   per segment in HowItWorks.jsx, all sharing this real fixed `top`. */
+/* 5 separate absolute overlay SVGs, `left` set inline per segment,
+   sharing this top. */
 .hiw-cnn-diagram__connector {
   position: absolute;
   top: 77px;
@@ -706,10 +547,8 @@
   gap: 6px;
 }
 
-/* 21st follow-up: real dot size is 13px -- the glow (box-shadow) is
-   applied inline per-head in HowItWorks.jsx since it's a per-color
-   value, matching the real `rgba(color, alpha) 0 0 6px -1px` mockup
-   values. */
+/* 13px. The glow (box-shadow) is set inline per head -- it's a
+   per-color value. */
 .hiw-cnn-diagram__head-dot {
   width: 13px;
   height: 13px;
@@ -725,10 +564,8 @@
   white-space: nowrap;
 }
 
-/* 31st follow-up: real mockup color is a literal #a98866 (matching
-   .hiw-cnn-diagram__dims/__label-dims exactly), not --placeholder
-   (#6b5d4b, a real, confirmed-wrong substitution from an earlier
-   round that never checked this specific value against source). */
+/* Mockup color is a literal #a98866 (matching the dims lines), not
+   --placeholder. */
 .hiw-cnn-diagram__head-sub {
   font-weight: 400;
   color: #a98866;
@@ -790,34 +627,27 @@
   margin-top: 10px;
 }
 
-/* 26th follow-up: real mockup value -- the plain text spans ("root G",
-   "bass G", "notes: D + G + Bb") were relying on inherited color with no
-   explicit rule; mockup's real value is --muted (#a99c87, confirmed
-   exact). */
+/* Plain text spans -- mockup color is --muted (no explicit rule
+   before). */
 .hiw-chord-summary__label {
   color: var(--muted);
 }
 
-/* 26th follow-up: real mockup value is #4a3826 -- already exists as
-   --hiw-tag-border in this page's own token set, reused rather than
-   --placeholder (which live was using). */
+/* Mockup: #4a3826 -- reuses --hiw-tag-border. */
 .hiw-chord-summary__plus {
   color: var(--hiw-tag-border);
 }
 
-/* 26th follow-up: real mockup value is --border (#7d5b37), not --muted. */
+/* Mockup: --border. */
 .hiw-chord-summary__eq {
   color: var(--border);
 }
 
 .hiw-chord-summary__result {
   font-weight: 700;
-  /* 26th follow-up: real mockup values -- a dark scan-tinted background
-     (#132320, a genuine one-off not matching any existing token -- this
-     is a "live detection result" badge, matching the same scan-tinted
-     treatment this app already uses elsewhere, e.g. DetectionBadge) and
-     a full-opacity --scan border, not the translucent --scan-border
-     live was using. */
+  /* "Live detection result" badge -- a dark scan-tinted background
+     (#132320, one-off) and a full-opacity --scan border, same
+     treatment as DetectionBadge. */
   background: #132320;
   border: 1px solid var(--scan);
   border-radius: 6px;
@@ -825,31 +655,10 @@
 }
 
 /* -- Stage 4: mini fret diagrams -- */
-/* Phase 5 Part 7 (How It Works vertical rebuild session): a fixed
-   `repeat(4, 1fr)` was tuned for the illustration's own normal ~392px
-   container width (yielding a well-proportioned ~90.5px card, confirmed
-   via direct measurement) -- but the SAME fixed count at the narrow
-   (<=900px) breakpoint's own much-wider single-column container
-   previously forced a hardcoded drop to 2 columns, ballooning each card
-   to ~304x390px (a real ~3.4x size jump with no benefit -- the dots/
-   text stay the same fixed font-size, so a bigger card is just more
-   empty space below a chord's own real fret span, not better legibility;
-   confirmed via a real narrow-viewport screenshot before changing this).
-   Replaced with `auto-fit`/`minmax(90px, 1fr)` -- the column COUNT now
-   adapts to whatever width is actually available, keeping every card
-   close to its own already-proven ~90px ideal size at any container
-   width, rather than needing a hand-picked column count per breakpoint.
-   Confirmed via real measurement, not assumed: reproduces the existing
-   4-column desktop layout exactly at the illustration's normal 392px
-   width (90.5px cards, byte-for-byte the old fixed rule's own result),
-   and naturally grows to 6 columns at the narrow (700px viewport)
-   breakpoint's own wider ~618px single-column container -- real cards
-   there measure ~94.7x133px, essentially the same well-proportioned
-   size as the desktop cards, not the ~304x390px ballooned size the old
-   hardcoded 2-column override produced. The narrow-mode media query's
-   own now-redundant `repeat(2, 1fr)` override was removed (see below)
-   -- leaving it in would have silently defeated this rule at exactly
-   the one breakpoint it needed to work differently. */
+/* auto-fit / minmax(90px, 1fr) -- the column count adapts to available
+   width, keeping every card near its ~90px ideal at any container size.
+   Replaced a fixed `repeat(4, 1fr)` plus a hardcoded 2-column narrow
+   override that ballooned cards to ~304x390px. */
 .hiw-voicing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
@@ -867,23 +676,11 @@
   gap: 3px;
 }
 
-/* Phase 5 Part 7 (How It Works dot-fix session, follow-up): featured
-   cards previously used --scan only as a flat border/label color -- no
-   glow at all, which under-uses --scan's own defined role (SKILL.md:
-   the "detected/computed" accent, MEANT to glow, via the same soft-blur
-   mechanism as the .readout treatment's `text-shadow: 0 0 18px
-   var(--scan-dim)`, App.css). Reused that exact mechanism here as a
-   `box-shadow` instead of `text-shadow` -- same translucent --scan-dim
-   fill (0.14 alpha, the same token .readout uses for its own soft aura,
-   not the more opaque --scan-border already carrying the solid border
-   color, to avoid doubling up two visible-strength scan layers on the
-   same edge), blur radius scaled up from the two existing box-shadow
-   scan precedents for this component's own larger size: `.brand::before`
-   (App.css) glows an 8px dot with `0 0 8px 1px var(--scan-border)`;
-   these are ~90px cards, roughly 11x larger, so 12px (not a linear
-   11x scale-up, which would overwhelm the card) reads as a soft ambient
-   glow without dominating -- tuned and confirmed via a real screenshot,
-   not assumed from the ratio alone. */
+/* Featured cards: a soft --scan glow -- the .readout treatment's
+   soft-blur mechanism (text-shadow: 0 0 18px var(--scan-dim)) as a
+   box-shadow. --scan-dim (0.14 alpha) not the more opaque
+   --scan-border, to avoid two visible scan layers on the same edge.
+   12px blur tuned for a ~90px card. */
 .hiw-voicing-card--featured {
   border-color: var(--scan-border);
   background: linear-gradient(var(--brown-900), var(--brown-950));
@@ -1010,9 +807,8 @@
 .hiw-song-row__title {
   font-size: 11.5px;
   font-weight: 600;
-  /* 26th follow-up: real mockup value -- a dimmer literal (#e2d9c9),
-     the same one already used for CNN diagram labels, not the
-     full-bright --parchment token. */
+  /* Dimmer literal (#e2d9c9), the same as the CNN diagram labels, not
+     --parchment. */
   color: #e2d9c9;
   white-space: nowrap;
   overflow: hidden;
@@ -1023,21 +819,18 @@
   color: var(--scan);
 }
 
-/* 26th follow-up: real mockup value -- the matched chord within the
-   live row's chord list is bold, which `.readout` alone doesn't set. */
+/* Mockup: the matched chord in the live row's chord list is bold. */
 .hiw-song-row__chords-match {
   font-weight: 700;
 }
 
-/* 26th follow-up: real mockup value is --border (#7d5b37), not
-   --placeholder, confirmed for both the regular rows and the live-
-   result row (identical in the mockup source). */
+/* Mockup: --border (not --placeholder), both regular and live rows. */
 .hiw-song-row__artist {
   font-size: 10px;
   color: var(--border);
 }
 
-/* 26th follow-up: real mockup value is a one-off #8a6b42, not --muted. */
+/* Mockup: a one-off #8a6b42. */
 .hiw-song-row__chords {
   font-family: var(--mono);
   font-size: 8.5px;
@@ -1080,10 +873,8 @@
   color: var(--brown-950);
 }
 
-/* 26th follow-up: real mockup value is plain --brass, no glow --
-   previously used the shared `.readout` class (scan + glow), which
-   doesn't match the mockup here (unlike the song-row's matched-chord
-   highlight, this formula line isn't a "detected" value). */
+/* Plain --brass, no glow -- not .readout (this formula line isn't a
+   detected value). */
 .hiw-chromatic-formula {
   font-family: var(--mono);
   font-size: 9px;
@@ -1092,29 +883,10 @@
 }
 
 @media (max-width: 900px) {
-  /* REAL BUG FOUND + FIXED, Phase 5 Part 7 (How It Works vertical
-     rebuild session): this block collapsed illustration/number/text to
-     one grid-column but never overrode the base rule's shared
-     `grid-row: 1` (added in an earlier follow-up specifically to force
-     wide-layout stages onto one row -- see that rule's own comment,
-     around line 210) -- so at narrow widths all 3 children stayed
-     stacked in the SAME single grid cell, overlapping outright. Confirmed
-     via real getBoundingClientRect overlap checks on all 6 stages at
-     700px (every one overlapped, not just this session's own Voicing
-     Lookup stage), and visually via a real screenshot showing the stage
-     4 text panel floating in the middle of the voicing-card grid. Found
-     while testing THIS session's own required narrow-breakpoint check
-     (the Voicing Lookup illustration's own much-increased vertical
-     scroll-length at narrow widths, from 8 real vertical fretboard
-     cards, is what made the pre-existing bug dramatically visible enough
-     to catch -- the other 5 stages had the identical bug, just with
-     shorter illustrations that made the overlap easy to miss in a plain
-     screenshot review). Fixed with explicit distinct rows, matching
-     natural reading order (marker, then image, then description) --
-     the marker's own number is otherwise redundant with the text
-     heading's own "N · Stage Name" (confirmed via source), so this
-     ordering is a reasonable default, not a load-bearing content
-     decision. */
+  /* This block collapses to one column but must also override the base
+     `grid-row: 1` (above) -- otherwise all 3 children stay in the same
+     single grid cell and overlap. Explicit rows: marker, then image,
+     then text. */
   .hiw-stage,
   .hiw-stage--reverse {
     grid-template-columns: 1fr;
@@ -1142,10 +914,6 @@
   .hiw-pipeline__spine {
     left: 22px;
   }
-  /* .hiw-voicing-grid's own hardcoded 2-column override REMOVED here --
-     its base rule now uses auto-fit/minmax (see that rule's own comment),
-     which already adapts correctly at this breakpoint's own wider
-     single-column container without needing a fixed count forced on top
-     of it; leaving the old override in would have silently defeated the
-     new rule at exactly this breakpoint, the one place it needed to work. */
+  /* .hiw-voicing-grid's base rule (auto-fit/minmax) already adapts at
+     this breakpoint -- no fixed column count forced here. */
 }

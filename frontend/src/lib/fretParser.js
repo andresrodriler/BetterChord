@@ -4,31 +4,50 @@ import { getIntervalStyle } from './intervalColors'
 // Converts one voicing object from /voicings/{chord} (e.g.
 // { frets: "8-10-10-9-8-8", base_fret: 8, barres: [1] }) into the `Chord`
 // shape svguitar's .chord() expects, plus the fret-window size the caller
-// should pass to .configure({ frets }).
+// passes to .configure({ frets }).
 //
-// Our frets string is ordered low E -> high e (index 0..5). svguitar numbers
-// strings 1..6 purely by array index (confirmed by reading svguitar's own
-// source during the Phase 3 Part 2 follow-up spike -- string x-position
-// comes from stringXPos()/toArrayIndex(), nothing else), so right-handed
-// puts string 1 = high e (stringNumber = 6 - index) and left-handed simply
-// reverses that mapping (stringNumber = index + 1) -- no SVG transforms or
-// library changes needed for the mirror. barres[] values are already
-// position-relative local fret numbers (base_fret=8, barres=[1] means
-// actual fret 8) so they pass through unchanged in the non-open path.
+// Our frets string is ordered low E -> high e (index 0..5). svguitar
+// numbers strings 1..6 purely by array index, so right-handed puts
+// string 1 = high e (stringNumber = 6 - index) and left-handed reverses
+// that (stringNumber = index + 1) -- no SVG transforms needed for the
+// mirror. barres[] values are position-relative local fret numbers, so
+// they pass through unchanged.
 const MIN_FRET_WINDOW = 5
 
-// Shared by voicingToChord (the simple single-window renderer) AND
-// needsCapoAttachment (below) -- both need the same "how many frets would
-// a plain, non-attached window need to show every note" number, and having
-// two separate copies of this calc is exactly how the 8th-follow-up bug
-// happened (see needsCapoAttachment's comment). One implementation.
+// computeHighestLocalFret (defined below) is shared by voicingToChord and
+// needsCapoAttachment -- both need the same "how many frets would a plain
+// window need to show every note" number, and keeping one copy prevents
+// the two from drifting.
 //
-// Takes an explicit `position` (Phase 5 Part 7, follow-up 2) rather than
-// re-deriving it from `base_fret` internally -- needed once `position` can
-// legitimately differ from `base_fret` (nut-anchoring, see voicingToChord's
-// own `nutAnchor` below). Callers that don't nut-anchor (needsCapoAttachment,
-// always Capo-only) just pass the same `baseFret > 1 ? baseFret : 1` value
-// this function used to compute on its own -- no behavior change for them.
+// It takes an explicit `position` rather than deriving it from `base_fret`,
+// since `position` can legitimately differ from `base_fret` under nut-
+// anchoring (see voicingToChord's `nutAnchor`). Capo-only callers just
+// pass `baseFret > 1 ? baseFret : 1`.
+
+// The fret-distance from an open string to the nearest fretted note past
+// which openStringGap() is worth showing -- an informational mirror of
+// the "Capo: N" field for the analogous "far from the fretted cluster"
+// case. Open strings are never windowed the way a capo is, so nothing
+// clips; this is display text only, not a rendering change. Threshold
+// picked against voicings.db: a small minority of open-string rows exceed
+// a 6-fret gap, matching the same "far" bar used for capo.
+const OPEN_STRING_GAP_THRESHOLD = 6
+
+// Fret-distance between an open string and the nearest edge of this
+// voicing's fretted cluster, or null when there's no open string, no
+// fretted cluster (all-open chord), or the gap doesn't clear
+// OPEN_STRING_GAP_THRESHOLD. The value is the cluster's lowest absolute
+// fret -- how far a player reaches past the nut, the same single-number
+// idea the capo field conveys.
+export function openStringGap(voicing) {
+  const positions = voicing.frets.split('-')
+  if (!positions.includes('0')) return null
+  const fretted = positions.filter((p) => p !== 'X' && p !== 'x' && p !== '0').map((p) => parseInt(p, 10))
+  if (fretted.length === 0) return null
+  const gap = Math.min(...fretted)
+  return gap > OPEN_STRING_GAP_THRESHOLD ? gap : null
+}
+
 function computeHighestLocalFret(voicing, position) {
   const { frets } = voicing
   const positions = frets.split('-')
@@ -44,60 +63,33 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
   const { frets, base_fret: baseFret, barres, intervals, notes } = voicing
   const positions = frets.split('-')
 
-  // Window sizing (Phase 3 Part 5/6, 4th follow-up -- real bug found while
-  // testing Part 4, not what the task's own bug report hypothesized).
-  // REVERTED (Phase 3 Part 2, second follow-up) then RE-INTRODUCED here in
-  // a narrower form: the Part 2 revert was specifically about NOT widening
-  // the window to include the nut just because a string happens to be
-  // open (that reasoning still holds, unchanged -- open strings are still
-  // marked via the "O" marker regardless of window position, see below).
-  // This is a DIFFERENT problem: a fixed 5-fret window is too narrow for
-  // the voicing's own FRETTED notes on their own terms, independent of any
-  // open string. Measured directly against the real db, not assumed: 1068
-  // of 1596 real Capo-type rows (67%) and 107 of 41918 Other rows span
-  // MORE than 5 frets from their own base_fret -- e.g. real row
-  // frets="8-X-14-12-13-8", base_fret=8 needs local frets up to 7, but the
-  // fixed window only showed 1-5, silently clipping 2 of the voicing's 5
-  // notes off the visible diagram entirely (confirmed via real DOM
-  // inspection: only 3 of 5 expected <circle> elements rendered on-screen
-  // for that exact row). This is what Part 4's "modal says the 5th is
-  // included but no dot shows it" symptom actually traces back to in the
-  // cases checked -- not literally about capo-BAR-sounded notes
-  // specifically (those, at local fret 1, were already always inside any
-  // window >=1 wide) -- see CLAUDE.md for the full trace.
-  // Fix: window grows to fit the voicing's own highest LOCAL fret when it
-  // exceeds 5, never shrinks below 5 (keeps every existing voicing's
-  // rendering pixel-identical to before). This does NOT reintroduce the
-  // Part 2 stretch-distortion bug -- that bug came from forcing every
-  // card to the SAME fixed pixel size via `preserveAspectRatio="none"`
-  // regardless of the SVG's real proportions; here, FretboardDiagram.jsx
-  // instead reads each voicing's own real rendered aspect ratio after
-  // draw() and sizes its container to match, so "meet" scaling (already
-  // in use, never "none") fills the container correctly at whatever
-  // window size this specific voicing actually needs, no stretch either way.
+  // Window sizing. A fixed 5-fret window is too narrow for many voicings'
+  // own FRETTED span (independent of any open string): plenty of real
+  // Capo-type and Other rows span more than 5 frets from their base_fret --
+  // e.g. frets="8-X-14-12-13-8", base_fret=8 needs local frets up to 7,
+  // and a fixed 1-5 window silently clips notes off the diagram. The
+  // window grows to fit the voicing's own highest LOCAL fret when it
+  // exceeds 5, never shrinks below 5. This does not stretch/distort cards:
+  // FretboardDiagram.jsx reads each voicing's real rendered aspect ratio
+  // after draw() and sizes its container to match, so "meet" scaling fills
+  // the container at whatever window size this voicing needs.
   //
-  // Nut-anchoring (Phase 5 Part 7, follow-up 2): a non-Capo voicing whose
-  // own base_fret is 1 or 2 gets its window anchored to the real nut
-  // (position 1) instead of its own base_fret -- a base_fret=2 voicing
-  // like D's X-X-0-2-3-2 previously showed a "2fr" window starting one
-  // fret below the nut, with the open D marked separately above it, which
-  // reads as an arbitrary offset rather than "this is basically a nut
-  // chord." Deliberately EXCLUDES Capo-type voicings: `base_fret ===
-  // capo` is a structural invariant there (see CLAUDE.md's Part 2 --
-  // local fret 1 IS the capo's own fret for every real Capo-type row), so
-  // nut-anchoring a Capo row would show real fret space BEHIND the capo,
-  // which is wrong -- the capo bar's own position is what's meant to
-  // anchor that diagram, not the literal nut. base_fret===1 rows are
-  // unaffected either way (already nut-anchored under the pre-existing
-  // `baseFret > 1 ? baseFret : 1` logic below).
-  // Real data checked before choosing the threshold (2), not guessed: of
-  // 5142 real non-Capo base_fret===2 rows, only 9 (~0.18%) have a note
-  // past real fret 6 -- confirmed via a direct query against
-  // voicings.db, not estimated. The window still needs to grow for those
-  // 9 (computeHighestLocalFret, below, already handles this the same way
-  // it already handles today's wide-span voicings -- letterboxed via the
-  // shared aspect-ratio mechanism, never clipped), it just can't be
-  // hardcoded to a strict 1-5 span for every base_fret===2 row.
+  // The window is NOT widened just to reach an open string -- open strings
+  // are marked with the "O" marker regardless of where the window starts
+  // (see the fretNum === 0 branch below).
+  //
+  // Nut-anchoring: a non-Capo voicing with base_fret 1 or 2 anchors its
+  // window to the real nut (position 1) instead of its own base_fret --
+  // a base_fret=2 shape like D's X-X-0-2-3-2 otherwise renders a "2fr"
+  // window starting one fret below the nut, reading as an arbitrary offset
+  // rather than "basically a nut chord." Excludes Capo-type voicings:
+  // base_fret === capo is a structural invariant there (local fret 1 IS
+  // the capo's fret), so nut-anchoring a Capo row would show fret space
+  // behind the capo. base_fret===1 rows are already nut-anchored by the
+  // `baseFret > 1 ? baseFret : 1` fallback below.
+  // Threshold is 2 because almost no non-Capo base_fret===2 row has a note
+  // past fret 6; the rare ones still grow the window via
+  // computeHighestLocalFret (letterboxed, never clipped).
   const nutAnchor = voicing.type !== 'Capo' && baseFret <= 2
   const position = nutAnchor ? 1 : baseFret > 1 ? baseFret : 1
   const highestLocalFret = computeHighestLocalFret(voicing, position)
@@ -106,59 +98,41 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
   const unmutedIndexes = []
 
   // `intervals` (and `notes`) arrive ordered per-unmuted-string, in the
-  // same left-to-right order as `frets` itself (confirmed against real
-  // live /voicings responses, not just the sample CSV -- Phase 3 Part 5/6
-  // task instructions required this be re-checked against real data, not
-  // assumed to still hold). So the Nth non-muted position here lines up
-  // with intervals[N] -- tracked via a running counter, not `index`
-  // (which also counts muted strings that intervals[] skips entirely).
+  // same left-to-right order as `frets`. So the Nth non-muted position
+  // here lines up with intervals[N] -- tracked via a running counter, not
+  // `index` (which also counts muted strings that intervals[] skips).
   let unmutedCount = 0
 
   positions.forEach((pos, index) => {
     const stringNumber = leftHanded ? index + 1 : 6 - index
     if (pos === 'X' || pos === 'x') {
-      // 24th follow-up: explicit strokeWidth override so the mute
-      // marker's own X keeps its original 2px weight -- it reads from
-      // svguitar's general `strokeWidth` setting by default (confirmed
-      // in svguitar's own source), which the nut/grid-hierarchy fix in
-      // FretboardDiagram.jsx just dropped to 1px for regular fret/string
-      // lines. Mute-marker rendering itself is explicitly out of scope
-      // for that fix, so this keeps it unaffected.
+      // Explicit strokeWidth so the mute marker's X keeps 2px weight --
+      // it otherwise reads from svguitar's general `strokeWidth`, which
+      // FretboardDiagram.jsx sets to 1px for regular fret/string lines.
       fingers.push([stringNumber, 'x', { strokeWidth: 2 }])
       return
     }
     unmutedIndexes.push(index)
     const interval = intervals && intervals[unmutedCount]
-    // Dot TEXT is the note name (Phase 3 Part 5/6 follow-up) -- always
-    // <=2 characters ("C", "F#", "Bb", ...), which is what actually fixes
-    // the overflow bug (some interval labels, e.g. "maj7"/"dim7", didn't
-    // fit the dot at all). Dot COLOR still encodes the interval bucket
-    // via `interval`/getIntervalStyle -- only the label changed, not the
-    // color logic.
+    // Dot TEXT is the note name -- always <=2 chars ("C", "F#", "Bb"),
+    // unlike some interval labels ("maj7"/"dim7") that don't fit the dot.
+    // Dot COLOR still encodes the interval bucket via getIntervalStyle.
     const noteName = notes && notes[unmutedCount]
     unmutedCount += 1
     const fretNum = parseInt(pos, 10)
     const style = interval ? getIntervalStyle(interval, formula) : null
 
     if (fretNum === 0) {
-      // Open strings (Phase 3 Part 5/6, 4th follow-up): now get the SAME
-      // interval-bucket color and note-letter text as fretted notes,
-      // rendered as a hollow ring rather than a solid dot -- svguitar's
-      // drawEmptyStringIndicators() already draws the "O" with `fill:
-      // undefined` (hollow by construction, confirmed in its source) and
-      // independently respects fingerOptions.strokeColor/textColor/text
-      // the exact same way drawFinger does for fretted dots -- no new
-      // rendering path needed, just supplying the same options object.
-      // Text renders ABOVE the ring (svguitar's own fixed layout for
-      // empty-string indicators), not inside it -- distinct from a
-      // fretted dot's centered text, which is itself part of what makes
-      // an open note read as "open" rather than "fretted."
-      // BUGFIX (5th follow-up): textColor here used to reuse `style.text`
-      // (the SOLID-fill-paired color, dark for most buckets) -- wrong for
-      // a hollow ring whose real background is the dark diagram well, not
-      // the (transparent) fill. Uses `style.openText` (always light)
-      // instead -- see intervalColors.js for why this can't just be the
-      // per-bucket `text` value.
+      // Open strings get the same interval-bucket color and note-letter
+      // text as fretted notes, but as a hollow ring: svguitar's
+      // drawEmptyStringIndicators() draws the "O" with no fill and
+      // respects fingerOptions.strokeColor/textColor/text the same way
+      // drawFinger does, so no new rendering path is needed. Text renders
+      // ABOVE the ring (svguitar's fixed layout for empty strings), which
+      // is part of what makes an open note read as "open" not "fretted".
+      // textColor uses style.openText (always light), not style.text: the
+      // ring's real background is the dark diagram well, not the
+      // transparent fill -- see intervalColors.js.
       if (style) {
         fingers.push([
           stringNumber,
@@ -174,34 +148,20 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
         fingers.push([stringNumber, 0])
       }
     } else {
-      // Derived from `position`, not `baseFret`, directly -- see
-      // `position`'s own comment above for why these can now legitimately
-      // differ (nut-anchoring). This is mathematically identical to the
-      // old `baseFret > 1 ? fretNum - baseFret + 1 : fretNum` for every
-      // row that ISN'T nut-anchored (position === baseFret there, or both
-      // are 1), so no behavior change for Capo/base_fret>2 rows.
+      // Derived from `position`, not `baseFret` -- see `position`'s
+      // comment for why they differ under nut-anchoring. Identical to
+      // `fretNum - baseFret + 1` for any non-nut-anchored row.
       const localFret = fretNum - position + 1
-      // Capo-sounded notes (Phase 3 Part 5/6, 4th follow-up; repositioning
-      // logic removed in the 5th follow-up's mini pass, see below): for
-      // Capo-type voicings specifically, a string at local fret 1 sounds
-      // because the capo bars across it, not an individual finger --
-      // confirmed structurally (never contradicted in real data: the
-      // established capo===base_fret invariant, see CLAUDE.md Part 2,
-      // means local fret 1 IS the capo's own fret for every real
-      // Capo-type row). Rendered with the same color/text as any other
-      // fretted note (still fully legible as "this note, this interval"),
-      // but as a SQUARE instead of a circle -- svguitar's native
-      // FingerOptions.shape, not a hand-rolled SVG shape -- so it can't be
-      // confused for either an individually-fretted note (circle) or a
-      // true open string (hollow ring). Must Know/Other voicings are
-      // completely unaffected -- this only ever fires on
-      // voicing.type === 'Capo', the same authoritative gate
-      // FretboardDiagram.jsx's capo-bar drawing already uses.
-      // These squares stay at their natural, un-repositioned mid-cell
-      // position -- FretboardDiagram.jsx's capo indicator is now a full
-      // BAR spanning the entire fret-1 column (not a thin boundary line),
-      // so a square sitting at that column's normal center already reads
-      // correctly as "inside the capo bar," no relocation needed.
+      // Capo-sounded notes: for Capo-type voicings, a string at local
+      // fret 1 sounds because the capo bars it, not a finger (the
+      // capo === base_fret invariant means local fret 1 IS the capo's
+      // fret). Rendered same color/text as any fretted note but as a
+      // SQUARE (svguitar's FingerOptions.shape), so it reads as neither an
+      // individually-fretted note (circle) nor an open string (hollow
+      // ring). Only fires on voicing.type === 'Capo'. The square sits at
+      // its natural mid-cell position; FretboardDiagram.jsx's capo
+      // indicator is a full bar spanning the fret-1 column, so it already
+      // reads as "inside the capo bar."
       const isCapoSoundedNote = voicing.type === 'Capo' && localFret === 1
       if (style) {
         fingers.push([
@@ -218,34 +178,22 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
           },
         ])
       } else {
-        // No interval data for this string (shouldn't happen against real
-        // data, but don't let a gap crash the render) -- falls back to
-        // the plain, uncolored dot from before this change.
+        // No interval data for this string (not expected in real data) --
+        // fall back to a plain uncolored dot rather than crashing.
         fingers.push([stringNumber, localFret])
       }
     }
   })
 
-  // Barre endpoints -- root-caused during the Phase 3 Part 2 follow-up
-  // review (real bug: left-handed barres rendered floating in the wrong
-  // place, not tracking the mirrored strings). svguitar's barre renderer
-  // does NOT sort fromString/toString itself -- it draws a rectangle
-  // starting at fromString's position and extending by
-  // |toString - fromString| in a fixed direction, trusting the caller's
-  // order. Confirmed by reading its source (drawBarre in svguitar.es5.js):
-  // it computes `fromStringX = stringXPositions[toArrayIndex(fromString)]`
-  // and extends from there, no swap/sort. Right-handed's mapping
-  // (stringNumber = 6 - index) happens to always produce
-  // fromString > toString for our low-to-high-index span, which satisfies
-  // the renderer's implicit assumption -- that's why right-handed barres
-  // were already correct. Left-handed's mapping (stringNumber = index + 1)
-  // reverses the direction, producing fromString < toString instead --
-  // same physical span, but now on the wrong side of that assumption, so
-  // the rectangle started from the wrong endpoint. Fix: always assign
-  // fromString/toString by numeric value (max/min), not by which data
-  // index (min or max) they came from -- this preserves the already-
-  // correct right-handed order and corrects left-handed's without a
-  // handedness-specific branch.
+  // Barre endpoints. svguitar's barre renderer does NOT sort
+  // fromString/toString -- it draws a rectangle from fromString's
+  // position extending by |toString - fromString| in a fixed direction,
+  // trusting caller order. Right-handed's mapping (6 - index) happens to
+  // produce fromString > toString; left-handed's (index + 1) reverses
+  // that, which anchored the rectangle to the wrong endpoint. Assigning
+  // fromString/toString by numeric value (max/min) rather than by data
+  // index keeps right-handed correct and fixes left-handed, with no
+  // handedness branch.
   const chordBarres = (barres || [])
     .map((fret) => {
       const fromDataIndex = Math.min(...unmutedIndexes)
@@ -257,32 +205,21 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
         fromString: Math.max(a, b),
         toString: Math.min(a, b),
         fret,
-        // Refined barre styling: brass-tinted at partial opacity instead of
-        // svguitar's hardcoded solid-black rectangle fill (confirmed in
-        // source -- the RECTANGLE barre style's fill color is hardcoded to
-        // the literal string 'black', ignoring fingerColor/any config
-        // entirely; only the ARC style respects a themeable color, which is
-        // why FretboardDiagram switches barreChordStyle to ARC). Same hue
-        // as the finger dots (brass), lower opacity so it reads as part of
-        // the theme rather than a flat block.
+        // Brass-tinted at partial opacity. svguitar's RECTANGLE barre
+        // fill is hardcoded to 'black' (ignores all config); only the ARC
+        // style respects a themeable color, which is why FretboardDiagram
+        // sets barreChordStyle to ARC. Same brass hue as the finger dots,
+        // lower opacity so it reads as theme, not a flat block.
         color: 'rgba(200, 155, 92, 0.55)',
       }
     })
     .filter((barre) => {
-      // Capo/barre coincidence suppression: within Capo-type voicings
-      // only (never Must Know/Other -- those keep every real barre
-      // exactly as before), drop a barre whose ABSOLUTE fret is the same
-      // as the capo's fret. Real example: chord C, base_fret=5,
-      // barres=[1], capo=5, type="Capo" -- barre.fret is a LOCAL fret
-      // (relative to `position`, same convention as fingers' localFret
-      // above), so its absolute fret is `position + barre.fret - 1` =
-      // 5 + 1 - 1 = 5, matching capo=5 exactly. The capo bar drawn in
-      // FretboardDiagram already stands in for a barre at that fret, so
-      // drawing the barre arc on top of/next to it would be redundant --
-      // the capo line alone is the correct representation. A barre at a
-      // DIFFERENT absolute fret than the capo is left untouched (both
-      // render independently), and only the specific coinciding barre(s)
-      // are dropped if a voicing ever has more than one.
+      // Capo/barre coincidence suppression: for Capo-type voicings only,
+      // drop a barre whose ABSOLUTE fret equals the capo's fret (e.g.
+      // base_fret=5, barres=[1], capo=5 -> absolute fret
+      // position + barre.fret - 1 = 5). FretboardDiagram's capo bar
+      // already stands in for a barre at that fret, so the arc would be
+      // redundant. A barre at a different fret renders normally.
       if (voicing.type !== 'Capo') return true
       const absoluteFret = position + barre.fret - 1
       return absoluteFret !== voicing.capo
@@ -297,59 +234,29 @@ export function voicingToChord(voicing, { leftHanded = false, formula = null } =
 }
 
 // ---------------------------------------------------------------------------
-// Wide-gap capo attachment -- for a Capo-type voicing whose individually-
-// fretted notes sit far above the capo, a single continuous window
-// technically shows every note correctly, but stretches to unrealistic
-// proportions with a huge empty middle -- real example, chord E:
-// frets="12-X-14-13-12-4", base_fret=4, capo=4 needs an 11-fret window to
-// show one note at local fret 1 and a cluster at local frets 9-11, with 7
-// entirely empty columns between them (confirmed via a real screenshot).
+// Wide-gap capo attachment -- for a Capo-type voicing whose fretted notes
+// sit far above the capo, a single continuous window shows every note but
+// stretches to unrealistic proportions with a huge empty middle (e.g.
+// chord E frets="12-X-14-13-12-4", base_fret=4, capo=4 needs an 11-fret
+// window for one note at local fret 1 and a cluster at 9-11).
 //
-// HISTORY (this went through a few iterations): first fix was rendering
-// TWO separate <svg> elements side by side (a narrow capo box + a
-// cluster box). Real feedback on that: it looked like a detached
-// sub-widget, caused floating "X" markers, inconsistent scaling between
-// the two independent svguitar instances, and label collisions. This
-// version renders exactly ONE <svg>/grid -- the cluster window only, with
-// off-cluster strings OMITTED from svguitar's own fingers array entirely
-// (confirmed via direct testing that an omitted string still draws its
-// own string LINE but gets no auto X-mark from svguitar -- so the grid
-// still reads as a real 6-string fretboard, just with blank rows for
-// off-cluster strings) so FretboardDiagram.jsx can draw its own X/O
-// markers and the capo bar in a hand-extended left margin, fully
-// controlling spacing so nothing ever collides.
+// Rendered as exactly ONE <svg>/grid -- the cluster window only -- with
+// off-cluster strings omitted from svguitar's fingers array entirely. An
+// omitted string still draws its string LINE but gets no auto X-mark, so
+// the grid still reads as a 6-string fretboard, and FretboardDiagram.jsx
+// draws its own X/O markers and the capo bar in a hand-extended left
+// margin where it fully controls spacing.
 // ---------------------------------------------------------------------------
 
-// BUGFIX (8th follow-up): this used to trigger only off the gap between
-// the capo and its NEAREST individually-fretted note (`WIDE_GAP_THRESHOLD`,
-// 5) -- real, confirmed-inconsistent bug, not a hypothetical. Real
-// example that exposed it: Emaj9's Capo-4 row `frets="X-7-9-11-4-4"` has
-// its nearest cluster note only 2 frets above the capo (gap=2, well under
-// the old threshold, so it rendered as one plain continuous window) --
-// but the CLUSTER ITSELF spans local frets 4 through 8, so that "plain"
-// window still had to stretch to 8 frets wide, looking exactly as
-// zoomed-out/unrealistic as the cases the gap check WAS catching (real
-// screenshot comparison: this row and Emaj9's Capo-7 row
-// `frets="X-7-13-13-12-14"`, also gap<=5 but a 6-8 local-fret span, both
-// rendered as an oversized plain window sitting right next to OTHER
-// Capo rows on the very same chord that correctly got the attached
-// treatment). The gap-only check assumed a cluster is always compact
-// once you're past the nearest note -- true for most rows, but false
-// often enough (measured directly against the real db, not guessed: of
-// 1596 real Capo-type rows, spans of 7+ frets are 42% of all rows, not
-// the ~9% the old gap-based measurement implied) that leaving it
-// unfixed meant near-identical-looking voicings on the same chord
-// rendered by two visibly different rules with no way to predict which.
-// Fixed by triggering off the SAME "how wide would a plain window need
-// to be" number voicingToChord itself already computes
-// (computeHighestLocalFret, shared above so the two can't drift again),
-// not the gap to the nearest note. MAX_SPAN_BEFORE_ATTACH=6 (attach when
-// the plain window would need to exceed 6 frets) was picked directly
-// against the real per-chord test case that prompted this fix: Emaj9's
-// span-7 Capo-7 row and span-9 Capo-4 row both needed to newly attach
-// (confirmed correct after this fix), while its span-5/span-6 Capo rows
-// -- already rendering compactly and correctly -- needed to stay
-// unattached, and did.
+// Attachment triggers off "how wide would a plain window need to be"
+// (computeHighestLocalFret, shared above), NOT the gap to the nearest
+// fretted note. Gap alone is wrong: a cluster whose nearest note is close
+// to the capo can still span wide on its own (e.g. Emaj9's
+// frets="X-7-9-11-4-4" has gap 2 but the cluster spans local frets 4-8),
+// so a gap-based check left near-identical voicings on one chord
+// rendering by two different rules. Roughly 40% of real Capo-type rows
+// span 7+ frets. MAX_SPAN_BEFORE_ATTACH=6: attach when the plain window
+// would exceed 6 frets.
 const MAX_SPAN_BEFORE_ATTACH = 6
 
 // True when this voicing's diagram would otherwise render as a plain
@@ -367,24 +274,18 @@ export function needsCapoAttachment(voicing) {
     .map((p) => parseInt(p, 10) - baseFret + 1)
   const clusterFrets = localFrets.filter((l) => l > 1)
   if (clusterFrets.length === 0) return false
-  // Capo-only by construction (the early return above), so never
-  // nut-anchored -- same `baseFret > 1 ? baseFret : 1` position
-  // computeHighestLocalFret used to derive internally before it took an
-  // explicit `position` param.
+  // Capo-only by construction (early return above), so never nut-anchored
+  // -- pass the plain `baseFret > 1 ? baseFret : 1` position.
   return computeHighestLocalFret(voicing, baseFret > 1 ? baseFret : 1) > MAX_SPAN_BEFORE_ATTACH
 }
 
 // Builds the ONE Chord config for the cluster window, plus a list of
-// every off-cluster string FretboardDiagram.jsx needs to draw itself (as
-// an X or square marker in the hand-extended left margin, next to the
-// capo bar). A string is off-cluster for one of two reasons: it's
-// genuinely muted (never played in this voicing at all -- kind: 'muted',
-// drawn as X), or it's capo-sounded (sounds because the capo bars it, no
-// individual finger needed -- kind: 'capo', drawn as a solid colored
-// SQUARE -- matching the SAME square convention the normal/small-gap
-// path already uses for capo-sounded notes inside its own grid, per real
-// feedback that the two capo treatments should look consistent with each
-// other rather than each inventing its own visual language).
+// off-cluster strings FretboardDiagram.jsx draws itself (X or square
+// marker in the hand-extended left margin, next to the capo bar). A
+// string is off-cluster if it's genuinely muted (kind: 'muted', drawn as
+// X) or capo-sounded (kind: 'capo', drawn as a solid colored SQUARE --
+// the same square convention the small-gap path uses inside its own
+// grid, so the two capo treatments look consistent).
 export function voicingToClusterChord(voicing, { leftHanded = false, formula = null } = {}) {
   const { frets, base_fret: baseFret, barres, intervals, notes, capo } = voicing
   const positions = frets.split('-')
@@ -396,22 +297,11 @@ export function voicingToClusterChord(voicing, { leftHanded = false, formula = n
     .filter((fretNum) => fretNum - baseFret + 1 > 1)
   const clusterMinAbs = Math.min(...clusterAbsoluteFrets)
   const clusterMaxAbs = Math.max(...clusterAbsoluteFrets)
-  // Phase 5 Part 7, follow-up (this round): REVERTED back to the
-  // MIN_FRET_WINDOW floor -- the immediately-prior follow-up's removal
-  // of it was a real, confirmed miscommunication, not a correction.
-  // Dropping the floor entirely didn't just trim unused visual space --
-  // it cut real CONTENT: the repro voicing (D, Capo 2,
-  // `10-X-12-11-10-2`) went from showing all 5 real fret rows (10-14)
-  // down to only 3 (10-12), a genuine reduction in what the diagram
-  // displays, not a rendering-only tightening. What was actually asked
-  // for was the SAME content rendered bigger within its existing box
-  // (padding/scale-to-fit slack), not fewer rows. Restored to
-  // `Math.max(MIN_FRET_WINDOW, ...)`, matching `voicingToChord`'s own
-  // window (above) exactly -- every split-view Capo voicing is back to
-  // its full original span, same as two rounds ago. See this round's
-  // own CLAUDE.md entry for whether any REAL rendering-layer slack
-  // (distinct from this content-window question) was found once the
-  // window was restored.
+  // Floored at MIN_FRET_WINDOW, matching voicingToChord's own window.
+  // Dropping the floor cut real content: e.g. D Capo 2 `10-X-12-11-10-2`
+  // would show only fret rows 10-12 instead of the full 10-14. The
+  // cluster box is made bigger by scaling to fit, not by showing fewer
+  // rows.
   const clusterWindow = Math.max(MIN_FRET_WINDOW, clusterMaxAbs - clusterMinAbs + 1)
 
   const fingers = []
@@ -436,11 +326,9 @@ export function voicingToClusterChord(voicing, { leftHanded = false, formula = n
     const fretNum = parseInt(pos, 10)
     const style = interval ? getIntervalStyle(interval, formula) : null
 
-    // Capo-type rows never have a literal open string in real data
-    // (confirmed via a direct query, zero exceptions -- see CLAUDE.md),
-    // but handled defensively rather than assumed: treated the same as
-    // a genuine mute for this purpose (neither the cluster nor the capo
-    // bar is where an actual open string would belong).
+    // Capo-type rows never have a literal open string in real data, but
+    // handle it defensively -- treat it as a mute (it belongs to neither
+    // the cluster nor the capo bar).
     if (fretNum === 0) {
       offClusterStrings.push({ stringNumber: str, kind: 'muted' })
       return
@@ -481,16 +369,13 @@ export function voicingToClusterChord(voicing, { leftHanded = false, formula = n
     }
   })
 
-  // Barres -- same fromString/toString logic as voicingToChord's (see its
-  // own comment above for why max/min, not data-index order), recomputed
-  // relative to the cluster's own new position and only kept if they
-  // actually fall within the cluster's window. Checked against real data
-  // first: every real wide-gap voicing's barre sits exactly AT the capo's
-  // own fret (dropped here since it's outside the cluster window by
-  // construction, same effective outcome as the single-window renderer's
-  // explicit capo-coincidence suppression), so in practice this ends up
-  // empty, but implemented for real rather than left silently broken if a
-  // genuine cluster barre ever appears in future data.
+  // Barres -- same fromString/toString logic as voicingToChord (see its
+  // comment for why max/min), recomputed relative to the cluster's
+  // position and kept only if they fall within the cluster window. In
+  // real data every wide-gap voicing's barre sits at the capo's fret, so
+  // it's dropped here (outside the cluster window) and this ends up
+  // empty -- but the remap is implemented for a future genuine cluster
+  // barre.
   const originalPosition = baseFret > 1 ? baseFret : 1
   const fromDataIndex = Math.min(...unmutedIndexes)
   const toDataIndex = Math.max(...unmutedIndexes)

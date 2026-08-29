@@ -185,6 +185,17 @@
   display: flex;
   align-items: center;
   gap: 9px;
+  transition: color 0.15s ease;
+}
+
+/* Dump Notes item #22: the home-link title had zero hover signal at all
+   beyond the browser's default link cursor. "Better" (the non-accent
+   half) shifts to brass on hover -- same "you can click this" color
+   already used for nav-link hover just above -- and the logo's own scan
+   dot brightens its glow, giving the whole lockup one combined response
+   rather than a single flat color swap. */
+.brand:hover {
+  color: var(--brass);
 }
 
 .brand__accent {
@@ -200,6 +211,11 @@
   border-radius: 50%;
   background: var(--scan);
   box-shadow: 0 0 8px 1px var(--scan-border);
+  transition: box-shadow 0.15s ease;
+}
+
+.brand:hover::before {
+  box-shadow: 0 0 10px 2px var(--scan-border);
 }
 
 /* Site-wide handedness toggle -- pill treatment matching .tag/.badge, but

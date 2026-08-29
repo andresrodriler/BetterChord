@@ -33,58 +33,23 @@
   padding-left: 40px;
 }
 
-/* Phase 5 Part 6/7, 6th follow-up: real audit findings, scoped to Home's
-   full-size CapturePanel specifically -- the only size variant actually
-   checked against a mockup this round (mini/compact are unverified,
-   left untouched rather than guessed at). paddingLeft is deliberately
-   NOT touched here -- that 40px reserves room for .manual-search__icon,
-   a real, working layout need the mockup's own simpler input doesn't
-   have to account for. */
+/* Scoped to Home's full-size CapturePanel. `padding-left` is NOT touched
+   here -- that 40px reserves room for .manual-search__icon, a real
+   layout need the mockup's simpler input doesn't have. */
 .capture-panel--default .manual-search__input.text-input {
   padding-top: 9px;
   padding-bottom: 9px;
-  /* Phase 5 Part 6/7, 13th follow-up: real, confirmed clipping bug, found
-     via the item-3 convergence loop and measured precisely (Canvas
-     measureText against the real placeholder string + real computed
-     font/width): at the base .text-input padding-right of 14px, the
-     placeholder needed 294.0px but only had 293.3px available -- a
-     ~0.7px overflow, enough to visibly clip the final "s" in
-     "inversions" in real rendering even though the raw numbers look
-     like a rounding-error-sized gap. Reduced to 8px here (real margin,
-     not just clearing the measured 0.7px), scoped to this one verified
-     instance rather than the shared .text-input base class (same
-     established pattern as padding-top/bottom and font-size above).
-
-     Phase 5 Part 6/7, Home polish follow-up: real, confirmed regression
-     from that same fix's own baseline -- re-measured directly (Canvas
-     measureText, same method) rather than assumed still valid, and the
-     real available width had dropped to 279.3px against the same
-     294.0px needed (a ~15px deficit, not the original ~0.7px), visibly
-     clipping "for inversions" down to "for inversio" in a real
-     screenshot. Not chased to find exactly which later round shrank the
-     row further -- fixed directly by reclaiming width from the icon's
-     own reserved padding-left (40px -> 34px below; the icon itself only
-     spans roughly 14-30px, still a comfortable ~4px clear of the text
-     after this reduction) plus 4px off this padding-right (8px -> 4px)
-     plus the search button's own padding (see
-     `.capture-panel--default .manual-search .btn-primary` below,
-     22px -> 18px each side) -- spread across three places rather than
-     concentrated in one, so no single value changes dramatically.
-     Combined, reclaims ~18px against the real ~15px deficit (a small
-     real margin, not just clearing it exactly). Re-verified after: the
-     placeholder now measures within the real available width at all 4
-     required breakpoints, not just this one. */
+  /* padding-right and padding-left are trimmed from the shared
+     .text-input base to reclaim width so the placeholder ("...for
+     inversions") doesn't clip -- reclaimed across three places (this
+     input's left/right padding + the search button's padding below)
+     rather than one. */
   padding-right: 4px;
   padding-left: 34px;
   font-size: 14px;
   line-height: normal;
-  /* Phase 5 Part 6/7, 14th follow-up: real value from the decoded mockup
-     source -- the shared --shadow-inset token (inset 0 4px 10px
-     rgba(0,0,0,0.5)) is close but not exact for this specific input;
-     scoped override rather than changing the shared token, same
-     established pattern as the other overrides in this rule (the shared
-     token is used app-wide and hasn't been separately re-verified for
-     every other usage this round). */
+  /* Scoped override -- the shared --shadow-inset token is close but not
+     exact for this input; not changing the app-wide token. */
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -94,25 +59,18 @@
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(200, 155, 92, 0.18);
 }
 
-/* Real audit finding: the submit button had none of its own sizing --
-   it was just inheriting the shared .btn/.btn-primary rules, which read
-   as a generic button rather than this specific "Search" affordance's
-   own real recipe (no border at all, tight padding, a subtle top-edge
-   bevel, a 1px hover lift). Scoped the same way as the input above, for
-   the same reason. */
+/* The submit button had no sizing of its own -- it inherited the shared
+   .btn/.btn-primary rules and read as a generic button rather than this
+   "Search" affordance's own recipe (no border, tight padding, top-edge
+   bevel, 1px hover lift). Scoped like the input above. */
 .capture-panel--default .manual-search .btn-primary {
-  /* Phase 5 Part 6/7, Home polish follow-up: 22px -> 18px each side --
-     one of 3 small reductions (see the input's own padding-left/-right
-     comment above) reclaiming real width so the search input's full
-     placeholder text stops truncating, spread thin rather than taking
-     it all from one property. */
+  /* Trimmed, one of the three places width is reclaimed for the search
+     input's placeholder (see the input's padding comment). */
   padding: 0 18px;
   border: none;
   line-height: normal;
   letter-spacing: 0.65px;
-  /* Phase 5 Part 6/7, 12th follow-up: real audit finding, from the
-     exhaustive diff -- was missing the mockup's own outer drop-shadow
-     layer entirely (only had the inset top highlight). */
+  /* Inset top highlight + the mockup's outer drop-shadow. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 5px rgba(0, 0, 0, 0.35);
   transition: background 0.2s ease, transform 0.15s ease;
 }
@@ -122,33 +80,20 @@
   transform: translateY(-1px);
 }
 
-/* Phase 5 Part 6/7, Results follow-up (literal-extraction rebuild of
-   size="header"): real, confirmed root cause of the previously-reported
-   input truncation -- this input had NO scoped font-size for this size
-   at all, silently inheriting the shared `.text-input` base's 16px
-   (index.css/App.css) instead of the mockup's real 12px. Every value
-   below is a real, measured target (see
-   RESULTS_VISUAL_FIDELITY_OPEN_ITEMS.md's before/after table), not a
-   guess -- `padding-right: 8px` reuses the same real clipping fix
-   already proven for Home's own search input (13th follow-up, same
-   file), scoped here rather than promoted to the shared base since it
-   hasn't been re-verified for every other usage. The input is
-   necessarily narrower here than the mockup's own bare (buttonless)
-   input -- this size keeps the real `.btn-primary` submit button
-   (see below) rather than reproducing the mockup's own submit-button-
-   less row, a deliberate, already-documented decision (a real, visible
-   submit control is worth more than a literal pixel match to what's
-   very likely a Design-tool export artifact) -- so the input's own
-   rendered width is a real, accepted consequence of that choice, not a
-   target this rebuild can hit directly. */
+/* This input had no scoped font-size for this size, so it inherited the
+   shared `.text-input` base's 16px instead of the mockup's 12px (the
+   cause of the reported truncation). `padding-right: 8px` reuses the
+   clipping fix from Home's search input, scoped here. The input is
+   narrower than the mockup's buttonless version because this size keeps
+   the real `.btn-primary` submit button (below) -- a deliberate choice
+   (a visible submit control over a literal pixel match). */
 .capture-panel--header .manual-search__input.text-input {
   padding-top: 12px;
   padding-bottom: 12px;
   padding-right: 8px;
   /* Icon shrunk + moved in (see .manual-search__icon below) to reclaim
-     a few px of text space in this genuinely tight column -- 32px is
-     enough clearance for the smaller icon, down from the base 40px
-     tuned for Home's own roomier input. */
+     text space in this tight column -- 32px clearance for the smaller
+     icon, down from the base 40px. */
   padding-left: 32px;
   font-size: 12px;
   line-height: normal;
@@ -166,10 +111,10 @@
   font-size: 12px;
 }
 
-/* Search button -- same real-sizing-gap as the input (was inheriting
-   the generic shared `.btn`/`.btn-primary` rules, way too large for
-   this compact widget), tuned to leave the input as much of the tight
-   ~292px actions-column width as reasonably possible. */
+/* Search button -- same sizing gap as the input (it was inheriting the
+   shared `.btn`/`.btn-primary` rules, too large for this compact
+   widget), tuned to leave the input as much of the ~292px
+   actions-column width as possible. */
 .capture-panel--header .manual-search .btn-primary {
   padding: 0 14px;
   border: none;
@@ -210,10 +155,9 @@
   cursor: default;
 }
 
-/* Phase 5 Part 2/7: chord names in this caption now get the same .readout
-   treatment every other note family uses -- matches .related-note .readout's
-   pattern of pinning the nested readout's font-size to its own container's,
-   rather than inheriting .readout's unset default. */
+/* Chord names in this caption get the .readout treatment, with
+   font-size pinned to this container's (like .related-note .readout)
+   rather than .readout's unset default. */
 .manual-search__enharmonic-note .readout {
   font-size: 12px;
 }

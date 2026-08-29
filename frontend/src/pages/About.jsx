@@ -1,21 +1,11 @@
+import Footer from '../components/Footer'
 import './About.css'
 
 const GITHUB_URL = 'https://github.com/andresrodriler/BetterChord'
 
-// Phase 5 Part 6/7, 16th follow-up: real content ported directly from the
-// About mockup (frontend/design-reference/About_dc.html) -- this file is
-// raw source (no bundler decoding needed), read directly. The stat strip
-// numbers (92.96% / 696 / ~50K / 98%+) are confirmed real and accurate,
-// not re-derived here. One landmine fixed while porting: the mockup's own
-// "Why this exists" paragraphs carry a stray inline width:958px/height:79px
-// (and a matching width:946px/height:99px on the second paragraph) --
-// near-full-page-width hardcoded onto text sitting inside a narrower
-// layout, almost certainly a drag-handle artifact from the design tool.
-// Left out entirely here; the paragraphs flow naturally at their real
-// column width instead. The mockup's own two-column grid for this
-// section has an empty second column (nothing was ever placed there) --
-// reproduced as a single column here rather than carrying over a dead
-// empty grid track.
+// Static content page: hero copy, a 4-item stat strip, and prose
+// sections. The stat numbers (92.96% / 696 / ~50K / 98%+) are real
+// pipeline figures, hardcoded here.
 function About() {
   return (
     <div className="section about-page">
@@ -134,6 +124,8 @@ function About() {
           View on GitHub
         </a>
       </div>
+
+      <Footer />
     </div>
   )
 }

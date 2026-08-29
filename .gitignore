@@ -330,6 +330,15 @@ experiments/
 results/
 outputs/
 
+# test_scripts/ -- personal/local verification tooling (visual-diff,
+# mockup-decode, style-audit, converge-loop scripts) plus their generated
+# output/ and diff_output/ artifacts. Kept local, not part of the shipped
+# repo. `test_scripts/test_audio_file.py` and `test_chords.py` were
+# committed before this rule and stay tracked (gitignore doesn't
+# retroactively untrack); `git rm --cached` them if the whole directory
+# should leave version control.
+test_scripts/
+
 # Personal notes
 notes.txt
 TODO.txt

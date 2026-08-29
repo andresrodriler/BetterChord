@@ -1,20 +1,16 @@
-/* display: contents -- was a bordered/backgrounded card when this was an
-   addendum appended below the preview content; now that it's the WHOLE
-   modal body (see CaptureModal.jsx), a nested box would read as a box
-   within a box. This keeps the wrapper purely semantic (aria-live
-   grouping) while letting .capture-modal__body--centered's own flex/gap
-   lay out the dots and fact directly, matching the armed/recording
-   states' plain centered layout. */
+/* display: contents keeps the wrapper purely semantic (aria-live
+   grouping) so .capture-modal__body--centered's own flex/gap lays out
+   the dots and fact directly -- a nested box would read as a box within
+   a box. */
 .identifying-status {
   display: contents;
 }
 
-/* -- "Processing" indicator, built as a sibling of .record-btn__dot's
-   pulse (App.css) rather than a borrowed generic spinner: same box-shadow
-   ring-expansion mechanic, recolored from --record-red to --scan (this is
-   BetterChord computing/detecting, not a live recording), and staggered
-   across 3 dots so the ripple itself reads as "actively working" instead
-   of one static pulsing circle. -- */
+/* "Processing" indicator -- built as a sibling of .record-btn__dot's
+   pulse (App.css): same box-shadow ring-expansion mechanic, recolored
+   from --record-red to --scan (this is computing/detecting, not a live
+   recording), staggered across 3 dots so the ripple reads as "actively
+   working". */
 .identifying-status__dots {
   display: flex;
   justify-content: center;
@@ -51,9 +47,45 @@
   }
 }
 
+/* Fact + manual-advance arrow share a row so the arrow sits beside the
+   text it advances. */
+.identifying-status__fact-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
 .identifying-status__fact {
   max-width: 360px;
-  margin: 0 auto;
+  margin: 0;
   font-size: 14px;
   color: var(--muted);
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.identifying-status__fact--fading {
+  opacity: 0;
+}
+
+.identifying-status__next {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.identifying-status__next:hover {
+  color: var(--brass);
+  border-color: var(--brass);
 }

@@ -4,16 +4,13 @@ import { QUIET_PEAK_THRESHOLD, CLIPPING_PEAK_THRESHOLD } from '../context/Captur
 import './Waveform.css'
 
 const BAR_COUNT = 96
-// Taller than pass 2 (120px) -- freed up by merging the modal's "Preview"
-// title into the Close button's row (see CaptureModal.jsx), and spent
-// entirely on the bar-plot area itself.
+// Total canvas height; TOP_MARGIN + BOTTOM_AXIS_HEIGHT are reserved, the
+// rest is the bar plot.
 const CANVAS_HEIGHT = 160
 // Room at the very top for the playhead's triangular "grab" handle.
 const TOP_MARGIN = 14
-// Room at the bottom for the tick marks ONLY -- the timestamp text moved
-// to a real DOM row below the canvas (see the JSX return + .waveform__
-// time-axis in Waveform.css), so this strip no longer needs to budget
-// space for canvas-drawn text, just the tick marks themselves.
+// Room at the bottom for the tick marks only -- the timestamp text is a
+// real DOM row below the canvas (.waveform__time-axis in Waveform.css).
 const BOTTOM_AXIS_HEIGHT = 8
 const BAR_AREA_BOTTOM = CANVAS_HEIGHT - BOTTOM_AXIS_HEIGHT
 const BAR_AREA_HEIGHT = BAR_AREA_BOTTOM - TOP_MARGIN
@@ -29,10 +26,9 @@ const CENTER_Y = TOP_MARGIN + HALF_BAR_AREA
 // one continuous mark instead of a triangle floating above a gap.
 const HANDLE_W = 9
 const HANDLE_H = 7
-// The playhead line's own bottom -- now runs all the way to the canvas's
-// own bottom edge, the SAME endpoint the tick marks reach (see the tick-
-// drawing block in draw()), so the line/ticks/timestamp read as one
-// connected column, not a line that stops short of where the ticks are.
+// The playhead line's bottom -- the canvas's bottom edge, the same
+// endpoint the tick marks reach, so line/ticks/timestamp read as one
+// connected column.
 const PLAYHEAD_BOTTOM = CANVAS_HEIGHT
 
 const MIN_BAR_HEIGHT = 4
@@ -49,13 +45,10 @@ const HEADROOM_DB = 3
 // unrelated to any of the dB domains below. --scan stays exclusively
 // this signature moment.
 const SIGNATURE_THRESHOLD = 0.86
-// The ONLY intentional alpha modulation left on ramp/error bars, after
-// removing a redundant brightness-via-alpha multiplier in a follow-up
-// pass (see dbIntensity's old comment, removed below) -- a bar not yet
-// reached by the playhead dims to this fraction, showing playback
-// progress. This is a genuinely different concept from "how loud is
-// this bar" (which the loudness ramp's hue/lightness already encodes on
-// its own) and stays untouched.
+// A bar not yet reached by the playhead dims to this fraction, showing
+// playback progress. This is the only alpha modulation on ramp/error
+// bars -- a different concept from "how loud is this bar", which the
+// loudness ramp's own hue/lightness encodes.
 const UNPLAYED_ALPHA_MULT = 0.72
 
 const QUIET_DB = amplitudeToDbClamped(QUIET_PEAK_THRESHOLD)
@@ -84,16 +77,12 @@ function lerpRgb(c1, c2, t) {
 }
 
 // 5-stop copper/rust "how loud is this moment" ramp (--loudness-quiet..
-// --loudness-peak, index.css) -- a purely neutral intensity signal, zero
-// warning connotation, distinct from --brass (control accent) and
-// --error (the genuine over-threshold state, handled separately in
-// draw() before this function is ever called). `stops` is the 5-color
-// array already resolved from those CSS custom properties. Positioned
-// via loDb/hiDb, which the caller passes as THIS clip's own measured
-// dB range (colorDomainRef) -- same per-clip-relative approach as the
-// prior pass, just a different palette and no absolute fallback branch
-// (that's what let a healthy loud passage get mistaken for a clipping
-// warning before -- see the CLIP_DB check in draw()).
+// --loudness-peak, index.css) -- a neutral intensity signal, distinct
+// from --brass (control accent) and --error (the over-threshold state,
+// handled separately in draw() before this is called). `stops` is the
+// 5-color array resolved from those CSS custom properties. loDb/hiDb are
+// THIS clip's own measured dB range (colorDomainRef), so every recording
+// uses the full ramp across its own content.
 function loudnessColorRgb(db, stops, loDb, hiDb) {
   const span = Math.max(hiDb - loDb, 0.001)
   const t = Math.min(1, Math.max(0, (db - loDb) / span))
@@ -135,8 +124,9 @@ function formatTime(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-// Standard canvas-HiDPI setup -- see the component's own comment for why
-// this exists; unchanged from the prior pass.
+// Standard canvas-HiDPI setup: size the buffer at cssSize *
+// devicePixelRatio, keep the CSS box in CSS px, and pre-scale the
+// context so draw calls stay in CSS-px coordinates.
 function configureCanvasForDpr(canvas, cssWidth, cssHeight) {
   const dpr = window.devicePixelRatio || 1
   canvas.width = Math.max(1, Math.round(cssWidth * dpr))
@@ -147,44 +137,30 @@ function configureCanvasForDpr(canvas, cssWidth, cssHeight) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 }
 
-// Canvas-based waveform + custom minimal transport (play/pause + time),
-// paired with a real <audio> element the caller renders and owns (passed
-// in via `audioRef`, hidden -- see CaptureModal.jsx). This is the ONLY
-// seek surface -- the native <audio controls> scrub bar is deliberately
-// not shown alongside it.
+// Canvas waveform + custom minimal transport (play/pause + time),
+// paired with an <audio> element the caller owns (passed via `audioRef`,
+// hidden -- see CaptureModal.jsx). The only seek surface -- the native
+// <audio controls> scrub bar is not shown.
 //
-// THREE independent scales are in play, deliberately kept separate --
-// each answers a different question:
-//   1. Reference lines (QUIET_DB/CLIP_DB) -- fixed, absolute dB values,
-//      identical across every recording, so a player can trust "this
-//      line always means the same real loudness."
-//   2. Bar HEIGHT -- dB-based, mapped through a domain whose FLOOR is
-//      fixed (METER_MIN_DB, so a genuinely quiet clip still reads as
-//      quiet relative to the reference lines) while its CEILING adapts
-//      to `min(0, thisClipsPeakDb + HEADROOM_DB)`, so a normal
-//      recording's own peak actually reaches near the top of the box.
-//   3. Bar COLOR (hue only -- see the alpha note below) -- the copper
-//      loudness ramp, relative to THIS clip's own measured quietest-to-
-//      loudest range (`colorDomainRef`), so every recording uses the
-//      full ramp across its own real content. --error is carved out
-//      SEPARATELY, before this ramp ever applies: a bar whose absolute
-//      dB actually crosses CLIP_DB gets --error directly, regardless of
-//      where it falls in the clip's own relative range -- so --error
-//      stays a sparse, absolute-threshold signal, never spread across
-//      merely-loud-but-healthy content the way the (now-replaced)
-//      muted->brass->error ramp did in an earlier pass.
-// --scan is spent in exactly one place regardless of all of the above:
-// bars at/above SIGNATURE_THRESHOLD of the clip's own loudest moment.
+// Three independent scales, each answering a different question:
+//   1. Reference lines (QUIET_DB/CLIP_DB) -- fixed absolute dB values,
+//      identical across recordings, so a line always means the same
+//      loudness.
+//   2. Bar HEIGHT -- dB-based, through a domain whose FLOOR is fixed
+//      (METER_MIN_DB, so a quiet clip still reads quiet against the
+//      reference lines) and whose CEILING adapts to
+//      `min(0, thisClipsPeakDb + HEADROOM_DB)`, so a normal recording's
+//      peak reaches near the top of the box.
+//   3. Bar COLOR -- the copper loudness ramp, relative to THIS clip's
+//      own measured range (`colorDomainRef`), so every recording uses
+//      the full ramp. --error is carved out SEPARATELY, before the ramp
+//      applies: a bar whose absolute dB crosses CLIP_DB gets --error
+//      directly, so --error stays a sparse absolute-threshold signal.
+// --scan is spent in exactly one place: bars at/above
+// SIGNATURE_THRESHOLD of the clip's own loudest moment.
 //
-// Alpha note (a real bug found and fixed in a follow-up pass): ramp/error
-// bars used to ALSO multiply their alpha by a brightness curve
-// (`dbIntensity`, now removed) scaled off the same loDb..hiDb range the
-// hue ramp already uses -- meaning quiet content was being dimmed TWICE
-// by two different mechanisms encoding the same "how loud" signal, which
-// is why raising the ramp's own hex lightness in an earlier pass didn't
-// fully fix quiet bars looking washed out. Bar alpha is now ONLY
-// `played ? 1 : UNPLAYED_ALPHA_MULT` -- a genuinely different concept
-// (has the playhead reached this bar yet), not a second loudness signal.
+// Bar alpha is only `played ? 1 : UNPLAYED_ALPHA_MULT` -- not a second
+// loudness signal (that's the ramp's hue/lightness).
 function Waveform({ channelData, audioRef }) {
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
@@ -323,22 +299,16 @@ function Waveform({ channelData, audioRef }) {
       const y = CENTER_Y - barHeight / 2
       const played = x + barWidth / 2 < progressX
 
-      // isPeak is relative to THIS clip's own loudest moment (rel),
-      // unrelated to any dB domain. Checked AFTER the absolute clip-line
-      // test below, not before -- a real, confirmed math fact, not a
-      // style choice: SIGNATURE_THRESHOLD (0.86) and CLIPPING_PEAK_THRESHOLD
-      // (0.97 amplitude) are related such that ANY bar crossing the
-      // absolute clip line automatically also satisfies the relative
-      // peak test too (0.97 / anyMaxUpTo1.0 is always >= 0.97 > 0.86) --
-      // checking isPeak first would make the --error branch below
-      // permanently unreachable dead code, confirmed via a real test
-      // clip that should have shown both states and only ever showed
-      // --scan. Checking the absolute threshold first instead makes
-      // --error the correctly higher-priority, always-reachable signal
-      // (a genuine clipping problem matters more than "this is the
-      // loudest moment") -- --scan still fires normally on any clip
-      // whose own real peak stays under the absolute clip line, which
-      // is the common case.
+      // isPeak is relative to THIS clip's own loudest moment (rel).
+      // Checked AFTER the absolute clip-line test below: SIGNATURE_THRESHOLD
+      // (0.86) and CLIPPING_PEAK_THRESHOLD (0.97 amplitude) are related
+      // such that any bar over the clip line also passes the relative
+      // peak test (0.97 / anyMaxUpTo1.0 >= 0.97 > 0.86), so checking
+      // isPeak first would make the --error branch unreachable. Checking
+      // the absolute threshold first makes --error the higher-priority
+      // signal (a clipping problem matters more than "loudest moment");
+      // --scan still fires for a clip whose own peak stays under the
+      // clip line.
       const rel = overallMax > 0 ? amp / overallMax : 0
       const isPeak = rel >= SIGNATURE_THRESHOLD
 
@@ -368,12 +338,9 @@ function Waveform({ channelData, audioRef }) {
       }
     })
 
-    // Time-axis tick MARKS only (the timestamp text itself is a real DOM
-    // row below the canvas now, see the JSX return + Waveform.css) --
-    // top edge exactly at BAR_AREA_BOTTOM (pixel-literal, not "close to"
-    // it) and bottom edge exactly at the canvas's own bottom border
-    // (height), so the ticks visibly touch/intersect both boundaries
-    // with zero gap.
+    // Time-axis tick MARKS only (the timestamp text is a DOM row below
+    // the canvas) -- top edge at BAR_AREA_BOTTOM, bottom edge at the
+    // canvas's own bottom border, so the ticks touch both boundaries.
     if (audioDuration > 0) {
       const interval = pickTickInterval(audioDuration)
       ctx.save()
@@ -586,13 +553,11 @@ function Waveform({ channelData, audioRef }) {
 
   const progressPct = duration > 0 ? Math.round((currentTime / duration) * 100) : 0
 
-  // Y-axis tick labels, rendered outside the canvas -- reactive to
-  // domainTopDb since the height-mapping domain's top adapts per clip.
-  // Labels snap to clean round dB values (NICE_DB_STEPS) that actually
-  // fall within the CURRENT domain, rather than mechanically dividing
-  // the (adaptive, often-not-round) domain into three -- the domain
-  // itself still drives where bars/lines sit, only the LABELS are
-  // rounded.
+  // Y-axis tick labels, outside the canvas -- reactive to domainTopDb
+  // since the height-mapping domain's top adapts per clip. Labels snap
+  // to clean round dB values (NICE_DB_STEPS) within the current domain
+  // rather than a mechanical thirds split; the domain still drives where
+  // bars/lines sit, only the labels are rounded.
   const axisTicks = useMemo(() => {
     const top = Math.min(0, domainTopDb)
     const bottom = METER_MIN_DB
@@ -610,9 +575,9 @@ function Waveform({ channelData, audioRef }) {
     }))
   }, [domainTopDb])
 
-  // Timestamp labels, rendered as real DOM elements in a row directly
-  // beneath the canvas (item 1 of this pass) -- reactive to plotWidth so
-  // they reposition correctly across the modal's own width steps.
+  // Timestamp labels, real DOM elements in a row beneath the canvas --
+  // reactive to plotWidth so they reposition across the modal's width
+  // steps.
   const timeTicks = useMemo(() => {
     if (!duration || !plotWidth) return []
     const interval = pickTickInterval(duration)

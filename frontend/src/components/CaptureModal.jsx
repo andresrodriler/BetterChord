@@ -61,10 +61,9 @@ function CaptureModal() {
   const modalClass = [
     'capture-modal',
     previewing && 'capture-modal--preview',
-    // The preview/chooser layout stays mounted (just dimmed/blurred, see
-    // the loading overlay below) while identifying now, rather than being
-    // replaced -- so the modal's width shouldn't change just because
-    // identifying started.
+    // The preview/chooser layout stays mounted (dimmed/blurred, see the
+    // loading overlay below) while identifying, so the modal's width
+    // shouldn't change when identifying starts.
     previewing && showChooser && 'capture-modal--wide',
   ]
     .filter(Boolean)
@@ -74,12 +73,10 @@ function CaptureModal() {
     <div className="capture-overlay">
       <div className={modalClass}>
         <div className="capture-modal__top">
-          {/* Merged onto the Close button's own row (was a separate row
-              above the waveform) -- frees vertical space, spent on a
-              taller waveform instead (Waveform.jsx's CANVAS_HEIGHT).
-              Empty otherwise so Close stays pinned top-right consistently
-              across every other modal state (armed/recording/etc), which
-              have their own headline inside their own centered body. */}
+          {/* The Preview title shares the Close button's row. Empty on
+              every other modal state so Close stays pinned top-right --
+              those states have their own headline in their centered
+              body. */}
           <h2 className="capture-modal__title">{previewing ? 'Preview' : ''}</h2>
           <button className="btn-close" onClick={close} disabled={identifying}>Close</button>
         </div>
@@ -113,15 +110,12 @@ function CaptureModal() {
           </div>
         )}
 
-        {/* The preview content stays mounted and visible while /identify is
-            in flight (this pass's change) -- a blurred/dimmed overlay plus
-            a floating loading card render on top of it instead of
-            replacing it, reusing the exact same tint+blur visual language
-            as .capture-overlay (the page-level backdrop this whole modal
-            already sits on), just one layer further in. Still ONE modal:
-            the overlay is `position: absolute` inside this body (which
-            gets `position: relative` below), not a second fixed-position
-            backdrop or a separate z-index stack. */}
+        {/* The preview content stays mounted and visible while /identify
+            is in flight -- a blurred/dimmed overlay + a floating loading
+            card render on top, reusing .capture-overlay's tint+blur one
+            layer further in. Still ONE modal: the overlay is
+            `position: absolute` inside this body (given `position:
+            relative` below), not a second fixed backdrop. */}
         {previewing && (
           <div
             className={`capture-modal__body${showChooser ? ' capture-modal__body--split' : ''}`}
@@ -129,9 +123,9 @@ function CaptureModal() {
           >
             <div className="capture-modal__preview">
               <Waveform channelData={waveformData} audioRef={audioRef} />
-              {/* Playback engine only -- the waveform above is the one clear seek
-                  surface (item 1 of an earlier Phase 5 Part 3/7 polish pass); native
-                  controls stay off so there's no second, redundant scrub bar. */}
+              {/* Playback engine only -- the waveform above is the one
+                  seek surface; native controls stay off so there's no
+                  second, redundant scrub bar. */}
               <audio ref={audioRef} src={audioUrl} className="visually-hidden" />
 
               {quality === null && <p className="status-text">Checking recording quality...</p>}

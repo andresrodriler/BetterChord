@@ -1,30 +1,22 @@
 import { useRef, useState } from 'react'
+import Footer from '../components/Footer'
+import { useAccessibilityPrefs } from '../context/AccessibilityPrefsContext'
+import { getIntervalStyle } from '../lib/intervalColors'
 import { stringX, fretY, fretCellY, isAnchoredAtNut, resolveBaseline } from '../lib/miniFretMath'
 import './HowItWorks.css'
 
-// Phase 5 Part 6/7, 16th follow-up: real 6-stage pipeline ported from the
-// How It Works mockup (frontend/design-reference/How_It_Works_dc.html) --
-// raw source, no bundler decoding needed. Illustrations are reproduced as
-// real CSS grid/flow layouts, NOT the mockup's own literal technique in two
-// places (both confirmed landmines, not copied):
-//   1. The mockup hardcodes several architecture-diagram labels ("Pool 1",
-//      "Pool 2", "Flatten") at absolute pixel offsets, which only lines up
-//      at the exact width the mockup was built at. This page lays the same
-//      stages out with real CSS grid columns instead, so it reflows
-//      correctly at every tested viewport width.
-//   2. Two copy fixes while porting: a stray `&nbsp;` mid-sentence in stage
-//      1 ("A single guitar strum", not "guitar&nbsp; strum"), and a
-//      subject-verb mismatch in stage 2 ("some known difficulties include
-//      complicated or niche chord qualities...", not "...difficulties the
-//      model has is complicated...").
-// The stage 2 CNN architecture (conv1 32ch -> pool1 -> conv2 64ch -> pool2
-// -> flatten 38,976 -> 3 parallel heads, NOTES sigmoid / ROOT softmax /
-// BASS softmax) is real, confirmed directly against
-// betterchord/training_scripts/cnn_model.py before porting, not assumed.
+// The 6-stage pipeline, ported from the How It Works mockup. Two
+// deviations from the mockup's own technique: (1) the architecture-
+// diagram labels use CSS grid columns, not the mockup's absolute pixel
+// offsets, so they reflow; (2) two copy fixes while porting -- a stray
+// &nbsp; in stage 1 and a subject-verb mismatch in stage 2. The stage 2
+// CNN architecture (conv1 32ch -> pool1 -> conv2 64ch -> pool2 ->
+// flatten 38,976 -> 3 heads) matches betterchord/training_scripts/
+// cnn_model.py.
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
-// Illustrative example values (Gm: G-Bb-D), matching the mockup's own
-// hardcoded example -- not live-computed, same as the mockup itself.
+// Illustrative example values (Gm: G-Bb-D), matching the mockup -- not
+// live-computed.
 const NOTE_PROBS = [0.06, 0.04, 0.55, 0.09, 0.05, 0.07, 0.03, 0.97, 0.06, 0.1, 0.89, 0.04]
 const ACTIVE_NOTES = new Set(['G', 'Bb', 'D'])
 
@@ -34,15 +26,8 @@ const CHROMATIC_C7ADD13 = new Set(['C', 'E', 'G', 'A', 'Bb'])
 const CHROMATIC_C7ADD13_LABELS = { C: 'R', E: '3rd', G: '5th', A: '13th', Bb: 'b7' }
 const GUIDE_TONES = new Set(['E', 'Bb'])
 
-// 19th follow-up: real, confirmed gap -- the mockup's own embedded
-// component (the real How_It_Works_dc.html, not the stale stub an
-// earlier round mistakenly diffed against) has 8 example voicing cards
-// in its real chordDefs array, filling its 4-column grid as 2 full
-// rows; this list only ever had 4 (C/Gm/F/Gm), silently dropping D, Em,
-// G, and Am. Restored to all 8, same order, same frets/roles -- byte-
-// for-byte matching the mockup's own real chordDefs (verified by
-// extracting and running that file's own JS logic directly via Node,
-// not eyeballed).
+// 8 example voicing cards (C/D/Em/Gm/G/Am/F/Gm), matching the mockup's
+// own chordDefs -- fills the 4-column grid as 2 rows.
 const EXAMPLE_VOICINGS = [
   { name: 'C', frets: ['X', '3', '2', '0', '1', '0'], roles: [null, 'R', '3', '5', 'R', '3'] },
   { name: 'D', frets: ['X', 'X', '0', '2', '3', '2'], roles: [null, null, 'R', '5', 'R', '3'] },
@@ -54,8 +39,20 @@ const EXAMPLE_VOICINGS = [
   { name: 'Gm', frets: ['X', '10', '12', '12', '11', '10'], roles: [null, 'R', '5', 'R', 'b3', '5'], featured: true },
 ]
 
-const ROLE_COLOR = { R: 'var(--interval-root)', 3: 'var(--interval-3rd)', b3: 'var(--interval-3rd)', 5: 'var(--interval-5th)', b7: 'var(--interval-7th)' }
-const ROLE_BORDER = { R: 'var(--interval-root-border)', 3: 'var(--interval-3rd-border)', b3: 'var(--interval-3rd-border)', 5: 'var(--interval-5th-border)', b7: 'var(--interval-7th-border)' }
+// Role token -> shared interval-color system, so this surface can't
+// drift from the fretboard dots / legend / ChordOverview if
+// classifyInterval gains a context-dependent bucket. No live visual
+// change -- every role this data uses (R/3/b3/5/b7) mapped 1:1 in the
+// old hardcoded map.
+const ROLE_TOKEN = { R: '1', 3: '3', b3: 'm3', 5: '5', b7: 'b7' }
+
+// Resolves a role token through classifyInterval/getIntervalStyle.
+// These are all plain root/3rd/5th/7th tones, so no `formula` is needed
+// -- the sus/extension branches are formula-gated and skip when it's
+// absent.
+function roleIntervalStyle(role) {
+  return getIntervalStyle(ROLE_TOKEN[role] || role)
+}
 
 const EXAMPLE_SONGS = [
   { title: 'Creep', artist: 'Radiohead', chords: 'G · B · C · Cm' },
@@ -63,13 +60,9 @@ const EXAMPLE_SONGS = [
   { title: 'Riptide', artist: 'Vance Joy', chords: "Bbm · Ab · C# · F#maj7" },
 ]
 
-// Grid coordinate math (nut-anchoring, string/fret-line positions, and
-// fretted-dot cell-centering) moved to `lib/miniFretMath.js` (Phase 5
-// Part 7, Item 3 session) -- extracted from here so Home's
-// AmbientFretboards could reuse this exact, already-debugged
-// implementation instead of a second independent one. See that file's
-// own comments for the full real-bug history (2 real alignment-bug
-// sessions' worth) this design fixes.
+// Grid coordinate math lives in lib/miniFretMath.js -- shared with
+// Home's AmbientFretboards. See that file for the alignment-bug history
+// it fixes.
 const rows = 5
 
 function MiniFretDiagram({ voicing }) {
@@ -88,6 +81,7 @@ function MiniFretDiagram({ voicing }) {
           if (f === '0') return <div key={i} className="hiw-voicing-card__mute hiw-voicing-card__mute--open" style={{ left: `${leftPct}%` }}>o</div>
           const row = Number(f) - baseline
           const role = voicing.roles[i]
+          const style = role ? roleIntervalStyle(role) : null
           return (
             <div
               key={i}
@@ -95,8 +89,8 @@ function MiniFretDiagram({ voicing }) {
               style={{
                 left: `${leftPct}%`,
                 top: `${fretCellY(row, rows)}%`,
-                background: ROLE_COLOR[role] || 'var(--brass)',
-                borderColor: ROLE_BORDER[role] || 'var(--brass-border)',
+                background: style?.fill || 'var(--brass)',
+                borderColor: style?.stroke || 'var(--brass-border)',
               }}
             >
               {role}
@@ -112,16 +106,11 @@ function MiniFretDiagram({ voicing }) {
   )
 }
 
-// 27th follow-up: real mockup values -- the mockup's audio player is a
-// fully bespoke component (32px circular brass button with hand-drawn
-// play/pause shapes, a real 36-bar waveform whose per-bar height comes
-// from this exact seed array, a plain time-label span, and a HIDDEN
-// native <audio> used purely as the playback engine) -- not the browser's
-// generic `<audio controls>` bar this page was using before (confirmed
-// via direct source inspection: the mockup's own real <audio> element is
-// `style="display:none"`). Real waveform seed + played/unplayed color
-// logic, ported verbatim from the mockup's own embedded component logic
-// (`waveSeed`/`progressIdx`/`waveform`), not approximated.
+// The mockup's audio player is bespoke: a 32px circular brass
+// play/pause button, a 36-bar waveform (heights from this seed), a time
+// label, and a hidden native <audio> as the playback engine -- not a
+// browser `<audio controls>` bar. Seed + played/unplayed color logic
+// ported from the mockup.
 const WAVEFORM_SEED = [30, 55, 80, 45, 60, 90, 40, 70, 50, 85, 35, 65, 95, 55, 40, 75, 60, 30, 50, 80, 45, 65, 90, 55, 35, 70, 60, 40, 85, 50, 75, 45, 65, 30, 55, 80]
 
 function formatAudioTime(t) {
@@ -198,15 +187,10 @@ function AudioCaptureIllustration() {
   )
 }
 
-// 20th follow-up: real mockup values (extracted via the real convergence
-// loop against a properly-rendered mockup -- see CLAUDE.md) -- each
-// conv/pool step is a real layered, angled "card stack" (multiple
-// offset divs, rotateY(18deg), each layer a step lighter), not one flat
-// block. Conv layers use 4 steps (brass family for Conv1, moss family
-// for Conv2), pool layers use 3 smaller steps in the same two families
-// -- literal hex values from the mockup's own real CSS, kept literal
-// here (not tokenized) since they're a one-off illustration effect, the
-// same precedent already used for DetectionBadge's ripple colors.
+// Each conv/pool step is a layered, angled "card stack" (offset divs,
+// rotateY(18deg), each layer a step lighter) -- literal hex from the
+// mockup, kept literal (one-off illustration effect, same precedent as
+// DetectionBadge's ripple colors). Conv = 4 layers, pool = 3 smaller.
 const CNN_LAYER_COLORS = {
   conv1: ['#3a2318', '#6b3a26', '#a5573a', '#d9895c'],
   pool1: ['#6b3a26', '#a5573a', '#e5a583'],
@@ -215,52 +199,16 @@ const CNN_LAYER_COLORS = {
 }
 const CNN_LAYER_TOP_BORDER = { conv1: '#eaa87f', pool1: '#f2c4ab', conv2: '#b3c9bc', pool2: '#c8dbd0' }
 
-// 31st follow-up: FULL REBUILD, not another position patch. 4+ rounds of
-// targeted alignment/label fixes left `converge.py`'s mismatch flat at
-// 47-48% -- a strong signal the old flex-column/`CnnLayerStack`
-// abstraction was a fundamentally different CONSTRUCTION from the
-// mockup, not a close recreation with a few wrong values. Re-extracted
-// the mockup's real, literal markup for this exact panel (raw source,
-// `frontend/design-reference/How It Works.dc.html`, the same real
-// support.js-rendered source already established as trustworthy for
-// this page since the 21st follow-up) before writing any code -- full
-// findings recorded in this session's own report, condensed here:
-//
-// The mockup is NOT a reusable "Conv/Pool column" component repeated 4
-// times. It's ONE single CSS grid for the WHOLE diagram
-// (`display:grid; grid-template-rows:36px 46px 34px; grid-auto-flow:
-// column`) -- every element (labels, boxes, dims, even empty spacer
-// columns reserved for arrow gaps) is a direct child placed into an
-// auto-generated column via its own explicit `grid-row`. Conv and Pool
-// boxes align because they share the SAME fixed-height row 2, not
-// because of any Conv/Pool-specific logic. Pool's own label+dims are
-// individually POSITION:ABSOLUTE (real literal px, e.g. `left:128px;
-// top:104px` for Pool 1), not flowed into a shared "caption" element.
-// The Flatten label and its bars are ALSO individually position:absolute
-// (`left:285px` / `left:290px`). The 5 inter-stage connector arrows are
-// SEPARATE absolutely-positioned `<svg>` overlays at fixed `left`
-// offsets (51/120/157/226/264px, all `top:77px`, `z-index:2`) painted
-// ON TOP of the grid, not flex-row siblings between columns -- 3 of the
-// 5 have a real triangular arrowhead marker (stage transitions: INPUT->
-// Conv1, Pool1->Conv2, Pool2->Flatten), 2 are plain lines with no head
-// (bridging Conv->Pool within one stage).
-// This whole panel has a real FIXED outer width (measured live and in
-// the mockup: 442px, unaffected by viewport -- confirmed at all 4
-// tested breakpoints) sitting inside a max-width:980px page column with
-// comfortable margin at every tested width, so literal absolute-px
-// positioning here carries none of the real page-level reflow risk the
-// 16th follow-up's own landmine warning was about (that warning was
-// about the whole PAGE's stage grid, a genuinely fluid layout -- this
-// one static, fixed-size illustration was never in that category).
-// Reproduced with real values throughout, not re-derived through a
-// generic abstraction -- `cnnStack()` below is pure visual repetition
-// (the layered-card divs), not a layout/positioning abstraction; every
-// grid-row/absolute-position/px value is copied straight from the real
-// mockup source.
-
-// Real mockup values, `CNN_LAYER_COLORS`/`CNN_LAYER_TOP_BORDER` already
-// confirmed correct (20th/21st follow-ups) -- kept as-is, only their
-// CONSUMPTION (layout) changes this round.
+// The diagram is ONE CSS grid for the whole panel (grid-template-rows:
+// 36px 46px 34px; grid-auto-flow: column), not a Conv/Pool column
+// repeated 4 times. Conv and Pool boxes align by sharing row 2. Pool's
+// label+dims and the Flatten label+bars are individually
+// position:absolute at literal mockup px. The 5 connector arrows are
+// separate absolute <svg> overlays at fixed left offsets (all top:77px)
+// -- 3 with an arrowhead (stage transitions), 2 plain lines
+// (Conv->Pool). The panel has a fixed 442px width inside the 980px page
+// column, so literal px positioning here carries no page-reflow risk.
+// cnnStack() below is pure visual repetition, not a layout abstraction.
 function cnnStack(variant) {
   const colors = CNN_LAYER_COLORS[variant]
   const isConv = variant.startsWith('conv')
@@ -286,8 +234,8 @@ function cnnStack(variant) {
 
 const FLATTEN_BAR_COLORS = ['#c89b5c', '#8a6b42', '#c89b5c', '#6b5236', '#8a6b42', '#c89b5c', '#8a6b42', '#c89b5c']
 
-// Real mockup arrow geometry, all 5 real segments (left/width/hasHead),
-// all at the mockup's own literal `top:77px`.
+// Arrow geometry: 5 segments (left/width/hasHead), all at the mockup's
+// top:77px.
 const CNN_ARROWS = [
   { left: 51, width: 27, hasHead: true },
   { left: 120, width: 11, hasHead: false },
@@ -326,13 +274,9 @@ function CnnConnectorArrows() {
 }
 
 function CnnDiagramIllustration() {
-  // 21st follow-up: real ground truth this time (support.js/image-slot.js
-  // actually executing, not the resolver workaround) confirmed BASS's real
-  // color is a one-off mauve (#b6788a) that doesn't match any existing
-  // interval token -- --interval-7th/--moss-deep (#5c7a63) was a real,
-  // wrong substitution from the prior round's approximation-based build.
-  // NOTES (#8faf9b) and ROOT (#d9895c) DID already exactly match
-  // --interval-3rd/--moss and --interval-root, kept as tokens.
+  // BASS's color is a one-off mauve (#b6788a), matching no interval
+  // token. NOTES (#8faf9b) and ROOT (#d9895c) do match --interval-3rd
+  // and --interval-root, so those stay tokens.
   const heads = [
     { label: 'NOTES', sub: 'sigmoid', color: 'var(--interval-3rd)' },
     { label: 'ROOT', sub: 'softmax', color: 'var(--interval-root)' },
@@ -423,17 +367,10 @@ function CnnDiagramIllustration() {
   )
 }
 
-// 21st follow-up: real mockup arrows are a thin brass SVG line + a
-// triangular arrowhead marker (stroke #c89b5c/--brass, stroke-width 2.2),
-// not a monospace "→" glyph -- confirmed via the real support.js-rendered
-// DOM (`<path ... stroke="#c89b5c" stroke-width="2.2" marker-end=...>`).
-// One shared-origin fan of 3 diverging colored SVG paths into NOTES/
-// ROOT/BASS, replacing 3 independent same-color CnnArrow calls -- real
-// mockup geometry (How_It_Works_dc.html, viewBox 0 0 26 122, all 3 paths
-// starting at (1,61), fanning to (20,15)/(20,61)/(20,107)), each with its
-// own colored 6x6 arrowhead marker, stroke-width 1.3. Colors match each
-// head's own dot color exactly (NOTES/ROOT reuse the same interval
-// tokens the dots use; BASS is the same one-off mauve literal).
+// A shared-origin fan of 3 diverging colored SVG paths into NOTES/ROOT/
+// BASS -- mockup geometry (viewBox 0 0 26 122, all starting at (1,61),
+// fanning to (20,15)/(20,61)/(20,107)), each with its own colored
+// arrowhead. Colors match each head's dot.
 function CnnHeadsFan() {
   return (
     <svg className="hiw-cnn-diagram__heads-fan-svg" width="26" height="122" viewBox="0 0 26 122" aria-hidden="true">
@@ -467,14 +404,8 @@ function ChordIdIllustration() {
                 className="hiw-note-bars__bar"
                 style={{
                   height: `${Math.max(6, NOTE_PROBS[i] * 100)}%`,
-                  // 26th follow-up: real mockup values -- active bar
-                  // color was already correct (--scan, confirmed exact
-                  // match to the mockup's own literal #6fe3d6), but the
-                  // inactive bar was using --brown-700 (#7d5b37) where
-                  // the mockup's real value is #4a3826 -- which already
-                  // exists in this page's own token set as
-                  // --hiw-tag-border, reused here rather than adding a
-                  // new literal.
+                  // Mockup colors: active = --scan; inactive =
+                  // --hiw-tag-border (#4a3826).
                   background: ACTIVE_NOTES.has(note) ? 'var(--scan)' : 'var(--hiw-tag-border)',
                 }}
               />
@@ -483,10 +414,8 @@ function ChordIdIllustration() {
         </div>
         <div className="hiw-note-bars__labels">
           {NOTE_NAMES.map((note) => (
-            // 26th follow-up: real mockup label colors -- active is
-            // --muted (#a99c87, confirmed exact), inactive is a real
-            // one-off #5a4632 that doesn't match any existing token
-            // (darker than --placeholder, which live was using).
+            // Mockup label colors: active = --muted; inactive = a
+            // one-off #5a4632.
             <span key={note} style={{ color: ACTIVE_NOTES.has(note) ? 'var(--muted)' : '#5a4632' }}>{note}</span>
           ))}
         </div>
@@ -546,16 +475,9 @@ function GuideToneIllustration() {
       <div className="hiw-illustration__tag">Guide Tone Connection Example: C13 and C7add13</div>
       <div className="hiw-chromatic-cols">
         {NOTE_NAMES.map((n) => (
-          // 26th follow-up: real mockup value -- a real 3rd tier, not
-          // just guide-tone-vs-everything-else. Real guide tones (E, Bb)
-          // are scan; D and F (present as extension tones -- 9th/11th --
-          // in the C13 formula shown below, but not themselves guide
-          // tones) get a dimmer --border highlight; everything else
-          // falls to a real one-off #5a4632 literal (NOT --placeholder --
-          // a real bug in the first version of this fix, caught by
-          // re-running the sweep after the initial fix rather than
-          // assuming it landed correctly). Confirmed via the mockup's
-          // own real noteColorMap, not guessed.
+          // Mockup: 3 tiers -- guide tones (E, Bb) = --scan; D and F
+          // (C13 extension tones, not guide tones) = --border;
+          // everything else = a one-off #5a4632.
           <span key={n} className="hiw-chromatic-cols__note" style={{ color: GUIDE_TONES.has(n) ? 'var(--scan)' : (n === 'D' || n === 'F') ? 'var(--border)' : '#5a4632' }}>{n}</span>
         ))}
       </div>
@@ -680,6 +602,9 @@ const STAGES = [
 ]
 
 function HowItWorks() {
+  // Subscribes the whole page (and un-memoized children) to the
+  // colorblind toggle -- see IntervalLegend.jsx.
+  useAccessibilityPrefs()
   return (
     <div className="section how-it-works-page">
       <h1>How BetterChord Works</h1>
@@ -703,6 +628,8 @@ function HowItWorks() {
           </div>
         ))}
       </div>
+
+      <Footer />
     </div>
   )
 }

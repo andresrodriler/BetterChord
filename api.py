@@ -35,11 +35,10 @@ _REGISTRY_PATH = os.path.join(
 
 def _build_chord_suggestions():
     """Build the full root+quality suggestion list once at import time
-    (the registry doesn't change at runtime -- see task instructions).
-    Every (root, quality) combo across the 12 standard chromatic roots x
-    every registry quality key, built via chord_parser.format_chord (never
-    hand-concatenated -- see CLAUDE.md's core parser rule). No slash/bass
-    variants -- root+quality only, per current scope.
+    (the registry doesn't change at runtime). Every (root, quality) combo
+    across the 12 chromatic roots x every registry quality key, built via
+    chord_parser.format_chord (never hand-concatenated -- see CLAUDE.md's
+    core parser rule). No slash/bass variants.
 
     Sorted by the quality's songs_db_occurrences descending, ties broken
     alphabetically by the formatted chord string.
@@ -71,27 +70,19 @@ CHORD_SUGGESTIONS = _build_chord_suggestions()
 ROOT_ALIASES = {raw: canon for raw, canon in cp.NOTE_ALIASES.items() if raw != canon}
 
 # The reverse of ROOT_ALIASES, grouped -- given a CANONICAL note name, every
-# OTHER real spelling for that same pitch. Used EXCLUSIVELY by
-# root_alt_spellings/bass_alt_spellings below, which feed ONLY the "Why this
-# spelling?" clause (chordAlias.js's buildAltSpellingSentence) -- confirmed
-# via grep, no other consumer exists, so restricting this table has no
-# effect anywhere else (ManualSearch's own typing-time root normalization
-# uses the full, unrestricted ROOT_ALIASES/NOTE_ALIASES table above, on
-# purpose -- unaffected by this).
+# other real spelling for that pitch. Used only by root_alt_spellings/
+# bass_alt_spellings below, which feed only the "Why this spelling?" clause
+# (chordAlias.js's buildAltSpellingSentence). ManualSearch's typing-time
+# root normalization uses the full, unrestricted ROOT_ALIASES above.
 #
-# Restricted (Phase 5 Part 2/7 closing round, Task 4) to the 5
-# CONVENTIONALLY dual-spelled pitch classes only -- C#/Db, D#/Eb, F#/Gb,
-# G#/Ab, A#/Bb, the only ones a real player actually encounters written
-# both ways. NOTE_ALIASES' full theoretical table also includes spellings
-# nobody actually uses in practice (B# for C, Fb for E, E# for F, Cb/H for
-# B) -- before this fix, "Why this spelling?" would draw from those too,
-# producing real-but-never-useful trivia (e.g. "B (the bass) and Cb or H
-# are the same note" on a plain Cmaj7/B). Every OTHER canonical spelling
-# (C, D, E, F, G, A, B in their natural/unaltered form) now correctly has
-# no alt-spelling entry at all, so the clause -- and, if both root and bass
-# are outside this set, the entire "Why this spelling?" bar -- doesn't
-# render for them (ChordOverview.jsx's existing "nothing to show" check
-# already handles the empty-list case, no frontend change needed).
+# Restricted to the 5 conventionally dual-spelled pitch classes -- C#/Db,
+# D#/Eb, F#/Gb, G#/Ab, A#/Bb, the ones a player actually encounters
+# written both ways. NOTE_ALIASES' full table also carries spellings
+# nobody uses (B#, Fb, E#, Cb/H); without this restriction "Why this
+# spelling?" would surface those as real-but-useless trivia. A natural
+# root (C/D/E/F/G/A/B) gets no entry at all, so the clause -- and the
+# whole bar, if root and bass are both outside this set -- simply doesn't
+# render (ChordOverview.jsx already handles the empty-list case).
 _CONVENTIONAL_ENHARMONIC_ROOTS = {"C#", "Eb", "F#", "Ab", "Bb"}
 REVERSE_ROOT_ALIASES = {}
 for _raw, _canon in ROOT_ALIASES.items():
@@ -110,24 +101,18 @@ with open(_REGISTRY_PATH, "r", encoding="utf-8") as _f:
 
 
 def _quality_alt_spellings(canonical_quality):
-    """Every other real, distinct way this quality has actually been seen
-    spelled in real data -- voicings.db's own scrape spelling
-    (voicing_strings_found) plus betterchord_songs.db's real example chord
-    strings (songs_db_example_spellings, root stripped via chord_parser to
-    isolate just the quality portion) -- excluding the canonical spelling
-    itself. Real, already-computed registry data, never re-derived.
+    """Every other real, distinct way this quality has been seen spelled
+    in real data -- voicings.db's scrape spelling (voicing_strings_found)
+    plus betterchord_songs.db's example chord strings
+    (songs_db_example_spellings, root stripped via chord_parser to
+    isolate the quality portion) -- excluding the canonical spelling.
+    Already-computed registry data, never re-derived.
 
-    Phase 5 Part 2/7 follow-up (Task 3b): filtered through
-    chord_info.explain_quality_synonym() -- a real investigation across
-    all 95 registry qualities found 12 of the 36 raw candidate pairs
-    aren't real, honest synonyms at all (4 are pure parenthesization
-    differences, not different spellings; 4 are confirmed parser
-    artifacts where an unrecognized alteration token silently no-ops
-    rather than being applied; 2 duplicate Task 4's own ambiguous-"sus"
-    note; 1 is a genuine music-theory edge case that would overclaim a
-    synonymy that isn't really there -- see chord_info.py's own
-    investigation notes for the full list). Only spellings with a real,
-    honest one-line "why" survive here."""
+    Filtered through chord_info.explain_quality_synonym(): some raw
+    candidate pairs aren't real synonyms (parenthesization-only
+    differences, parser artifacts where an unrecognized alteration token
+    silently no-ops, or overclaimed music-theory equivalences). Only
+    spellings with a real one-line "why" survive."""
     entry = _QUALITY_REGISTRY.get(canonical_quality, {})
     alts = set(entry.get("voicing_strings_found", []))
     for example in entry.get("songs_db_example_spellings", []):
@@ -138,9 +123,8 @@ def _quality_alt_spellings(canonical_quality):
     return sorted(alt for alt in alts if explain_quality_synonym(canonical_quality, alt))
 
 # DEV-ONLY CORS: allows the Vite dev server (localhost:5173) to call this
-# API directly from the browser during Phase 1 (browser audio -> API proof
-# of concept). Must be tightened to the real deployed frontend's origin
-# before Phase 3 (deployment) -- do not ship this wildcard-of-one to prod.
+# API from the browser. Must be tightened to the real deployed frontend's
+# origin before deployment -- do not ship this to prod.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -189,7 +173,7 @@ async def voicings(chord_name: str):
             content={"error": f"{chord_name!r} is not a valid chord string.", "reason": parsed.get("reason")},
         )
 
-    full, _required = compute_intervals(parsed["quality"])
+    full, required = compute_intervals(parsed["quality"])
     intervalset_to_canonical, _canonical_to_voicing_quality = _load_registry()
     if intervalset_to_canonical.get(frozenset(full)) is None:
         return JSONResponse(
@@ -209,37 +193,32 @@ async def voicings(chord_name: str):
         result["error"] = f"{chord_name!r} is a real chord, but no voicing data is available for it yet."
         return JSONResponse(status_code=404, content=result)
 
-    # Chord-quality-aware guide-tone formula (Phase 3 Part 5/6, 3rd + 4th
-    # follow-ups) -- which of root/third-or-sus/5th/7th/extensions are
-    # structurally part of THIS CHORD'S formula at all (e.g. sus4 has no
-    # 3rd slot, a plain triad has no extensions), and this app's real
-    # interval-string label for each one that is (e.g. "m3" for a minor
-    # chord, "maj7" for a major-seventh chord, "9"/"11"/"13" individually
-    # named, not one anonymous "other" blob). Passes both `parsed["quality"]`
-    # (the structured q dict) and `full` (already computed above for the
-    # registry-match check, reused rather than recomputed) -- the 4th
-    # follow-up session's fix requires the structured dict specifically to
-    # avoid the semitone-collision bug the 3rd follow-up's `full`-only
-    # version had (see guide_tone_formula's own docstring).
-    result["formula"] = guide_tone_formula(parsed["quality"], full)
+    # Chord-quality-aware guide-tone formula -- which of root/third-or-sus/
+    # 5th/7th/extensions are structurally part of THIS chord's formula
+    # (e.g. sus4 has no 3rd slot, a plain triad has no extensions), and
+    # this app's real interval-string label for each ("m3" for a minor
+    # chord, "maj7" for a major-seventh, "9"/"11"/"13" individually named,
+    # not one anonymous "other" blob). Passes the structured quality dict,
+    # not just the flat semitone set `full` -- guide_tone_formula needs it
+    # to avoid a semitone-collision bug (see its own docstring). `required`
+    # feeds the response's `formula.omittable` field: which slots are the
+    # chord's real guide tones vs. genuinely optional.
+    result["formula"] = guide_tone_formula(parsed["quality"], full, required)
     return result
 
 
 @app.get("/chord-info/{chord_name:path}")
 async def chord_info_endpoint(chord_name: str):
-    """Phase 5 Part 2/7 follow-up: exposes chord_info.py's get_chord_info()
-    (interval breakdown, quality "feeling" description, related chords --
-    see frontend/CHORD_INFO_AUDIT.md) for ANY resolved canonical chord, not
-    just the audio-ID path (main.py's identify_from_audio() was the only
-    live caller before this). Reuses get_chord_info() as-is -- no logic
-    duplicated here, this is pure routing.
+    """Exposes chord_info.py's get_chord_info() (interval breakdown,
+    quality "feeling" description, related chords -- see
+    frontend/CHORD_INFO_AUDIT.md) for any resolved canonical chord, not
+    just the audio-ID path. Pure routing, no logic duplicated.
 
-    404 covers two real, distinct cases without crashing: an unregistered
-    quality, OR a registered quality get_chord_info() still can't process
-    because music_theory.QUALITY_INTERVALS doesn't define its intervals
-    (a real, deliberately-not-fixed-here gap -- see the audit doc's
-    section 2). The frontend degrades gracefully either way: this section
-    of the page is simply omitted, the rest of Results is unaffected.
+    404 covers two distinct cases: an unregistered quality, or a
+    registered quality get_chord_info() can't process because
+    music_theory.QUALITY_INTERVALS doesn't define its intervals (see the
+    audit doc's section 2). The frontend omits this section either way;
+    the rest of Results is unaffected.
     """
     parsed = cp.parse_chord(chord_name)
     if not parsed["parsed"]:
@@ -262,25 +241,18 @@ async def chord_info_endpoint(chord_name: str):
             content={"error": f"{chord_name!r} parses fine but chord_info has no theory data for this quality yet."},
         )
 
-    # "Other ways to write this chord" (Task 2a) -- root/bass enharmonic
-    # alternates (reuses the same NOTE_ALIASES-derived table /chords
-    # already exposes) plus quality-naming alternates (real, already-
-    # computed registry data -- see _quality_alt_spellings above). This is
-    # a fact about the CHORD, not about how this particular search
-    # arrived at it, so it's attached unconditionally here rather than
-    # only when a substitution actually happened during this search.
+    # "Other ways to write this chord" -- root/bass enharmonic alternates
+    # (the same NOTE_ALIASES-derived table /chords exposes) plus
+    # quality-naming alternates (registry data -- see
+    # _quality_alt_spellings above). A fact about the chord, not about how
+    # this search arrived at it, so it's attached unconditionally.
     result["root_alt_spellings"] = REVERSE_ROOT_ALIASES.get(result["root"], [])
     result["bass_alt_spellings"] = REVERSE_ROOT_ALIASES.get(result["slash_bass"], []) if result["slash_bass"] else []
-    # Phase 5 Part 2/7 follow-up (Task 3): one entry per real, honest
-    # quality synonym -- full chord string (built via cp.format_chord(),
-    # never hand-concatenated; several alt spellings start with a bare
-    # accidental, e.g. a "b9"-style token, which format_chord already
-    # knows needs parens to round-trip correctly) PLUS the structured
-    # "why" reason from chord_info.explain_quality_synonym() (already
-    # filtered -- see _quality_alt_spellings' own docstring for which of
-    # the real candidate pairs were excluded and why). Same bass as the
-    # resolved chord throughout, since a quality synonym is still the
-    # identical chord, not a different inversion.
+    # One entry per real quality synonym -- full chord string (via
+    # cp.format_chord(), which adds parens for alt spellings that start
+    # with a bare accidental like "b9") plus the "why" reason from
+    # chord_info.explain_quality_synonym(). Same bass as the resolved
+    # chord -- a quality synonym is the identical chord, not an inversion.
     result["quality_synonyms"] = [
         {
             "chord": cp.format_chord(result["root"], alt, result["slash_bass"]),
@@ -311,11 +283,9 @@ async def songs(chord_name: str):
     if "error" in result:
         result["error"] = f"{chord_name!r} parses fine but matches no known quality in the registry."
         return JSONResponse(status_code=404, content=result)
-    # Real bug fix (Phase 5 Part 1/6): total_songs==0 alone used to always
-    # mean a 404, but get_songs() can now populate quality_fallback_songs
-    # for that exact case -- same-quality songs on other roots, genuinely
-    # useful data, not "nothing found." Only 404 when there's truly nothing
-    # to show at all (no exact-root songs AND no quality fallback either).
+    # total_songs==0 doesn't mean a 404 on its own -- get_songs() can
+    # populate quality_fallback_songs for that case (same-quality songs
+    # on other roots). Only 404 when there's truly nothing to show.
     if result.get("total_songs", 0) == 0 and not result.get("quality_fallback_used"):
         result["error"] = f"{chord_name!r} is a real chord, but no song data is available for it yet."
         return JSONResponse(status_code=404, content=result)

@@ -22,11 +22,10 @@ import re
 import json
 
 # Canonical alteration/add tables live in interval_calculator.py (one-way
-# import -- that module has no dependency on this one, confirmed before
-# adding this). Reused here, not duplicated, per CLAUDE.md's core rule
-# against hand-rolling a second copy of an existing mechanism: see Task 0
-# below, where these become the validation source for which alteration/add
-# tokens are real vs. silently-wrong.
+# import -- that module doesn't import this one). Reused here, not
+# duplicated, per CLAUDE.md's core rule; parse_quality() validates
+# alteration/add tokens against them so an unrecognized token fails
+# parsing instead of silently no-opping downstream.
 from interval_calculator import ALTERATION_MAP, ADD_INTERVAL
 
 # ---------------------------------------------------------------------------
@@ -92,11 +91,10 @@ SYMBOL_SUBS = [
     (r"[△Δ∆]", "maj"),      # jazz major-7 triangle -> maj  (context finishes the "7")
     (r"[øØ]", "m7b5"),
     (r"°", "dim"),
-    # NOTE: a "+" -> "aug" substitution used to live here, but it's been
-    # superseded by more precise handling inside parse_quality() (bare "+",
-    # digit-attached "+5"/"-5", and trailing bare "+"/"-" all handled there).
-    # Applying both would conflict -- e.g. "F7+" needs to become "F7" with
-    # alteration {"#5"}, not "F7aug" (which parse_quality can't consume).
+    # "+" is NOT substituted to "aug" here -- parse_quality() handles bare
+    # "+", digit-attached "+5"/"-5", and trailing bare "+"/"-" more
+    # precisely. A blanket "+" -> "aug" would break "F7+", which must
+    # become "F7" with alteration {"#5"}, not "F7aug".
 ]
 
 # characters that indicate outright junk / scrape garbage if left over
@@ -140,20 +138,12 @@ WORD_ALIASES = [
 # Matches the trailing alteration/add/sus tokens parse_quality() scans for
 # after stripping the base-quality prefix and numeric extension off the
 # front of the blob (e.g. "add9", "sus2", "sus4", bare "sus", "#11", "b9").
-# Hoisted to module level (Phase 5 Part 2/7 follow-up, Task 4) so callers
-# outside this file can detect the SAME real ambiguous-shorthand case
-# parse_quality() itself resolves, without a second hand-written pattern
-# drifting from this one. Real, confirmed-by-testing distinction worth
-# recording: WORD_ALIASES' own `\bsus\b(?!\d)` entry above does NOT cover
-# every "bare sus" case -- it only fires when "sus" has a real word
-# boundary before it (e.g. a bare "Csus" search), never inside a compound
-# blob like "maj7sus" (no boundary exists between the digit "7" and "s").
-# The compound case is resolved entirely by THIS pattern's bare `sus`
-# alternative instead, inside parse_quality()'s alteration-scanning loop
-# below -- two genuinely different code paths for what looks like the same
-# "ambiguous sus" rule, confirmed by tracing real parser output for
-# "maj7sus" (resolved to sus4 via this pattern, not WORD_ALIASES) before
-# picking which one Task 4's detection needed to reuse.
+# Module-level so external callers can detect the same ambiguous-shorthand
+# case parse_quality() resolves, without a second drifting copy of the
+# pattern. Note: WORD_ALIASES' `\bsus\b(?!\d)` entry only fires when "sus"
+# has a real word boundary before it (a bare "Csus"), never inside a
+# compound blob like "maj7sus" -- the compound case is resolved by this
+# pattern's bare `sus` alternative in parse_quality()'s scanning loop.
 ALT_PATTERN = re.compile(
     r"(add[#b]?\d+|sus2|sus4|sus|[#b]\d+|[+-]\d+|no3|no5|[+-]$)"
 )
@@ -327,18 +317,11 @@ def parse_quality(blob):
             unknown_tail.append(rest[pos:m.start()])
         token = m.group(1)
         if token.startswith("add"):
-            # Task 0 fix: ALT_PATTERN's `add[#b]?\d+` alternative matches ANY
-            # digit (e.g. "add3", "add7", "add8", "add10", "add12"), not just
-            # the real, theory-recognized add degrees ADD_INTERVAL actually
-            # knows how to apply -- previously any of these "parsed" fine but
-            # silently vanished with zero effect on the computed intervals in
-            # interval_calculator.compute_intervals() (its own ADD_INTERVAL.get()
-            # returning None was a silent no-op, not a real application).
-            # Validating against ADD_INTERVAL here (the same table that
-            # actually applies it) instead of blindly accepting the regex
-            # match means an unreal add degree now correctly fails parsing
-            # (routed into unknown_tail -> non-empty leftover -> None) instead
-            # of silently succeeding with data loss.
+            # ALT_PATTERN's `add[#b]?\d+` matches any digit ("add3",
+            # "add8", ...), not just the theory-recognized add degrees.
+            # Validate against ADD_INTERVAL (the table that actually
+            # applies it) so an unreal add degree fails parsing (-> leftover
+            # -> None) instead of silently no-opping in compute_intervals().
             if token in ADD_INTERVAL:
                 result["adds"].add(token)
             else:
@@ -361,25 +344,13 @@ def parse_quality(blob):
         elif token in ALT_NORMALIZE:
             result["alterations"].add(ALT_NORMALIZE[token])
         else:
-            # Task 0 fix: same class of bug as the "add" branch above, for
-            # the [#b]\d+ / [+-]\d+ alternative -- e.g. "C+7", "C7#3",
-            # "Cm7b4", "C7#7" all matched this regex and were accepted as a
-            # real alteration ("+7", "#3", "b4", "#7") even though none of
-            # these are real, theory-recognized alterations. Downstream,
-            # interval_calculator.compute_intervals() silently `pass`ed on
-            # any alteration not in ALTERATION_MAP (its comment claimed to
-            # "keep it visible rather than dropping silently" -- it did not;
-            # the token stayed in q["alterations"] but never touched the
-            # actual computed intervals). Concrete real bug this caused:
-            # "C+7" (intended as an augmented-triad-plus-dominant-7th
-            # notation) silently resolved to a plain C major triad, with the
-            # "+7" swallowed without a trace. Validating against
-            # ALTERATION_MAP (the same table that actually applies it) here
-            # means an unreal alteration now correctly fails parsing instead
-            # of silently succeeding with data loss -- matching this file's
-            # own docstring intent ("Anything that doesn't fit a recognized
-            # pattern is returned as UNPARSED... rather than being silently
-            # guessed at").
+            # Same as the "add" branch, for the [#b]\d+ / [+-]\d+
+            # alternative -- "C+7", "C7#3", "Cm7b4" etc. match the regex
+            # but aren't real alterations. compute_intervals() silently
+            # skips any token not in ALTERATION_MAP, so "C+7" would resolve
+            # to a plain C major triad with the "+7" lost. Validate here so
+            # it fails parsing instead, per this file's docstring intent
+            # (unrecognized patterns are UNPARSED, not guessed at).
             if token in ALTERATION_MAP:
                 result["alterations"].add(token)
             else:
@@ -481,9 +452,8 @@ def parse_chord(raw_token):
         "quality": quality,
         "had_junk_chars": had_junk_chars,
         # The literal, as-typed quality substring (e.g. "7#5"), before any
-        # alias/canonical-name resolution -- additive field, purely for
-        # callers that need to know what spelling the user actually typed
-        # vs. the canonical quality name it resolves to (see songs.py's
-        # resolve_query()/get_songs() "searched_quality" field).
+        # alias/canonical-name resolution -- for callers that need what
+        # the user typed vs. the canonical name it resolves to (see
+        # songs.py's resolve_query()/get_songs() "searched_quality").
         "quality_blob": quality_blob,
     }

@@ -1,27 +1,17 @@
-/* Voicing detail modal (Phase 3 Part 5/6) -- layers on top of
-   CaptureModal.css's shared .capture-overlay/.capture-modal chassis
-   (imported by VoicingModal.jsx), rather than a second modal system.
-   Widened past the base 420px specifically so the "larger render of the
-   same fretboard diagram" reads as meaningfully bigger than the compact
-   card, not just a same-size popup. */
+/* Voicing detail modal -- layers on top of CaptureModal.css's shared
+   .capture-overlay/.capture-modal chassis (imported by VoicingModal.jsx)
+   rather than a second modal system. Widened past the base 420px so the
+   larger fretboard diagram reads as meaningfully bigger than the compact
+   card. */
 .voicing-modal {
   width: 480px;
 }
 
-/* TOP ROW: the top-level TITLE stayed gone this round (13th follow-up
-   left that prior decision untouched) -- but a real CHORD NAME is back
-   in this row now, alongside Close (see VoicingModal.jsx). Two states,
-   handled via :has() rather than two separate override classes:
-     1. Chord name present (the normal case): base `.capture-modal__top`
-        rule's own `space-between` is exactly right again -- name left,
-        Close right -- so no override is needed for this state.
-     2. Chord name absent (the rare defensive fallback, no `chordName`
-        prop given): falls back to the 12th follow-up's `flex-end` fix,
-        so a lone Close still pins to the top-right corner rather than
-        space-between's flex-start default for a single child.
-   margin-bottom stays 18px (12th follow-up's own value, unchanged) --
-   still real breathing room below this row whether or not a name
-   renders alongside Close. */
+/* Top row: an optional chord name + Close. Two states via :has():
+     1. Chord name present: the base `.capture-modal__top` rule's
+        `space-between` already puts name left, Close right.
+     2. Chord name absent: `flex-end` so a lone Close still pins
+        top-right rather than falling to space-between's flex-start. */
 .voicing-modal .capture-modal__top {
   margin-bottom: 18px;
 }
@@ -30,67 +20,30 @@
   justify-content: flex-end;
 }
 
-/* Chord name (13th follow-up) -- reuses `.readout` (via the shared
-   ChordName component) verbatim for color/font/glow, only overriding
-   size here: `.readout`'s own base rule is tuned for Results.jsx's big
-   page-level `<h1>`, too large to sit comfortably in this compact top
-   row next to Close -- scaled down to this app's existing 20px "large
-   but not page-title" text tier (matches, e.g., SongCard's own artist
-   name size) rather than inventing a new size. */
+/* Chord name -- reuses `.readout` (via the shared ChordName component)
+   for color/font/glow, only overriding size: `.readout`'s base rule is
+   tuned for Results' page-level `<h1>`, too large for this compact top
+   row, so it's scaled to the app's 20px "large but not page-title" tier. */
 .voicing-modal__chord-name .readout {
   font-size: 20px;
 }
 
-/* Tightened 16px -> 10px (9th follow-up) -- reclaims the gap both above
-   the diagram/tones row and below it (row-to-details, which is what
-   moves the "Omitted from this voicing" sentence closer to the tones
-   panel above it). `.voicing-modal__details`'s OWN internal gap (Notes/
-   Base fret/Capo/omitted-sentence, unchanged below) is completely
-   separate from this outer gap, so the Notes/Base-fret block's own
-   spacing to the omitted sentence is untouched -- only the WHOLE details
-   block moved closer to the row above it. */
+/* The outer row-to-details gap. `.voicing-modal__details`'s own internal
+   gap (below) is separate, so the Notes block's spacing to the omitted
+   sentence is unaffected by this value. */
 .voicing-modal .capture-modal__body {
   gap: 10px;
 }
 
-/* Phase 5 Part 4/7 (3rd round on this panel): back to a two-column
-   layout, diagram left / Chord Tones panel right -- see that round's
-   report for the full reasoning. (History: round 1 was two-column at
-   760px with a boxy grid; round 2 reverted to full-width-below-diagram
-   at a flat 480px because the boxy grid wasted space; round 3 found
-   that full-width-below-diagram's real problem was TOTAL MODAL HEIGHT,
-   which a column fixes better than a row does -- a column's height
-   competes with the diagram's own height instead of adding to it.)
-   Diagram column stays EXACTLY the pixel width it already rendered at
-   pre-this-feature (432px = the base 480px modal's 480-48px padding)
-   with zero shrinkage.
+/* Two-column layout, diagram left / Chord Tones panel right -- a
+   column's height competes with the diagram's own height instead of
+   adding to it (unlike stacking the panel below the diagram, which
+   grew the total modal height). Diagram column stays 432px (the base
+   480px modal minus 48px padding).
 
-   WIDENED to 744px, then 768px, in earlier rounds for the same reason
-   (fitting "m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 · dim7", the two
-   longest real reference strings, tied at 20 characters). WIDENED AGAIN
-   to 792px this round (10th follow-up) -- a REAL, CONFIRMED REGRESSION:
-   the ":" label/reference separator added last round ate into that
-   budget, and the 768px confirmation was never re-run against it. Real
-   measurement this round (before widening) found every cell's content
-   fit inside its available width by only 1-2px -- not actually clipped
-   yet, but close enough that ordinary sub-pixel/font-rendering variance
-   could tip it over, which is almost certainly what the reported "sus4"/
-   "dim7" clipping screenshot actually caught.
-
-   NARROWED to 755px this round (11th follow-up) -- 792px's real margin
-   turned out to be much larger than needed once the true fix (the
-   .panel/.chord-tone-panel specificity bug, not the width itself) was
-   in place: ~51px of slack on the longest reference string, visibly
-   confirmable as excess empty space to the right of the 3rd-degree
-   cell. Re-measured fresh after this round's OTHER structural changes
-   (the new bordered diagram box, subtitles) via the same direct DOM
-   measurement used to catch the original clipping bug (reference
-   span's own rendered width vs. the real space actually available for
-   it in the flex row), not eyeballed -- 745px first (real minimum
-   found: only 4px of margin on the longest strings, under this round's
-   own 10-15px target), then bumped to 755px, landing at a real,
-   confirmed 14px margin on "m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 ·
-   dim7" -- see this round's report for the full per-cell numbers. */
+   Width 755px is sized to fit the two longest reference strings
+   ("m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 · dim7", both 20 chars) in
+   the Chord Tones cells with ~14px of margin. */
 .voicing-modal--with-tones {
   width: 755px;
 }
@@ -101,14 +54,10 @@
   gap: 20px;
 }
 
-/* Both columns are now flex columns with two children each -- a
-   subtitle (.voicing-modal__section-title) and a bordered box below it
-   (.voicing-modal__diagram-box / ChordTonePanel's own .chord-tone-panel)
-   -- symmetric structure on both sides as of this round (11th
-   follow-up). Fixed width, not flex:1, on the diagram column -- this is
-   what guarantees the diagram never shrinks from its pre-this-feature
-   size regardless of how the tones column's own content wants to size
-   itself. */
+/* Both columns are flex columns with two children each -- a subtitle
+   (.voicing-modal__section-title) and a bordered box below it. Fixed
+   width (not flex:1) on the diagram column so the diagram never shrinks
+   regardless of how the tones column's content sizes itself. */
 .voicing-modal__diagram-col {
   flex: 0 0 432px;
   min-width: 0;
@@ -139,45 +88,26 @@
   }
 }
 
-/* "Chord Diagram" / "Chord Tones" subtitles (11th follow-up), a real
-   sub-header tier above each box -- REVERSED from last round's "tiny
-   eyebrow label INSIDE the box" placement, which was a misread of the
-   original ask. Both share this one class so they match each other in
-   size/weight/spacing by construction, not just by coincidence. Plain
-   `<h3>` (see VoicingModal.jsx) reusing this app's EXISTING sub-header
-   typography tier verbatim -- index.css's base h3 rule (14px mono
-   uppercase muted), the same convention ChordOverview.jsx's own
-   "What is this chord?"/"Notes in this chord" kickers and Results.jsx's
-   voicing-list section headers already use -- not a new font-size tier
-   invented for this one spot, and noticeably more prominent than the
-   8px TRIAD/EXTENSIONS group-divider eyebrow style it was wrongly
-   borrowing before. This rule only adds the small bottom margin +
-   centering the base h3 rule doesn't already carry (h3 defaults to
-   left-aligned block text with a 10px bottom margin, tuned down
-   slightly here to keep the gap to its own box tight). */
+/* "Chord Diagram" / "Chord Tones" subtitles above each box. Both share
+   this class so they match. Plain `<h3>` reusing index.css's base h3
+   tier (14px mono uppercase muted, same as ChordOverview's kickers);
+   this rule only adds the small bottom margin + centering. */
 .voicing-modal__section-title {
   margin: 0 0 6px;
   text-align: center;
 }
 
-/* Real bordered box (11th follow-up) around the legend + diagram
-   together -- same panel/panel--recessed classes ChordTonePanel's own
-   box uses (see VoicingModal.jsx), so the two columns' boxes visually
-   match. `flex: 1` + `min-height: 0` (not height: 100%) since this box
-   is now one of two flex children in its column (the subtitle above it
-   is the other) -- the standard fix for a flex child's content
-   otherwise forcing a taller-than-available box. Padding matches
-   ChordTonePanel's own box padding (8px 10px) for visual consistency
-   between the two boxes.
+/* Bordered box around the legend + diagram together -- same panel/
+   panel--recessed classes as ChordTonePanel's box so the two columns
+   match. `flex: 1` + `min-height: 0` (not height: 100%) since it's one
+   of two flex children in its column (the subtitle is the other) -- the
+   standard fix for a flex child's content forcing a taller box. Padding
+   matches ChordTonePanel's box (8px 10px).
 
-   Compound selector (`.voicing-modal__diagram-box.panel`), NOT a bare
-   `.voicing-modal__diagram-box` rule -- this box carries the SAME
-   `panel` class ChordTonePanel.css's own box does, and would otherwise
-   hit the EXACT same real specificity bug found and fixed last round
-   (App.css's base `.panel { padding: 24px }` has identical selector
-   specificity to a bare single-class override and wins on source
-   order) -- caught and fixed proactively here before it could silently
-   repeat, not found again the hard way. */
+   Compound selector `.voicing-modal__diagram-box.panel`, not a bare
+   single class -- this box also carries the `panel` class, and App.css's
+   base `.panel { padding: 24px }` has equal single-class specificity, so
+   it would win on source order. */
 .voicing-modal__diagram-box.panel {
   flex: 1;
   min-height: 0;
@@ -186,50 +116,15 @@
   padding: 8px 10px;
 }
 
-/* REAL BUG FIXED (Phase 5 Part 7, Item 4 session) -- confirmed via
-   direct computed-style reads at a genuinely narrow+short viewport
-   (480x700, real overflow present -- `modalScrollH > modalClientH`),
-   not assumed from the standing hypothesis alone. The hypothesis held
-   in spirit but the actual chain runs one level deeper than "flex:1 has
-   no row to size against": `.voicing-modal__diagram-col` (the media
-   query above) is ALREADY correctly auto-sized to its own content in
-   the narrow column layout (`flex-basis: auto`, confirmed rendering at
-   whatever height its children need) -- but its own child, THIS rule
-   above, still carries the WIDE-layout `flex: 1; min-height: 0` (written
-   for the row-direction case, where `align-items: stretch` gives
-   diagram-col a real, definite height to hand down). In the narrow
-   column layout, diagram-col's own height is itself auto/content-driven
-   -- so this box's `flex: 1` has no defined space to grow INTO, and
-   `min-height: 0` removes the one thing that would otherwise stop it
-   collapsing toward its flex-basis (0%). Confirmed directly: diagram-col
-   rendered at 80px, this box at 51px (just the legend row's own real
-   height), and the SVG inside at literally 0px height -- a real,
-   reproducible collapse, not merely a "looks empty" impression.
-   Fixed by giving this box its own NATURAL, content-driven size in the
-   narrow context instead of fighting to flex-fill a parent that has no
-   space to offer -- `flex: 0 0 auto; min-height: auto` overrides the
-   wide-layout flex-grow behavior for exactly this breakpoint, letting
-   the box (and the real FretboardDiagram inside it, already sized via
-   its own `aspect-ratio` CSS once its width is known) size itself the
-   same way every other block-level element in this now-vertically-
-   stacked layout already does.
-   REAL, ONE-TIME GOTCHA, worth naming plainly: this override was
-   INITIALLY added inside the existing early `@media (max-width: 760px)`
-   block above (right next to `.voicing-modal__diagram-col`'s own narrow
-   override) -- and silently did nothing, because that block sits BEFORE
-   this base rule in the file, and at equal selector specificity (both
-   `.voicing-modal__diagram-box.panel`, 0,2,0) CSS cascade resolves by
-   SOURCE ORDER regardless of which one is inside a media query -- the
-   later, unconditional base rule kept winning even when the media query
-   matched. Confirmed via a real before/after computed-style re-read (not
-   assumed fixed from the CSS alone) before concluding this second,
-   correctly-ordered placement actually took effect. A genuinely new,
-   second `@media (max-width: 760px)` block (not merged into the earlier
-   one) is the right fix here specifically BECAUSE it needs to sit after
-   this base rule -- matching the "declare it right where the specificity
-   math actually requires" principle rather than one single early
-   media-query block for the whole component regardless of what it needs
-   to override. */
+/* In the narrow/column layout, `.voicing-modal__diagram-col`'s own
+   height is content-driven, so this box's wide-layout `flex: 1;
+   min-height: 0` has no defined space to grow into and collapses toward
+   flex-basis 0% (the SVG inside renders 0px tall). `flex: 0 0 auto;
+   min-height: auto` restores natural content-driven sizing here.
+   This override must sit in its OWN @media block AFTER the base
+   `.voicing-modal__diagram-box.panel` rule -- at equal specificity
+   (0,2,0), CSS resolves by source order regardless of media query, so
+   putting it in the earlier @media block did nothing. */
 @media (max-width: 760px) {
   .voicing-modal__diagram-box.panel {
     flex: 0 0 auto;
@@ -237,51 +132,18 @@
   }
 }
 
-/* NEUTRALIZE THE DIAGRAM'S OWN NESTED BOX (12th follow-up) -- real
-   feedback + screenshot confirmed the legend/diagram read as "two
-   separately bordered boxes," not "one box, two flowing sections."
-   Root cause: FretboardDiagram.jsx unconditionally renders its OWN
-   `panel panel--recessed fretboard-diagram` box around just the SVG
-   (needed as-is for its OTHER real call site, the compact voicing cards
-   on Results.jsx, which have no outer wrapper of their own) -- nested
-   inside THIS round's new outer `.voicing-modal__diagram-box` (also
-   panel--recessed), that inner box's own border/background visibly
-   separated it from the legend sitting above it in the same outer box.
-   FretboardDiagram.jsx itself is NOT touched (a shared component, other
-   call site needs its own real box) -- instead, scoped here to ONLY
-   this specific context, its border/background/shadow are stripped via
-   a more-specific selector so it visually blends into the outer box's
-   OWN identical background (--brown-800) instead of drawing a second,
-   separate-looking one.
-
-   PADDING override ADDED (Phase 5 Part 7, follow-up, step 2 of the
-   "restore MIN_FRET_WINDOW, then find any REAL rendering-layer slack"
-   task): the 12px inline padding this element carries
-   (`style={{ padding: 12 }}`, FretboardDiagram.jsx) was previously left
-   alone here -- flagged at the time as "not the source of the boxed
-   look" (true, that was border/background) but never actually measured
-   for whether it cost real space once the window was restored to its
-   full content span. Measured directly this round, after Step 1's
-   revert: with the outer `.voicing-modal__diagram-box` ALREADY
-   providing its own `padding: 8px 10px` around the legend+diagram
-   together, this inner element's 12px is pure REDUNDANT padding in the
-   modal context specifically -- confirmed via direct DOM measurement, a
-   real, unaccounted-for 26px gap between the outer box's own height and
-   the sum of its two real children (legend + this panel), fully
-   explained by exactly this inline padding (12px top + 12px bottom)
-   plus this panel's own 1px top/bottom border width (kept invisible via
-   `border-color: transparent` above, but still occupying layout space).
-   Zeroed out via `!important` -- the ONLY way to override an inline
-   style from CSS, and the one already-documented precedent this
-   codebase uses for exactly this situation (VoicingModal.css's own
-   comment already named this specific inline style as the case
-   `!important` exists for). Scoped narrowly to this one selector, so
-   the compact-card usage of FretboardDiagram (Results.jsx's voicing
-   grid, which has no outer wrapper providing its own padding) keeps its
-   real, needed 12px untouched. This does NOT touch `clusterWindow`,
-   `MIN_FRET_WINDOW`, or any fret-count logic -- purely how much of the
-   ALREADY-CORRECT window's content renders within the box, per the
-   task's own explicit scope. */
+/* FretboardDiagram.jsx renders its own `panel panel--recessed
+   fretboard-diagram` box around the SVG (needed for its compact-card
+   call site, which has no outer wrapper). Nested inside this modal's
+   `.voicing-modal__diagram-box`, that inner box drew a visible second
+   border. Scoped here (not touching the shared component): strip its
+   border/background/shadow so it blends into the outer box's
+   --brown-800 background.
+   Its inline `padding: 12` (from `style={{ padding: 12 }}` in
+   FretboardDiagram.jsx) is also zeroed -- redundant here, since the
+   outer box already has `padding: 8px 10px`; the 12px + a 1px
+   transparent border added ~26px of dead space. `!important` because
+   it's an inline style; the compact-card usage keeps its 12px. */
 .voicing-modal__diagram-box .fretboard-diagram {
   background: transparent;
   border-color: transparent;
@@ -289,11 +151,9 @@
   padding: 0 !important;
 }
 
-/* Faint hairline divider between legend and diagram (12th follow-up),
-   replacing the unwanted heavier nested-box separation above -- same
-   subtle `1px solid var(--brown-700)` treatment this file already uses
-   for the omitted-tones sentence's own divider (.voicing-modal__omitted
-   below), reused here rather than inventing a new divider style. */
+/* Faint hairline divider between legend and diagram -- same
+   `1px solid var(--brown-700)` treatment as the omitted-tones sentence's
+   divider (.voicing-modal__omitted below). */
 .voicing-modal__legend {
   justify-content: center;
   padding-bottom: 8px;
@@ -319,24 +179,11 @@
   font-weight: 600;
 }
 
-/* THREE-FIELD Notes/Base fret/Voicing type row (12th follow-up),
-   replacing three separate stacked lines. LEFT-ALIGNED CLUSTER as of
-   this round (14th follow-up) -- SUPERSEDES the 13th follow-up's
-   `justify-content: space-between` spread entirely (real feedback: that
-   read as "pushed to the full modal width," not the intended look).
-   Back to the default `flex-start` (all three fields + their new
-   separators sit together starting from the row's own left edge, one
-   flowing line) with a smaller, fixed `gap: 10px` (down from 20px --
-   the separator glyphs below now carry the visual "these are distinct
-   fields" job that the old wide 20px gap alone used to carry, so the
-   gap itself no longer needs to be as wide).
-   `flex-wrap: wrap` kept as a safety net only, not the expected
-   behavior -- confirmed via real measurement (see this round's report)
-   that even the longest realistic Notes list (a real 6-note extended
-   voicing) fits on one line at this modal's current 755px width with
-   real margin to spare, so wrapping is not expected to trigger on real
-   data; if it ever did, wrapping is still a better failure mode than
-   silent overflow/clipping. */
+/* Left-aligned cluster of label:value fields on one flowing line, with
+   ' · ' separators (the `<span>`s below) carrying the "distinct fields"
+   job the old wide gap did, so `gap` is a tight 10px. `flex-wrap: wrap`
+   is a safety net -- the longest realistic Notes list (a 6-note voicing)
+   fits on one line at 755px, but wrapping beats silent overflow. */
 .voicing-modal__row-3col {
   display: flex;
   align-items: baseline;
@@ -361,16 +208,10 @@
   min-width: 0;
 }
 
-/* Middle-dot field separator (14th follow-up) -- this app's existing
-   inline-separator convention (see ChordTonePanel.jsx's `ReferenceLine`/
-   `.chord-tone-panel__ref` and ChordOverview.jsx's interval-formula
-   line, both already use ' · ' between same-line items), reused here
-   rather than a new glyph/rule invented for this one spot. Low-opacity
-   (not full `--muted` strength) so it reads as a quiet divider, not a
-   fourth piece of content competing with the three real fields --
-   `aria-hidden` on the element itself (see VoicingModal.jsx) since it's
-   purely visual, redundant with the DOM's own field order for anyone
-   using a screen reader. */
+/* Middle-dot field separator -- the app's inline-separator convention
+   (see ChordTonePanel's ReferenceLine and ChordOverview's
+   interval-formula line). Low-opacity so it reads as a quiet divider,
+   not content; `aria-hidden` since it's purely visual. */
 .voicing-modal__row-3col-sep {
   color: var(--muted);
   opacity: 0.5;
@@ -380,3 +221,7 @@
   padding-top: 8px;
   border-top: 1px solid var(--brown-700);
 }
+
+/* Omittable-tones info lives inline in `.voicing-modal__row-3col` (see
+   VoicingModal.jsx), reusing that row's own item/separator styling, so
+   no dedicated rule is needed here. */

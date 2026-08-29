@@ -1,58 +1,29 @@
-/* Phase 5 Part 7 (vertical orientation): real, confirmed bug found while
-   verifying vertical cards, not present under horizontal. svguitar's own
-   <svg> never sets a `width`/`height` attribute (only `viewBox` --
-   confirmed by reading svg-js-renderer.js), so its CSS-computed size
-   follows the browser's normal "auto sizing of a replaced element with
-   only an intrinsic aspect ratio" rules -- and the containing div
-   (`.fretboard-diagram > div`, styled inline via `aspect-ratio` in
-   FretboardDiagram.jsx) has `height: auto`, whose own auto-height
-   algorithm can still grow past the CSS `aspect-ratio`-computed height
-   to fit taller intrinsic content (aspect-ratio sets a PREFERRED size,
-   not a hard cap, once real content wants more room).
-   This was invisible under horizontal orientation by coincidence, not
-   because the mechanism didn't apply there too: a wider intrinsic SVG
-   (viewBox width grows with fret span, height fixed at 400) has a
-   SHALLOWER intrinsic height-per-width ratio than the fixed CSS box, so
-   its content-based height need is always <= the CSS box's own height --
-   never triggers the overflow-grow path. Vertical orientation inverts
-   this (viewBox width fixed at 400, height grows with fret span), so a
-   voicing needing a taller-than-baseline window has a STEEPER intrinsic
-   ratio than the fixed CSS box -- confirmed via direct measurement on a
-   real wide-gap capo-attachment voicing (chord E, base_fret 4/capo 4,
-   frets 12-X-14-13-12-4): its card rendered at 257.6px tall against
-   every sibling card's 248.9-249.4px, a real, visible row-height
-   mismatch in the 2-column `.voicing-list` grid, not a rounding
-   difference.
-   Fixed by giving the <svg> itself an explicit 100%/100% CSS size --
-   this makes the PARENT's own `aspect-ratio`-computed box authoritative
-   for layout (no more content-driven auto-height to grow past it); the
-   svg's own `viewBox` + `preserveAspectRatio="xMidYMid meet"` (already
-   set by svguitar) still letterboxes/centers the real artwork correctly
-   within that fixed box, exactly as intended -- this rule doesn't change
-   what gets drawn, only removes the parent's own vulnerability to a
-   taller-than-expected intrinsic ratio. */
+/* svguitar's <svg> sets only a `viewBox`, no width/height, so its
+   CSS-computed size follows the intrinsic-aspect-ratio auto-sizing rules
+   -- and the containing div's `height: auto` can grow past its own
+   `aspect-ratio` box to fit taller intrinsic content. Under vertical
+   orientation the viewBox height grows with fret span, so a voicing
+   needing a taller-than-baseline window renders a taller card than its
+   row-mates in the 2-column `.voicing-list` grid.
+   Explicit 100%/100% on the <svg> makes the parent's `aspect-ratio` box
+   authoritative for layout; svguitar's own `preserveAspectRatio="xMidYMid
+   meet"` still letterboxes/centers the artwork within it. */
 .fretboard-diagram svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-/* Interval-colored finger dots (Phase 3 Part 5/6) -- svguitar's per-finger
-   fill/text/stroke colors are set directly via FingerOptions in
-   fretParser.js (SVG presentation attributes, not CSS), but the glow is
-   applied here via a CSS filter keyed off the className each finger dot
-   carries, matching the app's existing ".readout" text-shadow-glow
-   treatment (see index.css) applied per interval color instead of one
-   fixed accent. svguitar's SvgJsRenderer does call .addClass() for finger
-   circles (confirmed in its source), so these classNames really do land
-   on the rendered <circle> elements, unlike the barre/capo <line>
-   elements noted elsewhere as NOT receiving classNames.
-   drop-shadow (not box-shadow, which doesn't apply to SVG shapes) with a
-   soft blur reads as a subtle halo rather than a hard outline -- the
-   ...-border stroke (set inline via FingerOptions) already provides the
-   crisper "tactile" edge these glows are meant to complement, not
-   duplicate. Plain CSS (this project doesn't use CSS Modules), so these
-   selectors apply globally the same as every other stylesheet here. */
+/* Interval-colored finger dots -- svguitar's per-finger fill/text/stroke
+   are set via FingerOptions in fretParser.js (SVG presentation
+   attributes). The glow is a CSS filter keyed off the className each
+   finger dot carries, matching index.css's ".readout" text-shadow glow
+   per interval color. svguitar's SvgJsRenderer calls .addClass() for
+   finger circles, so these classNames land on the rendered <circle>
+   elements -- unlike the barre/capo <line> elements, which don't receive
+   classNames. drop-shadow (box-shadow doesn't apply to SVG shapes) with
+   a soft blur reads as a halo; the crisp edge comes from the inline
+   `...-border` stroke. */
 .interval-dot--root {
   filter: drop-shadow(0 0 3px var(--interval-root-glow));
 }
@@ -73,9 +44,8 @@
   filter: drop-shadow(0 0 3px var(--interval-ext-glow));
 }
 
-/* Extension-tone tints (Phase 3 Part 5/6, 5th follow-up) -- bare 9th/
-   11th/13th each get their own glow shade matching their own fill, same
-   mechanism as the buckets above, just one tint step apart. */
+/* Extension-tone tints -- bare 9th/11th/13th each get their own glow
+   shade matching their own fill, same mechanism as the buckets above. */
 .interval-dot--ext9 {
   filter: drop-shadow(0 0 3px var(--interval-ext-9-glow));
 }
@@ -88,22 +58,17 @@
   filter: drop-shadow(0 0 3px var(--interval-ext-13-glow));
 }
 
-/* A genuine 6th (Phase 5 Part 7, 8th-token session) -- same mechanism as
-   every bucket above, just a real gap: this rule didn't exist at all
-   before, since "6" had no dedicated bucket/glow token to point at yet
-   (see intervalColors.js's own classifyInterval() comment for the real
-   bug this closes). Without this rule, a "sixth"-bucket dot would still
-   get the correct fill/text/border via inline styles (getIntervalStyle),
-   but silently miss its glow halo -- confirmed this would have been a
-   real, if subtle, gap before adding it. */
+/* A genuine 6th -- same mechanism as the buckets above. Without this
+   rule a "sixth"-bucket dot gets the correct fill/text/border via inline
+   styles but misses its glow halo. */
 .interval-dot--sixth {
   filter: drop-shadow(0 0 3px var(--interval-6th-glow));
 }
 
-/* Click-to-expand affordance (Phase 3 Part 5/6) -- only applied when
-   FretboardDiagram receives an onExpand prop (the compact-card usage),
-   never on the modal's own larger render of the same component (which
-   omits onExpand specifically to avoid a modal-inside-modal trigger). */
+/* Click-to-expand affordance -- only applied when FretboardDiagram
+   receives an onExpand prop (the compact-card usage), never the modal's
+   own larger render (which omits onExpand to avoid a modal-inside-modal
+   trigger). */
 .fretboard-diagram--interactive {
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -116,12 +81,7 @@
   outline: none;
 }
 
-/* NOTE: a two-<svg> "capo split-rendering" layout (a separate capo box +
-   cluster box side by side) lived here at one point and was removed --
-   real feedback was that it looked like a detached sub-widget, with
-   inconsistent scaling and label collisions between the two independent
-   svguitar instances. Wide-gap capo voicings now render as ONE grid with
-   the capo hand-drawn as an attached bar in an extended left margin --
-   see FretboardDiagram.jsx's drawCapoAttachment. No extra layout classes
-   needed here; it's still just the one `ref` div with the fixed
-   DIAGRAM_ASPECT_RATIO, same as the normal case.
+/* Wide-gap capo voicings render as ONE grid with the capo hand-drawn as
+   an attached bar in an extended margin (see FretboardDiagram.jsx's
+   drawCapoAttachment) -- no extra layout classes here, just the one
+   `ref` div with the fixed DIAGRAM_ASPECT_RATIO. */

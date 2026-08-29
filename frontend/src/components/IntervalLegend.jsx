@@ -1,38 +1,31 @@
-// Persistent interval-color legend (Phase 3 Part 5/6 follow-ups) -- now
-// that dots show note names instead of interval numbers, this is the
-// only way to read interval identity off the compact cards. One shared
-// component, used both pinned atop the Voicings panel (Results.jsx) and
-// inside VoicingModal, so the two never drift into two different swatch
-// sets. Swatches read their fill color live via the same
-// `getIntervalStyle` used for the actual dots -- guarantees the legend
-// color always matches the real rendered dot color, not just a visually
-// similar hardcoded value.
+// Persistent interval-color legend -- the only way to read interval
+// identity off the compact cards, now that dots show note names not
+// interval numbers. One shared component, pinned atop the Voicings panel
+// (Results.jsx) and inside VoicingModal, so the two can't drift.
+// Swatches read their fill via the same `getIntervalStyle` as the dots,
+// so the legend color always matches the rendered dot color.
 //
-// Chord-quality-aware (3rd + 4th follow-up passes): `formula` is the
-// `/voicings/{chord}` response's `formula` field --
-// `{root, third, sus, fifth, seventh, extensions}`. A guide-tone bucket
-// with no tone in THIS chord's formula is hidden entirely, not grayed
-// out -- e.g. sus2/sus4 have no `third` at all (see `sus` instead), an
-// augmented triad has no `seventh`, and (4th follow-up, fixing the
-// "Other" swatch showing even with nothing in it -- confirmed on a plain
-// F# triad and Bmaj7, neither has any extension tone at all) a chord with
-// an empty `extensions` array now renders ZERO ext-bucket swatches,
-// instead of always showing one generic "Other" entry regardless.
-// `extensions` (4th follow-up) is an ordered list of every individually
-// named 9th/11th/13th/alteration/6th this chord's formula actually has
-// (e.g. Cm13 -> ["9","11","13"]) -- each gets its OWN swatch, all sharing
-// the same ext/"other" color (per the task's explicit instruction: reuse
-// the existing color, don't add 3 new tokens), never collapsed into one
-// anonymous blob.
-// `sus` (4th follow-up) reuses the THIRD bucket's color (moss) since a
-// sus tone occupies that exact structural slot -- see
-// intervalColors.js's `susRealToken` for how "sus2"/"sus4" (display
-// labels only) resolve to the real per-voicing token ("9"/"4") for color
-// lookup.
+// Chord-quality-aware: `formula` is the `/voicings/{chord}` response's
+// `formula` field -- `{root, third, sus, fifth, seventh, extensions}`.
+// A bucket with no tone in this chord's formula is hidden (not grayed):
+// sus2/sus4 have no `third` (use `sus` instead), an augmented triad has
+// no `seventh`, and a chord with an empty `extensions` array renders
+// zero ext-bucket swatches. `extensions` is an ordered list of every
+// named 9th/11th/13th/6th/alteration (e.g. Cm13 -> ["9","11","13"]) --
+// each gets its own swatch, all sharing the ext color. `sus` reuses the
+// THIRD bucket's color (moss), since a sus tone occupies that slot --
+// see intervalColors.js's `susRealToken`.
+import { useAccessibilityPrefs } from '../context/AccessibilityPrefsContext'
 import { getIntervalStyle, susRealToken } from '../lib/intervalColors'
 import './IntervalLegend.css'
 
 function IntervalLegend({ formula, className }) {
+  // Subscribed purely so this component re-renders (and therefore
+  // re-reads getIntervalStyle's now-cleared cache) the moment the
+  // colorblind palette toggles -- see AccessibilityPrefsContext.jsx's own
+  // comment on why a Context value change alone isn't enough without a
+  // consumer actually reading it.
+  useAccessibilityPrefs()
   const entries = [{ key: 'root', sample: '1', label: 'Root' }]
 
   if (formula?.sus?.length) {

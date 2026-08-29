@@ -1,19 +1,13 @@
-/* Phase 5 Part 2/7 follow-up -- "Chord Overview" card, positioned above
-   the Voicings/Songs grid in Results.jsx. Layout/structure follow a real
-   HTML/CSS mockup (frontend/design-reference); colors/type/spacing are
-   the app's own real tokens (App.css/index.css), not the mockup's
-   placeholder palette -- reuses .section.panel for the outer "device
-   face" look, same as every other panel on this page. */
+/* "Chord Overview" card, above the Voicings/Songs grid. Layout follows a
+   mockup (frontend/design-reference); colors/type/spacing are the app's
+   own tokens. Reuses .section.panel for the outer "device face" look. */
 .chord-overview {
   margin-bottom: 24px;
 }
 
-/* 18th follow-up: this panel's own bare <h2>Chord Overview</h2> has no
-   line-height of its own, inheriting the shared global h2 rule's own
-   gap (index.css sets font-size/color/etc but never line-height either)
-   -- same bug class as the kicker labels below, fixed here rather than
-   widening the shared global h2 rule's own scope beyond what this round
-   tested. */
+/* The bare <h2>Chord Overview</h2> inherits the shared global h2 rule,
+   which sets no line-height -- fixed locally rather than widening the
+   shared rule's scope. */
 .chord-overview h2 {
   line-height: normal;
 }
@@ -53,12 +47,9 @@
   }
 }
 
-/* 18th follow-up: real exhaustive-diff finding -- this kicker had no
-   font-size/color/letter-spacing of its own, silently inheriting the
-   shared global `h3` rule (14px, `--muted`, 1.2px letter-spacing,
-   index.css) instead of the mockup's own smaller eyebrow treatment.
-   Also picks up the same missing-line-height fix already applied
-   elsewhere on this page. */
+/* Without its own font-size/color/letter-spacing this kicker would
+   inherit the shared global `h3` rule (14px, --muted, 1.2px) instead of
+   this smaller eyebrow treatment; also the missing-line-height fix. */
 .chord-overview__kicker {
   margin-bottom: 10px;
   font-size: 12px;
@@ -95,13 +86,11 @@
   line-height: normal;
 }
 
-/* A solid-fill circle, same interval-color tokens the fretboard dots and
-   IntervalLegend swatches already use (getIntervalStyle, live in JS) --
-   never a second hardcoded palette. Phase 5 Part 6/7: glow + hover-lift
-   added, matching the mockup's treatment -- the glow color still comes
-   from the same per-interval `style` object as the fill/border (passed
-   as an inline custom property, `getIntervalStyle` already returns a
-   `glow` value alongside fill/text/stroke). */
+/* A solid-fill circle, same interval-color tokens as the fretboard dots
+   and IntervalLegend swatches (getIntervalStyle, in JS). Glow +
+   hover-lift from the mockup -- the glow color comes from the same
+   per-interval `style` object as fill/border, via an inline custom
+   property. */
 .chord-overview__ball {
   display: inline-flex;
   align-items: center;
@@ -156,11 +145,9 @@
   font-weight: 600;
 }
 
-/* Task 3 (Phase 5 Part 2/7 follow-up): "Similar Chords" -- a plain list,
-   deliberately NOT a bordered Songs-style banner like .related-note
-   above (explicit instruction: match the Overview's other facts, e.g.
-   "Notes in this chord"/"Interval formula", not a callout box).
-   Replaces the old "Overlapping chords" banner entirely. */
+/* "Similar Chords" -- a plain list, not a bordered banner like
+   .related-note above, so it matches the Overview's other facts rather
+   than reading as a callout box. */
 .chord-overview__block {
   margin-top: 20px;
 }

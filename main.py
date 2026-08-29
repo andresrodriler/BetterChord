@@ -84,7 +84,7 @@ def identify_from_audio(file_path):
 
     # 3. CNN forward pass -- returns raw logits for all three heads,
     #    NOT probabilities (identify_chord_smart applies sigmoid/softmax
-    #    itself, confirmed directly from its source).
+    #    itself).
     with torch.no_grad():
         note_out, root_out, bass_out = model(x)
 
@@ -99,10 +99,9 @@ def identify_from_audio(file_path):
     # identified["chord"] is a DISPLAY string (e.g. "A6/9 / A6add9" --
     # primary name + alias, joined with " / ") -- never re-parse it.
     # Build a clean, single, parseable chord name from the structured
-    # fields instead, same safe helper used everywhere else in this
-    # project. Confirmed necessary: reusing identified["chord"] directly
-    # caused get_chord_info to silently mis-parse the alias text as a
-    # bogus bass note, and both get_voicings/search to find nothing.
+    # fields via format_chord instead. Reusing identified["chord"]
+    # directly makes get_chord_info mis-parse the alias text as a bogus
+    # bass note, and get_voicings/search find nothing.
     display_name = identified["chord"]
     bass = identified["bass"] if identified["bass"] != identified["root"] else None
     chord_name = cp.format_chord(identified["root"], identified["quality"], bass)

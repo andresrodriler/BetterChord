@@ -1,28 +1,22 @@
 import './DetectionBadge.css'
 
-// The bars are a purely decorative "device scanner reading" flourish, not
-// a real visualization of the audio -- same spirit as the mini waveform in
-// CapturePanel's dropzone (Phase 5 Part 6/7), just in the scan/cyan accent
-// since this badge IS a detection, not a control. Fixed heights + staggered
-// animation delays read as one continuous "scanning" motion.
+// The bars are a decorative "device scanner reading" flourish, not a
+// real audio visualization -- same spirit as CapturePanel's mini
+// waveform, in the scan/cyan accent since this badge is a detection, not
+// a control. Fixed heights + staggered delays read as one scanning
+// motion.
 const BAR_HEIGHTS = [45, 85, 100, 60, 75]
 
-// 18th follow-up: real, previously-missing mockup detail -- 3 small
-// staggered "sonar ping" ripples emanating from the pulsing dot and
-// fading out (sig-ripple, index.css). Colors are literal, matching the
-// mockup's own real values exactly (not app tokens) -- purely decorative
-// and disconnected from any specific interval of the current chord, so
-// hardcoding is the same pragmatic call already made for other one-off
-// decorative mockup values elsewhere (e.g. About's GitHub pill).
+// 3 staggered "sonar ping" ripples from the pulsing dot (sig-ripple,
+// index.css). Colors are literal mockup values (not app tokens) --
+// decorative, disconnected from any chord interval, same call as other
+// one-off decorative mockup values.
 const RIPPLE_COLORS = ['#8faf9b', '#8a7550', '#b6788a']
 
-// Phase 5 Part 6/7 -- "the one bright moment on this page," per the design
-// mockup's own comment: a live-reading detection badge, shown only when a
-// chord was reached via audio identification (Results.jsx already gates
-// this on `fromAudio`, unchanged). Built as its own reusable component
-// since a future phase will likely wire the bars to live confidence data
-// -- this pass only needs it to render and animate correctly against the
-// existing static confidence value; how that value flows in is untouched.
+// A live-reading detection badge, shown only when a chord was reached
+// via audio identification (Results.jsx gates on `fromAudio`). Its own
+// reusable component since a future phase may wire the bars to live
+// confidence data.
 function DetectionBadge({ chord, confidence }) {
   return (
     <span className="detection-badge">

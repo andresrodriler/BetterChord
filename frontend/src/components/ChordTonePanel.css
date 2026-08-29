@@ -1,55 +1,20 @@
-/* Chord tone/interval panel (Phase 5 Part 4/7, this round: bounded
-   cells + category dividers, right-hand column beside the diagram --
-   see VoicingModal.css's .voicing-modal__tones-col). Sits in a
-   .panel--recessed well (this app's existing "pressed into the surface"
-   state), own BetterChord visual treatment, Oolimo-influenced in concept
-   only. */
-/* HEIGHT MATCH (10th follow-up, item 5; UPDATED 11th follow-up): the
-   box's real rendered height matches the diagram box's real height,
-   dynamically, via `align-items: stretch` on the shared parent row
-   (VoicingModal.css's .voicing-modal__row) -- kept this general
-   mechanism rather than switching to a literal hardcoded pixel value,
-   for the same reason as before: the diagram's real height varies
-   slightly per chord (whether a "Nfr" base-fret label renders), and a
-   dynamic match is exactly right for EVERY chord automatically, where a
-   hardcoded number could only ever be exactly right for one.
+/* Chord tone/interval panel -- bounded cells + category dividers in
+   VoicingModal's right-hand column (see VoicingModal.css's
+   .voicing-modal__tones-col). Sits in a .panel--recessed well;
+   Oolimo-influenced in concept only.
 
-   CHANGED this round: `height: 100%` -> `flex: 1` + `min-height: 0`.
-   The "Chord Tones" subtitle moved OUT of this box entirely (now a
-   sibling `<h3>` rendered by VoicingModal.jsx, matching "Chord
-   Diagram"'s own new subtitle on the diagram side) -- this box is now
-   one of two flex children in its own column (.voicing-modal__tones-col,
-   now itself a flex column), not the column's sole content, so
-   `height: 100%` would try to fill the WHOLE stretched column including
-   space the subtitle already needs, overflowing past it. `flex: 1`
-   (fill remaining space after the subtitle) + `min-height: 0` (the
-   standard fix stopping this box's own content from forcing a
-   taller-than-available size) is the correct flex-child pattern here --
-   see VoicingModal.css's `.voicing-modal__diagram-box.panel` for the
-   identical pattern now applied symmetrically on the diagram side. */
-/* REAL BUG, found and fixed this round (10th follow-up) while
-   investigating item 1's clipping regression: `.chord-tone-panel`
-   carries both the `chord-tone-panel` AND `panel` classes (see the JSX
-   -- `className="chord-tone-panel panel panel--recessed"`), and
-   App.css's base `.panel { padding: 24px }` rule has the EXACT SAME
-   selector specificity (one class) as this rule below -- CSS resolves
-   that tie by source order, and `.panel`'s rule was winning, silently
-   giving this panel a real 24px padding on every side instead of the
-   intended 8px/10px this whole time (confirmed via direct
-   getComputedStyle measurement: `padding: 24px`, not `8px 10px`). This
-   ate real horizontal budget from every cell's available text width --
-   a genuine contributing factor to item 1's clipping regression, not
-   just last round's ":" separator addition alone. Fixed with a compound
-   selector (`.chord-tone-panel.panel`, specificity two classes) that
-   unambiguously wins over the base `.panel` rule regardless of source
-   order, rather than reordering stylesheet imports (fragile) or
-   `!important` (the established precedent for a small, deliberate
-   .panel padding override elsewhere in this codebase -- see
-   FretboardDiagram.jsx's own inline `style={{ padding: 12 }}` on the
-   same two classes -- is inline style, but a CSS compound selector
-   achieves the identical intended override more maintainably for a
-   value that doesn't need to vary at render time the way that one
-   does). */
+   Box height matches the diagram box's dynamically, via `align-items:
+   stretch` on the shared row -- a dynamic match handles the slight
+   per-chord variance (whether a "Nfr" label renders) that a hardcoded
+   pixel value couldn't. `flex: 1` + `min-height: 0` (not `height:
+   100%`) since this box is one of two flex children in its column (the
+   "Chord Tones" subtitle is the other) -- same pattern as
+   VoicingModal.css's `.voicing-modal__diagram-box.panel`.
+
+   Compound selector `.chord-tone-panel.panel`, not a bare single class:
+   this element also carries the `panel` class, and App.css's base
+   `.panel { padding: 24px }` has equal single-class specificity, so it
+   would win on source order and override the intended 8px/10px. */
 .chord-tone-panel.panel {
   padding: 8px 10px;
   display: flex;
@@ -59,35 +24,13 @@
   min-height: 0;
 }
 
-/* One item per structural degree (plus an occasional divider directly
-   above it) -- single column, explicitly not a grid, per a prior
-   round's real trade-off discussion (readability of a clean
-   Root->3rd->5th... sequence over a more compact 2-column layout),
-   unchanged this round.
-
-   REAL BUG found and fixed this round (12th follow-up): `justify-
-   content: center` (added a couple rounds back specifically to stop
-   content from sitting flush at the top with slack collecting at the
-   bottom) was doing its job correctly, but the box it's centering
-   WITHIN had grown taller than intended by that point, so centering
-   just split a real 44px of dead space into two equal 22px gaps -- one
-   ABOVE "Triad" (the reported "leftover empty space at top" -- NOT
-   actually a leftover margin/element from the old in-box "Chord Tones"
-   label, confirmed via direct measurement before touching anything: the
-   list's own box already only had ~1px of slack around it; the real
-   44px gap was INSIDE the list, between its own top/bottom edges and
-   its first/last row) and one BELOW "Bass" (item 3's own complaint).
-   Since every chord's panel always has the exact same fixed 9-row
-   content (the always-show-all-canonical-slots model), the fix is to
-   spend that slack on real inter-row spacing instead of leaving it as
-   dead space at the two ends: `gap` raised 3px -> 9px (real content
-   height is constant across every chord, only the box's own height
-   varies slightly per chord by ~6px depending on whether a "Nfr"
-   base-fret label renders on the diagram side -- `justify-content:
-   center` stays in place specifically to gracefully absorb that small
-   remaining per-chord variance, not the original 44px). Re-measured
-   after this change -- see this round's report for the real
-   before/after top/bottom gap numbers. */
+/* One item per structural degree (plus an occasional divider above it)
+   -- single column, not a grid, for readability of a clean
+   Root->3rd->5th sequence. Content is a fixed 9 rows, so `gap: 9px`
+   spends the box's spare height on inter-row spacing rather than dead
+   space at the ends; `justify-content: center` then absorbs the small
+   (~6px) per-chord variance in box height (whether a "Nfr" label
+   renders on the diagram side). */
 .chord-tone-panel__list {
   display: flex;
   flex-direction: column;
@@ -102,13 +45,11 @@
   gap: 2px;
 }
 
-/* Same small-uppercase-mono eyebrow treatment as .chord-tone-panel__heading
-   above (and this app's h2s generally), one step down in emphasis so the
-   hierarchy reads as "CHORD TONES" (panel-level) > "TRIAD"/"7TH"/
-   "EXTENSIONS"/"BASS" (category-level) rather than two headings
-   competing at the same weight. Rendered directly above whichever cell
-   starts a new category (ChordTonePanel.jsx inserts one whenever a
-   row's `group` changes). */
+/* Small-uppercase-mono eyebrow, one step below the panel's own "CHORD
+   TONES" subtitle in emphasis so the hierarchy reads panel > category
+   ("TRIAD"/"7TH·6TH"/"EXTENSIONS"/"BASS"). Rendered above whichever cell
+   starts a new category (ChordTonePanel.jsx inserts one when a row's
+   `group` changes). */
 .chord-tone-panel__group-label {
   margin-top: 1px;
   font-family: var(--mono);
@@ -120,26 +61,13 @@
   opacity: 0.8;
 }
 
-/* --- The cell: one bounded container per slot -----------------------------
-   Direct fix for an earlier round's "jumbled" complaint -- chip + label +
-   reference text are one visually contained unit with its own background
-   (tinted with that slot's real interval color, see ChordTonePanel.jsx's
-   TINT_ALPHA/toRgba).
-
-   SINGLE-LINE (7th follow-up on this panel): cell height dropped again,
-   34px -> 26px -- re-derived the same "measure a real rendered cell
-   first" way as every prior round's height value, not guessed. Now that
-   chip/label/reference are one flex row instead of a two-line stack (see
-   ChordTonePanel.jsx's ToneCell), the chip (18px) is once again the
-   tallest element (the opposite of the previous round, where the 2-line
-   text stack was taller) -- 26px = chip(18) + padding(4 top/bottom) +
-   border(1.5x2), matching a real measured cell exactly, not a guess.
-   `overflow: hidden` kept as a safety net (reference text is still
-   forced to one line via white-space: nowrap below, so this should
-   never actually engage in practice). Padding stays asymmetric (more on
-   the right) -- the fix for the 6th-round "sus4 touching the cell edge"
-   bug -- re-verified this round the single-line layout doesn't
-   reintroduce it (see this round's report). */
+/* One bounded container per slot -- chip + label + reference text as one
+   contained unit with a background tinted by the slot's interval color
+   (ChordTonePanel.jsx's TINT_ALPHA/toRgba). `height: 26px` = chip(18) +
+   padding(4 top/bottom) + border(1.5x2). Padding is asymmetric (more on
+   the right) so the reference text doesn't touch the cell edge.
+   `overflow: hidden` is a safety net -- reference text is forced to one
+   line via white-space: nowrap below. */
 .chord-tone-panel__cell {
   border-radius: var(--radius-sm);
   border: 1px solid;
@@ -149,18 +77,10 @@
   overflow: hidden;
 }
 
-/* Opacity lives HERE (chip+text only), not on .chord-tone-panel__cell
-   above -- the cell's own background/border tint is already a
-   deliberately low, explicitly computed alpha (TINT_ALPHA), and putting
-   opacity on the outer cell would silently re-multiply that tint into
-   something fainter than intended, coupling two things that should stay
-   independently tunable.
-
-   SINGLE-LINE (7th follow-up): chip, degree label, and reference text
-   are now direct children of this one flex row (previously the label+
-   reference lived in a separate `.chord-tone-panel__row-text` column
-   wrapper, stacked two lines tall) -- see ChordTonePanel.jsx's ToneCell
-   for the JSX change this CSS rule now serves. */
+/* Opacity is on chip+text only, not .chord-tone-panel__cell -- the
+   cell's tint is already a low computed alpha (TINT_ALPHA), and opacity
+   on the outer cell would re-multiply it. Chip, degree label, and
+   reference text are direct children of this one flex row. */
 .chord-tone-panel__cell-inner {
   display: flex;
   align-items: center;
@@ -171,19 +91,13 @@
   opacity: 0.55;
 }
 
-/* Chip -- literally the same circular finger-dot language as the
-   fretboard diagram: a filled chip gets the SAME `interval-dot--<bucket>`
-   className FretboardDiagram.jsx's dots use (ChordTonePanel.jsx applies
-   it directly), so it picks up that class's existing glow
-   `filter: drop-shadow(...)` from FretboardDiagram.css for free -- one
-   visual language, not a second one built here.
-
-   SCALE-DOWN: 30px -> 18px (within this round's suggested 18-20px
-   range) -- full-size in BOTH tiers still, unchanged from a prior
-   round's decision that chip SIZE isn't the tier-differentiation
-   mechanism (tint intensity/fill/glow/reference-presence/opacity still
-   are). Border thinned 2px -> 1.5px to stay visually proportional at
-   the smaller diameter rather than reading as a chunky ring. */
+/* Chip -- the same circular finger-dot language as the fretboard
+   diagram: a filled chip gets the same `interval-dot--<bucket>`
+   className the dots use, so it picks up that class's glow
+   `filter: drop-shadow(...)` from FretboardDiagram.css. Chip size is not
+   the tier-differentiation signal (tint/fill/glow/opacity are), so it's
+   full-size in both tiers; border is 1.5px to stay proportional at this
+   diameter. */
 .chord-tone-panel__chip {
   width: 18px;
   height: 18px;
@@ -217,14 +131,9 @@
   opacity: 0.6;
 }
 
-/* Degree label -- e.g. "ROOT", "3RD", "13TH". Fixed min-width (7th
-   follow-up, single-line round) so every row's reference text starts at
-   the same x position regardless of how long its own label happens to
-   be ("ROOT" vs. "13TH") -- a small, deliberate readability touch, not
-   required by the single-line change itself but easy to get for free
-   once label and reference sit on the same flex row as siblings. 30px
-   comfortably fits the longest real label ("13TH", 4 characters) at 9px
-   mono with room to spare, confirmed via real measurement. */
+/* Degree label -- e.g. "ROOT", "3RD", "13TH". Fixed `min-width: 30px`
+   so every row's reference text starts at the same x regardless of
+   label length; 30px fits the longest label ("13TH") at 9px mono. */
 .chord-tone-panel__row-title {
   flex-shrink: 0;
   min-width: 30px;
@@ -239,21 +148,12 @@
 }
 
 /* Reference line -- the other conventional names this slot could hold
-   (e.g. "m3 · 3 · sus2 · sus4"), with whichever one THIS CHORD's formula
-   actually uses picked out via .chord-tone-panel__ref-active.
-
-   CHANGED (7th follow-up): now rendered for EVERY row, primary or
-   muted -- previously gated to primary-tier only. `active` is null for
-   a muted row (lib/chordTones.js), so .chord-tone-panel__ref-active
-   naturally never applies there -- correct, since nothing IS active for
-   a degree this chord's formula doesn't have. Still 10px (the
-   legibility floor confirmed in the previous round -- see that round's
-   report; not revisited this round) and still `white-space: nowrap`,
-   now on the same flex row as the chip/label rather than stacked below
-   the label -- confirmed via real measurement this still fits the
-   existing (unwidened) cell width for every reference string in the
-   app, including the longest ("m3 · 3 · sus2 · sus4" /
-   "b7 · 7 · maj7 · dim7", both tied at 20 characters). */
+   (e.g. "m3 · 3 · sus2 · sus4"), with this chord's own choice picked
+   out via .chord-tone-panel__ref-active. Rendered for every row;
+   `active` is null for a muted row (lib/chordTones.js), so nothing
+   highlights there. `white-space: nowrap`; fits the longest strings
+   ("m3 · 3 · sus2 · sus4" / "b7 · 7 · maj7 · dim7", 20 chars) at the
+   cell width. */
 .chord-tone-panel__ref {
   min-width: 0;
   font-family: var(--mono);
@@ -264,47 +164,30 @@
   white-space: nowrap;
 }
 
-/* 3-TIER REFERENCE EMPHASIS (10th follow-up), replacing the old single
-   `.chord-tone-panel__ref-active` bold+color+underline rule entirely --
-   real feedback was that a formula-included-but-not-actually-played
-   tone (dashed/hollow chip) getting the SAME full treatment as a tone
-   the voicing genuinely sounds read as "this is being played" when it
-   wasn't. `.chord-tone-panel__ref-active` is now just a shared base
-   class (underline geometry only, no color/weight of its own) --
-   ChordTonePanel.jsx always pairs it with exactly one of the three
-   modifiers below, which is what actually decides how loud it reads. */
+/* 3-tier reference emphasis. `.chord-tone-panel__ref-active` is a shared
+   base (underline geometry only); ChordTonePanel.jsx pairs it with one
+   of the three modifiers below, which decides how loud it reads. */
 .chord-tone-panel__ref-active {
   text-decoration: underline;
   text-decoration-thickness: 1.25px;
   text-underline-offset: 1.5px;
 }
 
-/* Tier 1 -- the chip is filled/colored (this voicing actually sounds
-   this tone). Full treatment, unchanged from the old single-state rule:
-   brass + bold, on top of the shared underline above. */
+/* Tier 1 (--played) -- filled/colored chip: brass + bold on top of the
+   shared underline. */
 .chord-tone-panel__ref-active--played {
   color: var(--brass);
   font-weight: 700;
 }
 
-/* Tier 2 (--omitted) -- primary tier (in this chord's formula), but
-   this specific voicing doesn't play it (dashed/hollow chip). No rule
-   of its own needed: it inherits the shared underline from the base
-   `.chord-tone-panel__ref-active` class above and deliberately gets
-   NONE of tier 1's color/weight, which is exactly "underline only."
+/* Tier 2 (--omitted, primary but not played) and Tier 3 (--none, muted)
+   need no rules of their own: --omitted inherits the shared underline
+   and none of tier 1's color/weight (i.e. underline only), and --none
+   never reaches `.chord-tone-panel__ref-active` since `active` is always
+   null for a muted row. Both modifiers are still applied in the JSX. */
 
-   Tier 3 (--none) -- muted (fully outside this chord's formula). Also
-   no rule needed -- `active` is always null for a muted row
-   (lib/chordTones.js's mutedRow()), so this token can never actually
-   reach `.chord-tone-panel__ref-active` in the first place. Both
-   modifier classes are still applied in the JSX either way (see
-   ChordTonePanel.jsx), so `emphasis` reads as a real, complete 3-state
-   value there even though only tier 1 needs CSS of its own here. */
-
-/* Label/reference separator (9th follow-up) -- a real, if small, fix:
-   "Root 1" read ambiguously as to whether "1" belonged to the label or
-   the reference; slightly dimmer than the reference text itself so it
-   reads as punctuation, not additional content. */
+/* Label/reference separator -- without it "Root 1" reads ambiguously.
+   Dimmer than the reference text so it reads as punctuation. */
 .chord-tone-panel__ref-sep {
   opacity: 0.6;
 }

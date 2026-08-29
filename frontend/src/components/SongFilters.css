@@ -1,8 +1,7 @@
-/* Phase 5 Part 5/7: client-side filter panel for the Songs list. Reuses
-   existing pill/segmented/field vocabulary (.tag, .handedness-toggle's
-   pressed-pill treatment, .field-label, .text-input, .panel--recessed) --
-   no new visual language introduced, per betterchord-design's "prefer
-   evolving in place" guidance. */
+/* Client-side filter panel for the Songs list. Reuses existing pill/
+   segmented/field vocabulary (.tag, .handedness-toggle's pressed-pill
+   treatment, .field-label, .text-input, .panel--recessed) -- no new
+   visual language. */
 
 .song-filters__toggle {
   display: inline-flex;
@@ -46,11 +45,8 @@
   color: var(--muted);
 }
 
-/* 3rd follow-up round: margin-top bumped 10px -> 16px -- this panel used
-   to sit just below its own toggle button (10px felt right relative to
-   that); now that the toggle moved into the panel header (Step 1) and
-   this panel renders directly after it with no wrapper between them, it
-   needs the same breathing room as any other block directly under an h2
+/* Renders directly after the panel header (the toggle now lives in the
+   header), so it needs the same breathing room as any block under an h2
    header row. */
 .song-filters__panel {
   margin-top: 16px;
@@ -67,14 +63,11 @@
   gap: 6px;
 }
 
-/* 4th follow-up round (Step 1, vertical-space pass): Capo and Album
-   Release Year now share one row instead of each taking a full-width row
-   of their own. flex-wrap (not a media query) is what provides the
-   "stack on narrow" fallback -- each `.song-filters__subfield` below has
-   a real min-width, so the two wrap onto separate lines automatically
-   once the ROW'S OWN rendered width can't fit both comfortably, correct
-   regardless of the Songs panel's actual column width rather than tied
-   to a guessed global viewport breakpoint. */
+/* Capo and Album Release Year share one row. flex-wrap (not a media
+   query) provides the "stack on narrow" fallback -- each
+   `.song-filters__subfield` has a min-width, so the two wrap onto
+   separate lines once the row's own width can't fit both, correct
+   regardless of the Songs panel's column width. */
 .song-filters__row--split {
   flex-direction: row;
   flex-wrap: wrap;
@@ -82,17 +75,12 @@
   gap: 10px 16px;
 }
 
-/* min-width: max-content (not a guessed pixel value) -- a subfield must
-   never shrink below its OWN control's natural, un-wrapped width (real
-   bug found and fixed here: an earlier pixel-guessed min-width let the
-   flex-shrink algorithm squeeze the Capo segmented control narrower than
-   its own button labels, wrapping "Has capo"/"No capo" mid-word inside
-   the pills -- confirmed via a real screenshot, not assumed). With
-   max-content as the floor, `flex-wrap` on the parent row is what
-   actually provides the "stack on narrow" fallback: once both
-   subfields' real natural widths can't fit side by side, Year wraps
-   onto its own line entirely, rather than either control silently
-   compressing/wrapping its own internal content. */
+/* min-width: max-content so a subfield never shrinks below its control's
+   natural, un-wrapped width -- a pixel guess let flex-shrink squeeze the
+   Capo segmented control so "Has capo"/"No capo" wrapped mid-word inside
+   the pills. With max-content as the floor, `flex-wrap` on the parent
+   row provides the "stack on narrow" fallback instead of a control
+   compressing its own content. */
 .song-filters__subfield {
   display: flex;
   flex-direction: column;
@@ -102,12 +90,9 @@
   min-width: max-content;
 }
 
-/* Phase 5 Part 5/7 follow-up (Step 3): custom-built combobox, replacing
-   the prior round's native <datalist> -- its browser-native popup can't be
-   meaningfully styled cross-browser (confirmed via screenshot: a jarring
-   unstyled white list), a real implementation limitation, not a CSS miss
-   to patch. Positioned relatively so the dropdown list below can anchor to
-   it directly. */
+/* Custom combobox replacing a native <datalist> (whose popup can't be
+   styled cross-browser). `position: relative` so the dropdown list
+   anchors to it. */
 .song-filters__combobox {
   position: relative;
   width: 100%;
@@ -206,17 +191,12 @@
   color: var(--muted);
 }
 
-/* Phase 5 Part 5/7 follow-up (Step 2, 3rd round; repositioned Step 3, 4th
-   round): the "ARTIST GENRE" field label and the currently-SELECTED
-   genres now share one flex-wrap row -- the always-visible summary
-   (SelectedGenres) renders as direct siblings of the label here, not
-   nested in a separate block, so the two read as one row with natural
-   overflow instead of two visually-disconnected pieces. Still a sibling
-   of the (scrollable, text-filterable) chip grid below, never nested
-   inside it -- neither scrolling that grid nor narrowing it with the text
-   filter can hide a real selection from this row. Overflow chips wrap
-   onto a new line within THIS row (flex-wrap, no explicit breakpoint
-   needed) -- still strictly above the search input/chip grid below. */
+/* The "ARTIST GENRE" field label and the currently-SELECTED genres share
+   one flex-wrap row -- the summary (SelectedGenres) renders as direct
+   siblings of the label. Still a sibling of (not nested in) the
+   scrollable/text-filterable chip grid below, so neither scrolling nor
+   filtering that grid can hide a selection. Overflow chips wrap within
+   this row, above the search input/chip grid. */
 .song-filters__genre-header {
   display: flex;
   flex-wrap: wrap;
@@ -249,9 +229,8 @@
   border-color: var(--brass-hover);
 }
 
-/* Phase 5 Part 5/7 follow-up (Step 2): small text filter narrowing the
-   genre chip list itself -- purely a discoverability aid, doesn't touch
-   the underlying ANY-match filter logic below. */
+/* Small text filter narrowing which genre chips are shown -- a
+   discoverability aid, doesn't touch the ANY-match filter logic. */
 .song-filters__genre-search {
   width: 100%;
   padding: 8px 12px;
@@ -291,9 +270,8 @@
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-/* Phase 5 Part 5/7 follow-up (Step 2): per-chip song count, sorted by this
-   descending elsewhere (computeSongFilterOptions) -- shown small/muted so
-   the genre name itself stays the visually primary text. */
+/* Per-chip song count (the sort key, computeSongFilterOptions) -- shown
+   small/muted so the genre name stays the primary text. */
 .song-filters__chip-count {
   font-size: 9px;
   opacity: 0.75;
@@ -354,23 +332,12 @@
   gap: 6px;
 }
 
-/* 4th follow-up round (Step 1): narrowed from the original 90px so Capo +
-   Year can comfortably share one row within the Songs panel's real max
-   content width (~436px, confirmed via screenshot at every real desktop
-   viewport width -- the app's own centered-column max-width caps it there
-   regardless of browser window size beyond that). Real, screenshot-
-   confirmed clipping bug from that pass (a too-narrow width cut off the
-   last digit of real values like "1900"/"2026") was root-caused to the
-   browser's native number-input spinner eating part of the content box --
-   fixed THEN by suppressing that spinner entirely.
-   5th round (user request): the suppressed spinner's tap/hold-to-adjust
-   affordance is back, rebuilt as themed buttons (`.song-filters__year-
-   steppers` below) instead of un-suppressing the native one -- so the
-   native spin buttons stay hidden here (`appearance: textfield`) and
-   `padding-right` grows to reserve real room for the custom buttons
-   instead, re-tuned together with the panel's overall footprint so the
-   Capo+Year row still fits on one line at every real desktop width
-   (see .song-filters__row--split). */
+/* Width narrowed so Capo + Year fit one row within the Songs panel's
+   real max content width (~436px, the app's centered-column cap). The
+   native number-input spin buttons are suppressed (`appearance:
+   textfield`) because they ate part of the content box and clipped the
+   last digit of values like "1900"; `padding-right` reserves room for
+   the custom stepper buttons (`.song-filters__year-steppers`) instead. */
 .song-filters__year-input {
   width: 82px;
   padding: 8px 22px 8px 8px;
@@ -392,15 +359,12 @@
   align-items: center;
 }
 
-/* Themed replacement for the native number-input spinner (5th round) --
-   two small triangle buttons stacked in the same visual position a
-   native spinner would occupy, tap-or-hold to increment/decrement (see
-   useHoldRepeat in SongFilters.jsx). Deliberately excluded from the tab
-   order (tabIndex={-1}) -- the input itself already supports the native
-   ArrowUp/ArrowDown keyboard stepping a `type="number"` input provides
-   regardless of whether its own visual spinner is shown, so a keyboard
-   user's path is the field itself, not tabbing through two extra mouse-
-   oriented buttons. */
+/* Themed replacement for the native number-input spinner -- two small
+   triangle buttons where a native spinner would sit, tap-or-hold to
+   increment/decrement (see useHoldRepeat in SongFilters.jsx). Excluded
+   from the tab order (tabIndex={-1}) since a `type="number"` input
+   already supports ArrowUp/ArrowDown, so a keyboard user's path is the
+   field itself. */
 .song-filters__year-steppers {
   position: absolute;
   right: 3px;
@@ -439,11 +403,9 @@
   color: var(--muted);
 }
 
-/* Phase 5 Part 5/7 follow-up (Step 3, 3rd round): restyled from `.btn-ghost`
-   (a rectangular, differently-bordered treatment that read as a visual
-   outlier next to everything else in this panel) to match the same pill
-   treatment as `.song-filters__toggle`/`.handedness-toggle` -- the app's
-   established "small toggle/action control" language, not a new one. */
+/* Matches the pill treatment of `.song-filters__toggle`/
+   `.handedness-toggle` -- the app's "small toggle/action control"
+   language -- rather than the rectangular `.btn-ghost` it used before. */
 .song-filters__clear {
   align-self: flex-start;
   font-family: var(--mono);

@@ -1,19 +1,13 @@
-// Shared functional-slot logic for a chord's guide-tone formula -- Phase 5
-// Part 4/7. Originally lived only inside VoicingModal.jsx (built for its
-// "Omitted from this voicing" sentence, Phase 3 Part 5/6's 3rd+4th
-// follow-ups); pulled out into its own module here so the new
-// ChordTonePanel.jsx can reuse the EXACT same "what slots does this
-// chord's formula have" logic rather than re-deriving it a second way,
-// per CLAUDE.md's core rule against parallel implementations of the same
-// theory decision. VoicingModal.jsx now imports from here too -- nothing
-// about its own behavior changed, this is a pure extraction.
+// Shared functional-slot logic for a chord's guide-tone formula, used by
+// both VoicingModal.jsx's "Omitted from this voicing" sentence and
+// ChordTonePanel.jsx -- one implementation of "what slots does this
+// chord's formula have," per CLAUDE.md's rule against parallel theory
+// implementations.
 //
 // `formula` is the /voicings/{chord} response's `formula` field --
-// `{root, third, sus, fifth, seventh, extensions}` -- computed
-// backend-side by interval_calculator.guide_tone_formula(). See that
-// function's docstring (and CLAUDE.md's Phase 3 Part 5/6 "Follow-up pass
-// #3" entry) for why it's driven off the structured quality dict rather
-// than a flat semitone set.
+// `{root, third, sus, fifth, seventh, extensions}` -- computed by
+// interval_calculator.guide_tone_formula() (see its docstring for why
+// it's driven off the structured quality dict, not a flat semitone set).
 import { classifyInterval, cssVar, getIntervalStyle, susRealToken } from './intervalColors'
 
 // Every functional slot THIS chord's formula structurally has, in
@@ -38,35 +32,20 @@ export function formulaTones(formula) {
   return tones
 }
 
-// REAL BUG, found + fixed this round (Phase 5 Part 4/7, 13th follow-up):
-// a formula tone's OWN token (e.g. "11") isn't always the literal string
-// a real voicing uses for that same degree -- confirmed directly against
-// live data (see intervalColors.js's classifyInterval for the full
-// root-cause writeup, which this file shares). An unaltered natural 11th
-// is declared as formula token "11" but every real voicing logs it as
-// "4"; a natural 13th is USUALLY "13" but is inconsistently "6" in some
-// real Cm13 rows for the identical pitch. This is what caused a real,
-// confirmed bug: a Cmaj11/E voicing that genuinely plays its F (the
-// natural 11th, real token "4") was shown as MUTED/omitted here, while
-// the SAME real "4" token correctly drove the fretboard diagram's own
-// dot -- the diagram reads voicing.intervals directly, this file was
-// comparing against formula's own label instead.
-// realTokenAliases() returns every string a voicing might legitimately
-// use for a given formula tone -- almost always just the tone's own
-// token, plus the two confirmed real divergences above. Deliberately
-// NOT a blanket "match by degree" rewrite (tried and rejected) -- that
-// would incorrectly conflate a chord's sus2 tone with an unrelated sus4
-// tone, which share ONE color bucket but are two structurally different,
-// mutually exclusive real tokens ("9" vs "4") that must stay
-// distinguishable; a narrow alias list keeps every other degree's exact-
-// match behavior completely unchanged.
-// The sus4+11-extension combo (a real quality, e.g. C11sus4/C13sus4 --
-// confirmed via a live query: formula.sus=["sus4"] AND extensions
-// includes "11" simultaneously) is a genuine, narrower, KNOWN LIMITATION
-// left unresolved here, matching the same call made in
-// intervalColors.js: "4" is already unambiguously the sus4 tone for that
-// formula, and the real per-voicing data has no separate token to tell
-// an actual additional 11th apart from the sus4 tone itself.
+// A formula tone's own token (e.g. "11") isn't always the string a real
+// voicing uses for that degree: an unaltered natural 11th is formula
+// token "11" but voicings log it as "4"; a natural 13th is usually "13"
+// but is inconsistently "6" for the same pitch in some real Cm13 rows.
+// Comparing formula's label directly against voicing.intervals therefore
+// misses genuinely-played notes (the fretboard diagram reads
+// voicing.intervals and got these right; this file didn't).
+// realTokenAliases() returns every token a voicing might use for a given
+// formula tone. Not a blanket "match by degree" -- that would conflate a
+// chord's sus2 tone with an unrelated sus4 tone (both in one color
+// bucket, but "9" vs "4", mutually exclusive). Known limitation, same as
+// intervalColors.js: for the sus4+11-extension combo (e.g. C11sus4) "4"
+// is already the sus4 tone and real data has no separate token for an
+// additional 11th.
 function realTokenAliases(token, formula) {
   if (token === '11' && !formula?.sus?.includes('sus4')) return ['11', '4']
   if (token === '13') return ['13', '6']
@@ -88,87 +67,82 @@ export function presentToneLabels(formula) {
   return formulaTones(formula).map((t) => t.label)
 }
 
-// --- ChordTonePanel data model (Phase 5 Part 4/7) -------------------------
+// Which of this voicing's played notes are optional per the chord's
+// theory -- i.e. present but not required for the chord's name to apply
+// (interval_calculator.guide_tone_formula's `omittable` field, from the
+// required/full distinction compute_intervals() computes for
+// CNN-identification scoring). The inverse of omittedTones() above, which
+// reports REQUIRED tones this voicing leaves out. A missing
+// `formula.omittable` is treated as "nothing omittable."
+export function omittableAndPlayedTones(intervals, notes, formula) {
+  const present = new Set(intervals || [])
+  const omittableLabels = new Set(formula?.omittable || [])
+  if (omittableLabels.size === 0) return []
+  return formulaTones(formula)
+    .filter((t) => omittableLabels.has(t.label))
+    .map((t) => {
+      const idx = realTokenAliases(t.realToken, formula).reduce((found, tok) => {
+        if (found !== -1) return found
+        const i = (intervals || []).indexOf(tok)
+        return i
+      }, -1)
+      return { label: t.label, note: idx >= 0 ? notes?.[idx] : null, played: realTokenAliases(t.realToken, formula).some((tok) => present.has(tok)) }
+    })
+    .filter((t) => t.played)
+}
+
+// --- ChordTonePanel data model ------------------------------------------
 //
 // buildAllToneSlots() is the ONE place that decides, per structural
-// degree: what to title it, what the "other conventional names for this
-// slot" reference list is (with the chord's own real choice marked so
-// the caller can highlight it), what color it should render in (reusing
-// the same getIntervalStyle tokens that color the matching fretboard
-// dot), and whether THIS voicing actually plays it. Layout-agnostic (no
-// JSX, no assumptions about row-vs-column arrangement) specifically so a
-// future layout variant of this panel can reuse this exact data shape
-// instead of re-deriving "what are this chord's slots" a third time.
+// degree: its title, its "other conventional names for this slot"
+// reference list (with the chord's own choice marked), its color (the
+// same getIntervalStyle tokens that color the matching fretboard dot),
+// and whether this voicing plays it. Layout-agnostic (no JSX) so a
+// future layout variant can reuse this data shape.
 //
-// Real per-voicing/formula vocabulary used below was confirmed against
-// live /voicings/{chord} responses, not assumed from the prose comments
-// elsewhere in this codebase (which turned out to describe an older/
-// imprecise version of the third-slot vocabulary -- see DEGREE_META's
-// own `third` entry: real data uses "m3", never "b3"; C11 and Cm7 both
-// queried live to confirm "b7"/"m3" are the actual tokens, not bare
-// "7"/"b3").
+// The panel shows ALL canonical structural degrees for every chord, not
+// just the ones this chord's formula uses -- degrees the formula lacks
+// render as a visually secondary "muted" tier rather than being hidden.
+// Every row carries a `group` (Triad / 7th·6th / Extensions / Bass, see
+// GROUP_LABELS) for ChordTonePanel.jsx's eyebrow-label dividers, and a
+// representative `style` even on muted rows so a muted cell can tint
+// itself with that degree's color family at low opacity (the chip still
+// renders flat/no-glow for muted rows -- drawn in the renderer).
 //
-// This round (3rd follow-up on the panel) always shows all canonical
-// structural degrees for every chord, not just the ones this chord's
-// formula uses -- real feedback wanted the full theory framework visible
-// (Oolimo-influenced), with formula-outside degrees rendered as a
-// visually secondary "muted" tier (see ChordTonePanel.jsx/.css) rather
-// than hidden.
+// The per-degree vocabulary in DEGREE_META below was taken from live
+// /voicings/{chord} responses: real data uses "m3" not "b3", "b7" not
+// bare "7".
 //
-// 4th round on this panel adds `group` to every row (Triad / 7th·6th /
-// Extensions / Bass -- see GROUP_LABELS), for ChordTonePanel.jsx to
-// insert a small eyebrow-label divider whenever the group changes, and a
-// representative `style` even on muted rows (see REPRESENTATIVE_TOKEN)
-// so a muted cell can still tint itself with that degree's own real
-// color family at very low opacity, per the task's explicit "reuse
-// existing tokens, don't invent a neutral one" instruction -- the CHIP
-// itself still renders flat/no-glow for muted rows regardless (that
-// distinction is drawn in the renderer, not here).
-//
-// 7th follow-up on this panel: "sixth" PROMOTED to a permanent canonical
-// degree (was previously an ad-hoc "extra" only interleaved into the
-// list when a chord's formula actually contained one) -- every chord's
-// panel now has 8 canonical degree slots, always, not 7-9 variably.
-// Shares 'seventh's `group: 'seventh'` -- this is what keeps the two
-// rows physically adjacent under one divider, same reasoning as the
-// previous round's regroup (a 6 is the 5th's peer color-tone
-// ALTERNATIVE to a 7th, not stacked on top of one the way a real
-// extension is, so it belongs beside the 7th-degree row, not among
-// 9th/11th/13th).
-//
-// 8th follow-up (this round): reordered to come BEFORE 'seventh', not
-// after -- scale degrees ascend everywhere else in this list (Triad
-// reads Root->3rd->5th, Extensions reads 9th->11th->13th); 6 < 7
-// numerically, so the "7th / 6th" group's own cell order should read
-// 6th-then-7th to match that same ascending convention (the divider's
-// TEXT stays "7th / 6th", unchanged -- only the two cells' physical
-// order flipped, see GROUP_LABELS' own comment for why the text itself
-// wasn't touched).
+// CANONICAL_DEGREES is in ascending scale-degree order throughout (Triad
+// Root->3rd->5th, then 6th before 7th, then Extensions 9th->11th->13th).
+// 6th and 7th share `group: 'seventh'` so they sit adjacent under one
+// divider -- a 6 is the 5th's peer alternative to a 7th, not an
+// extension stacked on top of one.
 const CANONICAL_DEGREES = ['root', 'third', 'fifth', 'sixth', 'seventh', 'ninth', 'eleventh', 'thirteenth']
 
 const DEGREE_META = {
-  // ROOT and SIXTH are the only two canonical degrees with just ONE real
-  // token in this app's model -- unlike 3rd/5th/7th/9th/11th/13th,
-  // there's no genuine alternate spelling to compare against. They still
-  // get a real, non-empty `options` list (so their reference line isn't
-  // empty), but bolding follows the SAME rule as every other degree:
-  // only a PRIMARY-tier row's real formula token ever bolds (see
-  // primaryRow() below, unchanged) -- a MUTED 6th never bolds "6",
-  // exactly like a muted 9th never bolds "9". `alwaysActive` (the 8th
-  // follow-up's mechanism for forcing a bolded token on a MUTED row
-  // too) was a REAL BUG, confirmed via a real C7#11 screenshot: it made
-  // the Bass/6th cells bold their token even when the chord genuinely
-  // has neither, contradicting what "bolded" means everywhere else in
-  // this panel (this chord's real, active choice) -- removed entirely
-  // this round, see mutedRow() below.
+  // ROOT and SIXTH each have just ONE token in this app's model -- no
+  // genuine alternate spelling to compare against, unlike 3rd/5th/7th/
+  // 9th/11th/13th. They still get a non-empty `options` list so their
+  // reference line isn't blank, but bolding follows the same rule as
+  // every degree: only a PRIMARY-tier row's real formula token bolds
+  // (see primaryRow()) -- a muted 6th never bolds "6", exactly like a
+  // muted 9th never bolds "9".
   root:       { title: 'Root', options: ['1'], group: 'triad' },
   third:      { title: '3rd', options: ['m3', '3', 'sus2', 'sus4'], group: 'triad' }, // sus tones occupy this same structural slot
   fifth:      { title: '5th', options: ['b5', '5', '#5'], group: 'triad' },
-  // No real alternate-spelling options exist for a plain added 6th
-  // (confirmed against interval_calculator's own documented extensions
-  // vocabulary) -- same "trivially unambiguous" reasoning as Root above.
+  // No alternate-spelling options for a plain added 6th -- same
+  // "unambiguous" reasoning as Root above.
   sixth:      { title: '6th', options: ['6'], group: 'seventh' },
-  seventh:    { title: '7th', options: ['b7', '7', 'maj7', 'dim7'], group: 'seventh' },
+  // Bare "7" is not in this reference list: it's redundant with "b7".
+  // voicings.db's `intervals` never contains bare "7" (only "b7"), and
+  // interval_calculator.py's _SEVENTH_LABEL maps the quality-dict's
+  // internal "7" key to output label "b7" before `formula.seventh`
+  // reaches the frontend, so "7" is never a spelling a user sees --
+  // listing it would falsely imply a distinct alternate spelling.
+  // classifyInterval() still accepts bare "7" defensively for COLOR
+  // classification (a different, harmless case).
+  seventh:    { title: '7th', options: ['b7', 'maj7', 'dim7'], group: 'seventh' },
   ninth:      { title: '9th', options: ['b9', '9', '#9'], group: 'extensions' },
   eleventh:   { title: '11th', options: ['11', '#11'], group: 'extensions' },
   thirteenth: { title: '13th', options: ['b13', '13', '#13'], group: 'extensions' },
@@ -185,26 +159,15 @@ const REPRESENTATIVE_TOKEN = {
 }
 
 // Eyebrow-label text for each group divider (ChordTonePanel.jsx renders
-// one whenever a row's `group` differs from the previous row's). Every
-// group always has at least one row under the always-show-all-degrees
-// model (even an empty group is represented by a muted placeholder row),
-// so all 4 always render -- there's no real "empty category" case to
-// conditionally skip.
+// one whenever a row's `group` changes). All 4 always render -- every
+// group has at least one row under the show-all-degrees model, even if
+// it's a muted placeholder.
 //
-// DECISION this round (7th follow-up on this panel, promoting "6" to a
-// permanent slot): the 'seventh' group's divider now reads a STATIC
-// "7th / 6th" always, not conditionally (a prior round computed this
-// dynamically in ChordTonePanel.jsx, showing plain "7th" whenever a
-// chord happened to have no 6). That conditional logic no longer makes
-// sense now that the 6th-degree slot is ALWAYS present (primary or
-// muted) for every chord, exactly like every other canonical degree --
-// the divider describes the two cells that are always physically there
-// underneath it, not a fact about this specific chord. Simpler and more
-// honest than keeping the old per-chord conditional around.
-// Renamed 'bass' -> "Bass (Inversion)" this round (9th follow-up), per
-// real feedback -- makes it explicit this slot is specifically about
-// slash-chord inversions, not a generic degree the way the other 3
-// groups' cells are.
+// The 'seventh' divider reads a static "7th / 6th": both slots are
+// always present (primary or muted), so it describes the two cells
+// physically under it, not a fact about the specific chord. 'bass' reads
+// "Bass (Inversion)" to make explicit it's about slash-chord inversions,
+// not a generic degree.
 const GROUP_LABELS = {
   triad: 'Triad',
   seventh: '7th / 6th',
@@ -224,12 +187,9 @@ const BUCKET_TO_DEGREE = {
 }
 
 // classifyInterval() collapses ALTERED 9/11/13ths (#9/b9/#11/b13/#13)
-// into its single generic "ext" color bucket (Phase 3 Part 5/6's own
-// design -- unchanged, this only affects which canonical row the token
-// structurally belongs under, not its color). A plain "6" now routes to
-// its own permanent 'sixth' degree (7th follow-up on this panel --
-// previously fell through to null/"extra" here); a non-sus "4" still has
-// no home among the canonical degrees at all.
+// into its generic "ext" color bucket; this function only decides which
+// canonical row such a token belongs under, not its color. A plain "6"
+// routes to the 'sixth' degree; a non-sus "4" has no canonical degree.
 function extensionDegree(token) {
   if (token === '6') return 'sixth'
   if (['b9', '9', '#9'].includes(token)) return 'ninth'
@@ -239,23 +199,15 @@ function extensionDegree(token) {
 }
 
 // Builds one row per structural degree, in fixed canonical order, for
-// EVERY chord -- a degree this chord's formula doesn't structurally have
-// (e.g. no 9th/11th/13th on a plain triad) still gets a row, tagged
-// `tier: 'muted'` so the renderer can visually de-emphasize it, rather
-// than being omitted the way earlier rounds of this panel did. A degree
-// the formula DOES have gets `tier: 'primary'`, with the exact same
-// filled/omitted-from-this-voicing/color logic as before.
+// every chord. A degree the formula lacks still gets a row, tagged
+// `tier: 'muted'` for the renderer to de-emphasize; a degree the formula
+// has gets `tier: 'primary'` with the filled/omitted/color logic.
 //
-// The rare sus2sus4 base (formula.sus can hold BOTH labels at once --
-// see interval_calculator.guide_tone_formula's own docstring) produces
-// two 'third'-degree rows instead of one. `extras` below is now a purely
-// defensive path -- since "6" was promoted to its own canonical degree
-// (7th follow-up), the only tokens that could still land there are ones
-// this app has never actually seen in real data (extensionDegree()
-// returns null for them); kept so a genuinely unknown future token still
-// renders SOMEWHERE (grouped with 'seventh', same contiguous-run
-// reasoning as before) rather than being silently dropped, not because
-// this path is expected to ever fire today.
+// The rare sus2sus4 base (formula.sus holds both labels) produces two
+// 'third'-degree rows. `extras` is a defensive path: it only catches
+// tokens extensionDegree() can't place, none of which appear in real
+// data today -- kept so an unknown future token renders somewhere
+// (grouped with 'seventh') rather than being dropped.
 export function buildAllToneSlots(voicing, formula) {
   const intervals = voicing?.intervals || []
   const notes = voicing?.notes || []
@@ -280,27 +232,21 @@ export function buildAllToneSlots(voicing, formula) {
   function primaryRow({ tone, bucket }, degree) {
     const style = getIntervalStyle(tone.realToken, formula)
     const isSus = tone.label === 'sus2' || tone.label === 'sus4'
-    // A genuinely unknown formula token (see `extras` comment above) has
-    // degree === null here -- falls back to the 'seventh' group as a
-    // reasonable default rather than crashing or silently dropping it.
+    // An unknown formula token (see `extras`) has degree === null --
+    // fall back to the 'seventh' group rather than crash or drop it.
     const meta = DEGREE_META[degree] || { title: tone.label, options: [], group: 'seventh' }
-    // ALIAS-AWARE presence check (13th follow-up, real bugfix -- see
-    // realTokenAliases()'s own header comment above for the full
-    // root-cause writeup): checks every real token this voicing might
-    // legitimately use for this formula tone, not just the tone's own
-    // literal label. `matchedToken` (not just a boolean) is kept so the
-    // displayed note name comes from whichever real token actually
-    // matched, not assumed to be `tone.realToken` itself.
+    // Alias-aware presence check (see realTokenAliases): match against
+    // every token this voicing might use for this formula tone, not just
+    // its literal label. Keep the matched token (not a boolean) so the
+    // displayed note name comes from whichever token actually matched.
     const matchedToken = realTokenAliases(tone.realToken, formula).find((tok) => tok in noteByToken)
     return {
       key: `${bucket}-${tone.realToken}`,
       tier: 'primary',
       group: meta.group,
       isExtra: degree === null,
-      // BUGFIX (caught on a real Csus4 screenshot, this panel's first
-      // round): a sus tone reuses the third DEGREE's slot and color, but
-      // structurally is NOT a 3rd -- title must say "sus4"/"sus2", not
-      // the degree's generic "3rd".
+      // A sus tone reuses the third degree's slot and color but is not a
+      // 3rd -- title must say "sus4"/"sus2", not the degree's "3rd".
       title: isSus ? tone.label : meta.title,
       active: tone.label,
       options: meta.options,
@@ -317,14 +263,10 @@ export function buildAllToneSlots(voicing, formula) {
       tier: 'muted',
       group: meta.group,
       title: meta.title,
-      // Muted rows carry their real `options` list (7th follow-up), per
-      // the "every cell, primary or muted, always shows its reference
-      // text" instruction. `active` is ALWAYS null here (9th follow-up
-      // BUGFIX -- see DEGREE_META's own comment above for the real bug
-      // this fixes) -- nothing is ever bolded on a muted row, full
-      // stop, exactly like every other muted degree already worked;
-      // ReferenceLine's own "which option is the active one" logic
-      // naturally never matches anything against a null `active`.
+      // Muted rows still carry their `options` list (every cell shows its
+      // reference text). `active` is always null -- nothing is bolded on
+      // a muted row; ReferenceLine's "which option is active" logic never
+      // matches against a null `active`.
       active: null,
       options: meta.options,
       noteName: null,
@@ -344,14 +286,10 @@ export function buildAllToneSlots(voicing, formula) {
     } else {
       rows.push(mutedRow(degree))
     }
-    // Any genuinely unknown extension token (see `extras`'s own comment
-    // above -- not expected to fire on real data today) is interleaved
-    // right here, after BOTH the sixth- and seventh-degree rows have
-    // been emitted (8th follow-up: 'seventh' is now the LAST degree in
-    // this group, since sixth was reordered ahead of it) -- keeps the
-    // 'seventh' group one CONTIGUOUS run in the flat list so
-    // ChordTonePanel.jsx's group-change divider logic still renders
-    // exactly one "7th / 6th" divider, not two.
+    // Any unknown extension token (see `extras`) is interleaved here,
+    // after both the sixth- and seventh-degree rows, so the 'seventh'
+    // group stays one contiguous run and ChordTonePanel.jsx renders
+    // exactly one "7th / 6th" divider.
     if (degree === 'seventh') {
       extras.forEach((entry) => rows.push(primaryRow(entry, null)))
     }
@@ -361,37 +299,22 @@ export function buildAllToneSlots(voicing, formula) {
 }
 
 // The Bass row -- NOT part of the chord's formula (a slash-chord's bass
-// note is a fact about which inversion is being searched, not the
-// chord's own structure). This round (4th on this panel): ALWAYS
-// returned now, never null -- real feedback wanted Bass consistent with
-// the "show the full possible framework" treatment already applied to
-// the other 7 degrees, rather than conditionally present. `tier` is
-// 'primary'/filled only when the caller has a real, non-null `bass` (the
-// /voicings/{chord} response's top-level `bass` field); otherwise
-// 'muted', same visual treatment as any other formula-outside degree.
+// note is about which inversion is searched, not the chord's structure).
+// Always returned, never null, so it's consistent with the show-all-
+// degrees treatment. `tier` is 'primary'/filled only when `bass` (the
+// /voicings/{chord} response's top-level field) is non-null; otherwise
+// 'muted'.
 //
 // When present, colored via whichever structural degree the bass note's
-// own interval falls into (e.g. a first-inversion Cmaj7/E's bass is
-// genuinely the chord's own 3rd) -- confirmed against real Cmaj7/E data
-// during this feature's first round, unchanged. When absent, there's no
-// real bass note to derive a color family from at all (unlike the 7
-// canonical degrees, which always have a REPRESENTATIVE_TOKEN even when
-// muted) -- styled with this app's existing neutral surface/border/muted
-// tokens instead (via intervalColors.js's exported cssVar, not a
-// hardcoded duplicate hex), not a fabricated "bass color."
+// interval falls into (e.g. Cmaj7/E's bass is the chord's 3rd). When
+// absent there's no bass note to derive a color family from -- styled
+// with the app's neutral surface/border/muted tokens via cssVar, not a
+// fabricated "bass color."
 //
-// `options`/`active` REVERTED to empty this round (9th follow-up) --
-// a prior round had given Bass a literal "bass" reference token (a
-// judgment call, flagged at the time as a different KIND of reference
-// than every other cell's, restating identity rather than a real
-// alternate spelling). Real feedback: not useful, remove it entirely --
-// Bass now shows just its chip + "BASS" label, no reference text at
-// all, a deliberate exception to every other cell always showing one
-// (Bass genuinely has no scale-degree alternate-spelling concept the
-// way 3rd/5th/7th/etc. do -- which specific degree a bass note IS
-// varies per chord, it's not a fixed slot identity the way Root's "1"
-// or Sixth's "6" are). ReferenceLine already self-hides on an empty
-// `options` array, so no extra rendering logic was needed for this.
+// `options`/`active` are empty: Bass has no scale-degree alternate-
+// spelling concept (which degree a bass note IS varies per chord, it's
+// not a fixed slot identity like Root's "1"), so it shows just its chip
+// + "BASS" label. ReferenceLine self-hides on empty `options`.
 export function buildBassSlot(voicing, formula, bass) {
   if (bass) {
     const bassInterval = (voicing?.intervals || [])[0] || '1'

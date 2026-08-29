@@ -40,12 +40,10 @@
   flex-direction: column;
 }
 
-/* -- Timestamp row: real DOM elements immediately beneath the canvas
-   (margin-top: 0 -- no floating gap), directly under the tick marks the
-   canvas itself draws flush against its own bottom border. Kept as DOM
-   (not canvas-drawn) specifically so this positioning is trivially
-   precise/testable via getBoundingClientRect, the same reasoning the
-   y-axis dB labels already used. -- */
+/* Timestamp row: real DOM elements immediately beneath the canvas
+   (margin-top: 0), under the tick marks the canvas draws against its own
+   bottom border. DOM (not canvas-drawn) so this positioning is
+   testable via getBoundingClientRect. */
 .waveform__time-axis {
   position: relative;
   height: 12px;
@@ -64,13 +62,9 @@
 }
 
 .waveform__canvas {
-  /* width/height here are a fallback only, for the brief window before
+  /* width/height here are a fallback for the window before
      Waveform.jsx's configureCanvasForDpr() sets a matching inline style
-     -- kept in sync with CANVAS_HEIGHT (160) so there's never a stale
-     mismatch between this fallback and the canvas's real intrinsic
-     buffer size (a real, confirmed bug in an earlier pass: this was
-     still 120px after CANVAS_HEIGHT grew to 160, silently squishing the
-     buffer to fit). */
+     -- kept in sync with CANVAS_HEIGHT (160). */
   display: block;
   width: 100%;
   height: 160px;
@@ -96,12 +90,10 @@
   outline-offset: 2px;
 }
 
-/* -- Custom minimal transport: the ONLY playback controls shown --
-   deliberately replaces the native <audio controls> bar (hidden, see
-   CaptureModal.jsx) so there's one clear seek surface (the waveform
-   above), not two stacked scrub bars. Play/pause uses --brass, the
-   control accent -- this is a user-triggered action, not a detected
-   result. -- */
+/* Custom minimal transport -- the only playback controls shown,
+   replacing the native <audio controls> bar so there's one seek surface
+   (the waveform above), not two scrub bars. Play/pause uses --brass, the
+   control accent (a user action, not a detected result). */
 .waveform__transport {
   display: flex;
   align-items: center;

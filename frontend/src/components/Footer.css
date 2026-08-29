@@ -1,0 +1,60 @@
+/* Renders at the bottom of all four pages. Values from the Home mockup:
+   `font-size: 9px`, `color: rgb(179, 151, 112)` (the same brass-tan
+   literal used for `.home-hero__tags`), `--sans`, centered,
+   `padding: 16px 24px 20px`. A plain in-flow block (not fixed/pinned),
+   so it scrolls with the page. No page-specific width constraint --
+   each page's own container decides how wide this reads. */
+.app-footer {
+  padding: 16px 24px 20px;
+  font-family: var(--sans);
+  font-size: 9px;
+  color: rgb(179, 151, 112);
+  text-align: center;
+}
+
+/* An animated underline that grows in from 0% width on hover (a
+   `background-image` gradient line, `background-size` animated 0% ->
+   100%) rather than an always-on text-decoration. */
+.app-footer__link {
+  color: var(--brass);
+  text-decoration: none;
+  background-image: linear-gradient(var(--brass), var(--brass));
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition: background-size 0.25s ease, color 0.2s ease;
+}
+
+.app-footer__link:hover {
+  background-size: 100% 1px;
+}
+
+/* The second row block, below the disclaimer row. Font-size/color are
+   not redeclared -- they inherit from `.app-footer`. `margin-top` + a
+   faint `border-top` (the `--border` hairline this app uses for its
+   other visually-separated dividers, e.g. VoicingModal's
+   `.voicing-modal__omitted`) separates the two rows. */
+.app-footer__secondary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.app-footer__row--links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Low-opacity inline separator, the same convention as VoicingModal's
+   `.voicing-modal__row-3col-sep` and ChordTonePanel's reference lines. */
+.app-footer__sep {
+  color: currentColor;
+  opacity: 0.5;
+}
+
+.app-footer__row--credit {
+  margin-top: 6px;
+}

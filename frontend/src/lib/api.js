@@ -1,5 +1,5 @@
-// Deferred to Phase 3 per CLAUDE.md Phase 1 notes: hardcoded to the local
-// dev backend, needs to become configurable before deployment.
+// Hardcoded to the local dev backend; must become configurable before
+// deployment (see CLAUDE.md Phase 1 / Phase 7 notes on API_URL).
 export const API_BASE = 'http://127.0.0.1:8000'
 
 export async function identifyAudio(blob, filename) {
@@ -23,14 +23,12 @@ export async function getSongs(chordName) {
   return { ok: res.ok, status: res.status, data }
 }
 
-// Phase 5 Part 2/7 follow-up: chord_info.py's interval breakdown/quality
-// description/related-chords data, for the new "Overall Chord Info"
-// section -- works for ANY resolved canonical chord, not just the
-// audio-ID path (see CHORD_INFO_AUDIT.md). A 404 here (an unregistered
-// quality, or one of the small number chord_info.py can't process yet --
-// see the audit doc) is a normal, expected response, not an error state:
-// callers should just omit the theory subsection, same pattern as
-// getVoicings/getSongs's own ok/data shape.
+// chord_info.py's interval breakdown / quality description / related-
+// chords data for the Chord Overview section -- works for any resolved
+// canonical chord, not just the audio-ID path (see CHORD_INFO_AUDIT.md).
+// A 404 (unregistered quality, or one chord_info.py can't process yet) is
+// a normal response, not an error: callers omit the theory subsection,
+// same ok/data shape as getVoicings/getSongs.
 export async function getChordInfo(chordName) {
   const res = await fetch(`${API_BASE}/chord-info/${encodeURIComponent(chordName)}`)
   const data = await res.json()

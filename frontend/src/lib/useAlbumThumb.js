@@ -1,52 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Phase 4 follow-up: mitigates a real, confirmed Deezer CDN issue (see
-// CLAUDE.md's Phase 4 entry) -- cdn-images.dzcdn.net sometimes serves a
-// generic "no artwork" placeholder icon instead of the real cover, as a
-// normal, successfully-loading 200 response (after an internal redirect),
-// not a network error. A plain <img onError> can never catch this -- the
-// load genuinely succeeds, just with the wrong image. Detection instead
-// keys off the placeholder's own stable identity: Deezer always redirects
-// a "no artwork" cover request to this exact cover ID (the MD5 of an empty
-// string, a well-known "no image" sentinel convention) -- confirmed via
-// dozens of real repeated requests, both for the specific known-bad cover
-// that prompted this and a broad random sample of 15 other, unaffected
-// covers (0/45 false positives).
+// Mitigates a Deezer CDN issue (see CLAUDE.md's Phase 4 entry):
+// cdn-images.dzcdn.net sometimes serves a generic "no artwork"
+// placeholder as a normal 200 response (after an internal redirect), not
+// a network error, so a plain <img onError> can't catch it. Detection
+// keys off the placeholder's stable identity -- Deezer redirects a
+// "no artwork" request to this exact cover ID (the MD5 of an empty
+// string, a common "no image" sentinel).
 const PLACEHOLDER_URL_FRAGMENT = 'd41d8cd98f00b204e9800998ecf8427e'
 
-// Real-world finding, worth recording here since it changes what this hook
-// can actually promise: this issue was originally observed as *intermittent*
-// per-request CDN routing (some requests for the same cover landing on a
-// backend that redirects to the placeholder, others on one that serves the
-// real image). Re-verified before writing this hook, not assumed to still
-// hold -- and it does NOT, for the specific covers already known to be
-// affected: 28/28 real fresh requests across all 3 of Mac DeMarco's distinct
-// cover hashes now hit the placeholder consistently, 100% of the time,
-// matching the same catalog-removal event already documented for his
-// YouTube links. Retries won't recover these SPECIFIC covers anymore --
-// they're genuinely gone from Deezer's origin now, not randomly routed.
-// The retry logic is still worth keeping for genuinely transient cases
-// (this app has no way to know in advance which failure mode a given cover
-// is hitting), and the artist-image/generic-box fallback chain is a real
-// improvement regardless of whether a retry ever recovers anything -- it
-// replaces a misleadingly "successful-looking" wrong icon with either a
-// real photo or an honest "no art" placeholder box.
+// Two failure modes, and retries only help one of them. Some covers are
+// permanently gone from Deezer's origin (a catalog-removal event -- the
+// placeholder is returned 100% of the time, retries can't recover them).
+// Others fail only transiently. The hook can't tell which in advance, so
+// it retries, then falls back down the chain (artist image -> generic
+// box) -- an improvement either way, replacing a misleadingly
+// "successful" wrong icon with a real photo or an honest "no art" box.
 const MAX_ATTEMPTS = 3
 
 /**
- * Loads albumImageUrl for a SongCard's collapsed thumbnail, detecting and
- * working around the placeholder-redirect issue above. Returns
- * { src, isFallback }:
- *   - src: a blob: URL for the real cover, artistImageUrl directly (no
- *     fetch needed -- Part 1's investigation found artist images aren't
- *     affected by this issue), or null if neither is usable.
+ * Loads albumImageUrl for a SongCard's collapsed thumbnail, working
+ * around the placeholder-redirect issue above. Returns { src, isFallback }:
+ *   - src: a blob: URL for the real cover, artistImageUrl directly
+ *     (artist images aren't affected by the issue), or null if neither is
+ *     usable.
  *   - isFallback: true when src is the artist photo, not the real cover.
  *
  * Lazy: does nothing until `containerRef`'s element is near the viewport
- * (IntersectionObserver, same mechanism/margin style as Results.jsx's
- * infinite-scroll sentinel), matching the native `loading="lazy"` behavior
- * this replaces -- otherwise every rendered card would eagerly fetch on
- * mount, undoing Item 2's fix for high-volume chords.
+ * (IntersectionObserver, same as Results.jsx's infinite-scroll sentinel),
+ * so a high-volume chord's cards don't all fetch on mount.
  */
 export function useAlbumThumb(albumImageUrl, artistImageUrl, containerRef) {
   const [state, setState] = useState({ src: null, isFallback: false })
@@ -93,43 +75,23 @@ export function useAlbumThumb(albumImageUrl, artistImageUrl, containerRef) {
       if (!cancelled) setState({ src: artistImageUrl || null, isFallback: !!artistImageUrl })
     }
 
-    // Real bug caught in testing, not theoretical: IntersectionObserver's
-    // `root` defaults to the browser viewport, not `.song-list`'s own
-    // internal scroll container (it has its own `overflow-y: auto`, see
-    // Results.css). Without an explicit `root`, every card's thumb counts
-    // as "visible" the instant the panel itself is on-screen, REGARDLESS
-    // of whether it's scrolled out of view inside that panel -- confirmed
-    // via direct instrumentation: all ~150 initially-rendered cards fired
-    // their observer within ~1 second of each other, triggering a real
-    // fetch stampede (150 concurrent requests competing for the browser's
-    // limited per-origin connections) that measurably slowed down every
-    // individual thumb, including ones that should have loaded instantly.
-    // `closest('.song-list')` finds the real scrolling ancestor so only
-    // thumbs actually near-visible within it are treated as visible.
+    // IntersectionObserver's `root` defaults to the viewport, not
+    // `.song-list`'s own internal scroll container (it has its own
+    // `overflow-y: auto`). Without an explicit `root`, every card's thumb
+    // counts as visible the instant the panel is on-screen even if
+    // scrolled out of view inside it, so all ~150 initial cards fetch at
+    // once. `closest('.song-list')` scopes visibility to the real
+    // scrolling ancestor.
     const scrollRoot = el.closest('.song-list')
 
-    // Second real bug, found while re-testing the fix above: with ~150
-    // IntersectionObservers all created in the same React commit (one per
-    // initially-rendered card), most delivered an incorrect FIRST reading
-    // of `isIntersecting: false` for cards that were genuinely visible --
-    // confirmed via direct instrumentation (only 9/150 cards' first
-    // callback correctly reported true; the rest never fired again, since
-    // IntersectionObserver only re-delivers on a real subsequent change,
-    // and nothing else was changing). A synchronous getBoundingClientRect
-    // check run inline in the effect (tried first) turned out to have the
-    // same underlying race -- still sometimes ran before the browser's
-    // layout for this batch of 150 cards had actually settled, since
-    // React commits the DOM before the browser necessarily finishes a
-    // layout pass for it. Fixed properly by deferring BOTH the manual
-    // check and observer creation to the frame after the one this effect
-    // ran in (`requestAnimationFrame`) -- guarantees the browser has
-    // completed a real layout pass first. Verified via 15 consecutive
-    // fresh-context runs against the real top-ranked (genuinely visible,
-    // no scroll needed) song for chord "C" -- 15/15 resolved correctly
-    // (an earlier "still fails sometimes" reading turned out to be testing
-    // a stale reference song that had since sorted out of the visible
-    // range, not a real remaining bug -- re-verified against the real
-    // current #1 song before trusting this fix).
+    // With ~150 IntersectionObservers created in one React commit, most
+    // deliver an incorrect first `isIntersecting: false` for cards that
+    // are genuinely visible, and never fire again (IntersectionObserver
+    // only re-delivers on a subsequent change). A synchronous
+    // getBoundingClientRect check has the same race -- React commits the
+    // DOM before the browser finishes a layout pass. Deferring both the
+    // manual check and observer creation to the next frame
+    // (requestAnimationFrame) guarantees layout has settled first.
     let observer = null
     let rafId = requestAnimationFrame(() => {
       const isVisible = !scrollRoot || (() => {

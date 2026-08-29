@@ -12,10 +12,9 @@ function formatChannels(channelCount) {
   return channelCount > 1 ? `Stereo (${channelCount}ch)` : 'Mono'
 }
 
-// A real good/warning/danger status card (item 6 of the Phase 5 Part 3/7
-// 2nd polish pass) plus a secondary "device readout" meta panel (item 7)
-// -- both driven entirely by CaptureContext's `quality` object. No new
-// analysis happens here, this is presentation only.
+// A good/warning/danger status card plus a secondary "device readout"
+// meta panel, both driven by CaptureContext's `quality` object.
+// Presentation only, no new analysis.
 function RecordingInfo({ quality }) {
   if (!quality) return null
 

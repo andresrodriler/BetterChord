@@ -61,21 +61,14 @@ _B5_QUALITIES = {
 # Qualities where interval 8 is b13 (degree 6 flat) not #5 (degree 5 sharp)
 _B13_QUALITIES = {'7(#5,b9)', '7(#5,#9)', 'aug13'}
 
-# Qualities where interval 9 is a genuinely DIMINISHED (double-flatted)
-# seventh -- degree 7 lowered twice -- not the natural 6th degree
-# _INTERVAL_DEGREE_BASE defaults interval 9 to. Real bug, found via
-# voicings.py's closing verification pass (Phase 3 Part 5/6): a
-# fully-diminished-7th chord stacks four minor thirds (root-b3-b5-bb7),
-# so its 7th is conventionally spelled as the ROOT's 7th-degree LETTER
-# flattened twice (e.g. F's -> Ebb), never as its 6th-degree letter
-# (D) -- both are the same pitch (9 semitones up), but only one is the
-# letter a diminished-7th chord is actually built from. Confirmed this
-# was a pre-existing gap in THIS function specifically (not something
-# voicings.py's own fix introduced): get_chord_info('Fdim7') already
-# showed "D" labeled "13 (thirteenth)" before this fix, for the exact
-# same underlying reason -- interval 9 had no dim7-aware override here,
-# same class of ambiguity _B5_QUALITIES/_B13_QUALITIES above already
-# solve for interval 6/8, just never extended to interval 9.
+# Qualities where interval 9 is a diminished (double-flatted) seventh --
+# degree 7 lowered twice -- not the natural 6th degree
+# _INTERVAL_DEGREE_BASE defaults it to. A fully-diminished-7th chord
+# stacks four minor thirds (root-b3-b5-bb7), so its 7th is the root's
+# 7th-degree letter flattened twice (F -> Ebb), never the 6th-degree
+# letter (D) -- same pitch, but only one is the letter the chord is
+# built from. Same class of override as _B5_QUALITIES/_B13_QUALITIES for
+# interval 6/8.
 _BB7_QUALITIES = {'dim7'}
 
 
@@ -197,9 +190,8 @@ INTERVAL_LABEL_OVERRIDES = {
         "13b9":     ("13",  "thirteenth"),
         "13#9":     ("13",  "thirteenth"),
         "13b9#11":  ("13",  "thirteenth"),
-        # Paired with _BB7_QUALITIES above -- the note is now correctly
-        # spelled "Ebb"-style (double-flatted 7th degree); the label
-        # needs to match, not still say "13 (thirteenth)" next to it.
+        # Paired with _BB7_QUALITIES above -- the note is spelled as a
+        # double-flatted 7th degree, so the label must match, not "13".
         "dim7":     ("dim7", "diminished seventh"),
     },
 }
@@ -269,20 +261,13 @@ QUALITY_DESCRIPTIONS = {
     "13#9":     "Thirteen sharp-nine — Hendrix-adjacent, fully extended. Funky and tense.",
     "13b9#11":  "Thirteen flat-nine sharp-eleven — the most altered dominant possible.",
 
-    # Phase 5 Part 2/7 follow-up audit (see frontend/CHORD_INFO_AUDIT.md):
-    # 39 real registry qualities had no entry here at all -- 4 of those were
-    # actually already "covered" above under a dead parenthesized key
-    # (e.g. "7(#5,#9)") that no real chord string is ever spelled as; those
-    # were respelled in place to their real registry keys just above. These
-    # are the remaining 35, written from each quality's real interval
-    # content (checked directly against music_theory.QUALITY_INTERVALS/the
-    # registry, not guessed from the name alone). 6 of the original 39
-    # (7b9b13, dim7b13, m7b13, m7no5, susb9, plus 7#5 which isn't even a
-    # registry quality) still can't actually be returned by
-    # get_chord_info() today -- it bails before reaching this dict, since
-    # music_theory.QUALITY_INTERVALS doesn't define their intervals at all.
-    # Described anyway so the text is ready once that deeper gap is closed;
-    # see the audit doc for why that fix is out of this pass's scope.
+    # Descriptions for registry qualities that had no entry above, written
+    # from each quality's real interval content (checked against
+    # music_theory.QUALITY_INTERVALS / the registry). A few (7b9b13,
+    # dim7b13, m7b13, m7no5, susb9) still can't be returned by
+    # get_chord_info() at all -- it bails before this dict, since
+    # QUALITY_INTERVALS doesn't define their intervals -- but the text is
+    # ready once that gap is closed. See frontend/CHORD_INFO_AUDIT.md.
     "#9":         "Sharp-nine add — a major triad clashing against its own sharp ninth (the Hendrix-chord color), no seventh.",
     "11":         "Dominant eleventh — the full 9-11-b7 stack with the third left in, an unusually dense, clashing voicing.",
     "6add11":     "Sixth chord with an added eleventh — colors the mellow 6th sound with a fourth-degree tension.",
@@ -415,51 +400,31 @@ def get_related_chords(root_name, quality, root_idx):
 
 
 # ---------------------------------------------------------------------------
-# Quality-synonym "why" explanations (Phase 5 Part 2/7 follow-up, Task 3b)
+# Quality-synonym "why" explanations
 # ---------------------------------------------------------------------------
-# Investigated EVERY real quality-alt-spelling pair the registry actually
-# produces before writing any of this (36 total, via api.py's
-# _quality_alt_spellings() run against all 95 registry qualities) --
-# real findings, not assumed:
-#   - 4 pairs ("#9"/"(#9)", "b9"/"(b9)", "add#11"/"(add#11)", "7no3"/
-#     "7(no3)") are NOT real spelling differences at all -- identical once
-#     parens are stripped (format_chord() wraps bare-leading-accidental
-#     qualities in parens purely for round-trip parsing safety, per
-#     CLAUDE.md's core parser rule -- never a real alternate name).
-#   - 4 pairs are real, confirmed PARSER ARTIFACTS, not intentional
-#     notation: e.g. "C+7"/"Faddb6"/"GM#7" all resolve to a plain major
-#     triad only because their "+7"/"addb6"/"#7" tokens aren't in any
-#     alteration/add table this engine recognizes, so they're silently
-#     dropped rather than applied -- confirmed by inspecting each raw
-#     parsed structure directly (parse_chord("C+7")["quality"] shows
-#     alterations={"+7"}, a token compute_intervals never acts on), not
-#     assumed from the resolved quality name alone. Similarly "F#m7-11"
-#     resolving to "7#9"'s interval set turned out to be an
-#     interval_calculator quirk around an unsupported "b11" alteration,
-#     not real "m7b11 == 7#9" notation.
-#   - 2 pairs ("13sus4"/"13sus", "6sus2"/"sus2add13") are excluded on
-#     purpose: "13sus" is the SAME bare-"sus"-defaults-to-sus4 ambiguity
-#     Task 4's `_ambiguity_note()` already owns (see songs.py) -- listing
-#     it here too as if it were a clean, symmetric "these mean the same
-#     thing" fact would contradict that mechanism's own framing (there's
-#     no real "sus4 is also called sus", it's shorthand that only ever
-#     meant one thing once resolved). "sus2add13" would need a genuinely
-#     different (word-reordering) explanation than any rule below
-#     produces cleanly, so it's left out rather than forced.
-#   - 1 pair ("m7"/"m7+9") is a real, subtle music-theory edge case, not
-#     an artifact: a `#9`/`+9` alteration collapses onto the SAME semitone
-#     an m7's own minor 3rd already occupies (enharmonically identical
-#     pitch classes), so the raw interval SET is technically unchanged --
-#     but a plain "m7" and an "m7#9" are still understood as two
-#     deliberately different chord choices in practice, not "the same
-#     chord, different name" the way aug7/7#5 genuinely are. Forcing a
-#     "why" here would overclaim a real synonymy that isn't really there.
+# For each real quality-alt-spelling pair the registry produces (via
+# api.py's _quality_alt_spellings()), a clean one-line reason the two
+# describe identical notes -- as a few recurring patterns (below), not one
+# hardcoded string per pair. Applied by api.py's /chord-info enrichment so
+# the frontend never hardcodes per-instance text.
 #
-# The 32 remaining pairs DO have a clean, honest one-line reason, and
-# fall into a small number of real, recurring PATTERNS (not one hardcoded
-# reason per pair) -- stored as structured data/rules here, applied by
-# api.py's /chord-info enrichment, so the frontend never hardcodes
-# per-instance strings (per the task's explicit instruction).
+# Pairs deliberately WITHOUT a reason (explain_quality_synonym returns
+# None -> excluded from Similar Chords):
+#   - parens-only differences ("#9"/"(#9)" etc.) -- format_chord() wraps
+#     bare-leading-accidental qualities in parens for round-trip safety,
+#     not as an alternate name.
+#   - parser artifacts: "C+7"/"Faddb6"/"GM#7" resolve to a plain major
+#     triad only because their alteration/add tokens aren't in any table
+#     this engine recognizes, so they're silently dropped; "F#m7-11"
+#     matching "7#9"'s interval set is an interval_calculator quirk around
+#     an unsupported "b11", not real "m7b11 == 7#9" notation.
+#   - "13sus" / bare-"sus" shorthand -- already owned by songs.py's
+#     _ambiguity_note(); framing it here as a symmetric synonym would
+#     contradict that (there's no real "sus4 is also called sus").
+#   - "m7"/"m7+9": a `#9` alteration lands on the same semitone as m7's
+#     minor 3rd, so the raw interval set is unchanged -- but the two are
+#     understood as different chord choices, not "same chord, different
+#     name" the way aug7/7#5 is.
 
 _SYNONYM_REASON_TEXT = {
     "aug_sharp5": "`aug` means a raised 5th, exactly what `#5` specifies",
@@ -471,10 +436,8 @@ _SYNONYM_REASON_TEXT = {
     "m_shorthand": "`M` is shorthand for `maj` -- both mean the same major-quality extension",
 }
 
-# A small, explicit set for relationships that are real but too specific
-# (or too few in number, 1-3 each) to generalize into a regex rule without
-# it becoming harder to verify than just listing them -- verified against
-# the real registry data above, not guessed.
+# Relationships too specific (or too few, 1-3 each) to generalize into a
+# regex rule without it being harder to verify than just listing them.
 _EXPLICIT_SYNONYM_REASONS = {
     ("aug", "+"): "aug_sharp5",
     ("aug7", "7#5"): "aug_sharp5",
@@ -491,9 +454,8 @@ _EXPLICIT_SYNONYM_REASONS = {
 }
 
 # Octave-equivalent extension-number pairs (a 9th and a 2nd, an 11th and a
-# 4th, a 13th and a 6th, are literally the same pitch class) -- a real,
-# general rule, not a per-pair memorization, since it applies identically
-# regardless of what quality/prefix the "addN" is attached to.
+# 4th, a 13th and a 6th are the same pitch class) -- a general rule,
+# independent of what quality/prefix the "addN" is attached to.
 _OCTAVE_EQUIVALENT_DEGREES = [("9", "2"), ("11", "4"), ("13", "6")]
 
 
@@ -523,13 +485,11 @@ def _symbol_variant(a, b):
 
 
 def explain_quality_synonym(canonical_quality, alt_spelling):
-    """Returns a short, honest, beginner-friendly reason the two quality
-    spellings describe identical notes, or None when there ISN'T a clean
-    one-liner (a real parser artifact, an ambiguous-shorthand duplicate of
-    Task 4's own note, or a genuine music-theory edge case that would
-    overclaim a synonymy that isn't really there -- see the real
-    investigation notes above). None means: exclude this pair from
-    Similar Chords entirely, don't force an explanation onto it."""
+    """Returns a short, beginner-friendly reason the two quality spellings
+    describe identical notes, or None when there isn't a clean one-liner
+    (parser artifact, ambiguous-shorthand duplicate, or an edge case that
+    would overclaim a synonymy -- see the notes above). None means:
+    exclude this pair from Similar Chords."""
     c, a = _strip_parens(canonical_quality), _strip_parens(alt_spelling)
     if c == a:
         return None  # pure formatting difference, not a real alt spelling at all
@@ -551,13 +511,10 @@ def get_chord_info(chord_name):
  
     chord_name = normalize(chord_name)
 
-    # Delegate root/quality/bass splitting to chord_parser.py's real parser
-    # instead of naive character slicing -- that naive approach treated
-    # ANY "/" in the quality portion as a slash-bass separator, which
-    # silently mis-parsed "A6/9" (a real quality using "/" as PART of its
-    # own conventional notation, not a bass separator) into root=A,
-    # quality="6", slash_bass="9" -- a nonsense "bass note" that doesn't
-    # even exist, confirmed via real testing.
+    # Delegate root/quality/bass splitting to chord_parser.py instead of
+    # naive character slicing -- naive slicing treats any "/" in the
+    # quality as a slash-bass separator, mis-parsing "A6/9" (where "/" is
+    # part of the quality notation) into root=A, quality="6", bass="9".
     parsed = cp.parse_chord(chord_name)
     if not parsed["parsed"]:
         return None
@@ -588,11 +545,6 @@ def get_chord_info(chord_name):
     # Falls back to QUALITY_INTERVALS which uses minimal sets for CNN detection
     display_notes = DISPLAY_INTERVALS.get(quality, data["notes"])
 
-    # Sort by musical convention order: R, 3rd, 5th, 7th, 9th, 11th, 13th
-    # Maps each semitone interval to a display position index
-    _DISPLAY_ORDER = {0: 0, 4: 1, 3: 1, 7: 2, 6: 2, 8: 2, 11: 3, 10: 3, 2: 4, 1: 4, 5: 5, 9: 6}
-    display_notes = sorted(display_notes, key=lambda s: _DISPLAY_ORDER.get(s, 99))
-
     for semitones in display_notes:
         # Correctly spelled note name for this root context
         note_name = spell_note(root, semitones, quality)
@@ -611,6 +563,26 @@ def get_chord_info(chord_name):
             "full":      full,
             "display":   f"{short} ({full})",
         })
+
+    # Sort by ascending scale-degree number (R, 2, 3, 4, 5, 6, 7, 9, 11,
+    # 13), not a thirds-stacking bucket order -- otherwise a sus chord's
+    # characteristic 2nd/4th (post-override `short`, e.g. "7sus2" ->
+    # R/2/5/b7) sorts last like a 9th/11th, giving "R · 5 · b7 · 2"
+    # instead of "R · 2 · 5 · b7". Degree is read from the `short` label's
+    # leading digits (ignoring #/b); "R" is degree 1, "dim7"/"6" resolve
+    # via the same digit extraction. Ties (b9 vs 9) break by semitone
+    # count, which orders flat < natural < sharp for every altered pair
+    # here.
+    def _degree_sort_key(iv):
+        short = iv["short"]
+        if short == "R":
+            degree = 1
+        else:
+            m = re.search(r"\d+", short)
+            degree = int(m.group()) if m else 99
+        return (degree, iv["semitones"])
+
+    intervals_list.sort(key=_degree_sort_key)
 
     description = QUALITY_DESCRIPTIONS.get(quality, "Extended or altered chord.")
 
