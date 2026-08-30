@@ -1,0 +1,49 @@
+# Build context trimming for the backend image (see Dockerfile).
+
+# VCS / editor / meta
+.git
+.gitignore
+.claude
+CLAUDE.md
+*.md
+Dockerfile
+.dockerignore
+
+# Python caches / venvs
+**/__pycache__
+**/*.py[cod]
+.venv
+.venv312
+.pytest_cache
+.ruff_cache
+
+# Frontend (not part of the backend image)
+frontend
+
+# Local verification tooling
+test_scripts
+docs
+
+# Large data files -- the container fetches these fresh from Hugging Face
+# in the Dockerfile's "data" stage; the local copies must not enter the
+# build context. chord_cnn.pth is torch-only training output, never used
+# by the deployed image at all.
+betterchord/training_scripts/chord_cnn.pth
+betterchord/training_scripts/chord_cnn.onnx
+data/voicing_data/voicings.db
+data/song_data/betterchord_songs.db
+
+# Personal / regenerable data
+data/song_data/backups
+data/voicing_data/voicings.sql
+data/voicing_data/voicings10row.csv
+data/song_data/songs_10rows.csv
+data/spec_data
+data/noise_bank
+data/betterchord_mytesting
+data/training_data
+data/test_data
+data/dataset_stats.npz
+
+# Note: data/registry/*.json IS kept -- quality_registry.json and
+# guide_tone_groups.json are committed and required at runtime.

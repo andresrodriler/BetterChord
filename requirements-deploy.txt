@@ -1,0 +1,24 @@
+# Runtime deps for the DEPLOYED backend image only (see the repo-root
+# Dockerfile). The container runs CNN inference through chord_cnn.onnx
+# via onnxruntime, so PyTorch (~300 MiB RSS just to import) is not here.
+#
+# Relative to requirements-cpu.txt: no torch/torchaudio/torchvision (ONNX
+# instead), and no matplotlib/pandas -- audited as not imported anywhere
+# on the /identify request path (only cnn_model.py needs them, and that's
+# torch-fallback-only, never loaded in this image). scikit-learn stays:
+# it's a hard dependency of librosa 0.11 and pip pulls it in regardless.
+#
+# Training and the ONNX export step still use PyTorch -- see
+# requirements-cpu.txt (or requirements-gpu.txt).
+
+onnxruntime
+
+librosa==0.11.0
+numpy==2.3.5
+soundfile==0.13.1
+scikit-learn==1.8.0
+audioread>=3.0.0
+fastapi
+uvicorn
+python-multipart
+huggingface_hub

@@ -237,6 +237,9 @@ models/*.pkl
 models/*.h5
 *.pth
 *.pt
+# chord_cnn.onnx -- large derived artifact (converted from chord_cnn.pth
+# by training_scripts/export_onnx.py), lives on the private HF repo, not git.
+*.onnx
 
 # Database files (may contain large amounts of data)
 *.db

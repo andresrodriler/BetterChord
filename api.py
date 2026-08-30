@@ -123,12 +123,18 @@ def _quality_alt_spellings(canonical_quality):
     alts.discard(canonical_quality)
     return sorted(alt for alt in alts if explain_quality_synonym(canonical_quality, alt))
 
-# DEV-ONLY CORS: allows the Vite dev server (localhost:5173) to call this
-# API from the browser. Must be tightened to the real deployed frontend's
-# origin before deployment -- do not ship this to prod.
+# CORS: the browser frontend's origin(s). ALLOWED_ORIGINS is a
+# comma-separated env var set in production to the deployed frontend's
+# origin(s) (e.g. https://betterchord.vercel.app); unset, it falls back to
+# the Vite dev server so local dev needs no config.
+_allowed_origins = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

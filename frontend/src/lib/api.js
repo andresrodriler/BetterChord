@@ -1,6 +1,8 @@
-// Hardcoded to the local dev backend; must become configurable before
-// deployment (see CLAUDE.md Phase 1 / Phase 7 notes on API_URL).
-export const API_BASE = 'http://127.0.0.1:8000'
+// Backend origin. Set VITE_API_URL at build time (Vercel env var) to the
+// deployed backend's origin; when unset it falls back to the local dev
+// backend so `npm run dev` works with no config. Trailing slash trimmed so
+// `${API_BASE}/identify` never becomes `//identify`.
+export const API_BASE = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 
 export async function identifyAudio(blob, filename) {
   const formData = new FormData()

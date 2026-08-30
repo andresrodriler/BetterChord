@@ -10,6 +10,12 @@ torch==2.11.0
 torchaudio==2.11.0
 torchvision==0.26.0
 
+# ONNX export toolchain (betterchord/training_scripts/export_onnx.py):
+# converts the trained chord_cnn.pth to chord_cnn.onnx for the deployed
+# backend, which runs onnxruntime instead of torch. Not needed to train.
+onnx
+onnxruntime
+
 librosa==0.11.0
 numpy==2.3.5
 pandas==3.0.1
@@ -19,3 +25,5 @@ scikit-learn==1.8.0
 audioread>=3.0.0
 fastapi
 uvicorn
+python-multipart
+huggingface_hub

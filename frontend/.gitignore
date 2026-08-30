@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local env files with real values. .env.example IS tracked (documents
+# VITE_API_URL); the real value is set in Vercel's dashboard, not a file.
+.env
+.env.*
+!.env.example
+
 # Design mockup references (Phase 5 Part 6/7) -- large bundled HTML files,
 # not source, not meant to be tracked.
 design-reference
