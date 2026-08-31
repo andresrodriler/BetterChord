@@ -42,6 +42,23 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Cap every numerical-library thread pool to 1. On a 512 MB instance the
+# per-thread stacks/buffers of OpenBLAS (numpy/scipy), OpenMP and numba's
+# threadpool are pure overhead -- the /identify path is one small
+# inference, not a parallel workload. Set as ENV (not just Render
+# dashboard vars) so they're guaranteed present before numpy/OpenBLAS
+# load, and version-controlled.
+#   BLAS backend here is bundled OpenBLAS (libscipy_openblas), which reads
+#   OPENBLAS_NUM_THREADS + OMP_NUM_THREADS. MKL_NUM_THREADS is a no-op
+#   with these PyPI wheels (no MKL) but harmless. numba: NUMBA_NUM_THREADS
+#   caps its pool; workqueue is its lightest threading layer (no external
+#   libgomp/libtbb).
+ENV OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    NUMBA_NUM_THREADS=1 \
+    NUMBA_THREADING_LAYER=workqueue
+
 # Runtime deps. NO torch here -- the container runs CNN inference through
 # chord_cnn.onnx via onnxruntime (requirements-deploy.txt). This is the
 # bulk of the image's memory saving.

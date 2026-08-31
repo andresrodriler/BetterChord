@@ -9,6 +9,8 @@ Run with:
 Then open http://127.0.0.1:8000/docs
 """
 
+import ctypes
+import gc
 import json
 import os
 import shutil
@@ -17,6 +19,27 @@ import tempfile
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+# glibc malloc_trim: hand freed heap pages back to the OS after a request.
+# Python's allocator and numba/scipy/onnxruntime C-side pools retain freed
+# memory, so RSS creeps up across /identify requests on a memory-tight
+# instance. glibc-only; a harmless no-op anywhere libc.so.6 / malloc_trim
+# isn't available (local dev on Windows/macOS).
+try:
+    _LIBC = ctypes.CDLL("libc.so.6", use_errno=False)
+    _HAS_MALLOC_TRIM = hasattr(_LIBC, "malloc_trim")
+except OSError:
+    _LIBC = None
+    _HAS_MALLOC_TRIM = False
+
+
+def _release_memory():
+    gc.collect()
+    if _HAS_MALLOC_TRIM:
+        try:
+            _LIBC.malloc_trim(0)
+        except Exception:
+            pass
 
 from main import identify_from_audio
 from voicings import get_voicings, _load_registry
@@ -206,6 +229,7 @@ async def identify(file: UploadFile = File(...)):
         return JSONResponse(status_code=500, content=content)
     finally:
         os.remove(tmp_path)
+        _release_memory()  # return freed pages to the OS -- see _release_memory
 
     return result
 
