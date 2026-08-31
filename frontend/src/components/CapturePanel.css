@@ -371,3 +371,26 @@
   padding: 11px 14px;
   font-size: 10px;
 }
+
+/* Phone (Results header widget only): the 2-column dropzone+actions
+   layout leaves a lopsided 224px dropzone when it wraps. Make it a clean
+   full-width vertical stack and pull the whole thing in -- on Results
+   this widget is secondary to the chord/voicings/songs content.
+   Mobile-scoped: no effect at any desktop width. */
+@media (max-width: 560px) {
+  .capture-panel--header {
+    gap: 10px;
+    max-width: none;
+  }
+
+  .capture-panel--header .capture-panel__dropzone {
+    width: 100%;
+    min-height: 84px;
+    padding: 10px 12px;
+  }
+
+  .capture-panel__header-actions {
+    min-width: 0;
+    gap: 10px;
+  }
+}

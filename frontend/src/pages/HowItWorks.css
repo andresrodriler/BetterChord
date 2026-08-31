@@ -950,10 +950,27 @@
 
   .hiw-illustration--cnn.hiw-illustration--cnn {
     width: 100%;
+    /* Trim the panel's own side padding so the scaled diagram below has
+       the most room, and clip any sub-pixel rounding from the zoom. */
+    padding: 20px 8px 12px;
+    overflow: hidden;
   }
 
+  /* The CNN diagram's real content is ~420px wide (absolute-positioned
+     Pool/Flatten labels + the heads column -- it genuinely can't
+     reflow). On a 375-430px phone that overflows the panel and forces a
+     sideways scroll to read the pipeline. Pin its width to its natural
+     content extent so it never needs an internal scrollbar, then `zoom`
+     it down to fit: `zoom` (unlike `transform`) also shrinks the box as
+     the panel sees it, so 430px * 0.66 contributes ~284px to layout and
+     fits inside a 375px phone's panel. `zoom` is supported on iOS Safari
+     15.4+ and every modern desktop/Android engine. */
   .hiw-cnn-diagram {
-    overflow-x: auto;
+    width: 430px;
+    zoom: 0.66;
+    overflow-x: visible;
+    padding-left: 6px;
+    margin-inline: auto;
   }
 
   .hiw-illustration__tag {

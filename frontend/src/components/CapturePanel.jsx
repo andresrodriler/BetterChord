@@ -5,6 +5,14 @@ import './CapturePanel.css'
 
 const SUPPORTED_FORMATS = ['MP3', 'WAV', 'WEBM', 'OGG', 'M4A']
 
+// `accept` for the file <input>. `audio/*` alone is loosely interpreted by
+// iOS Safari and can surface Photo Library / Take Video options; pairing it
+// with the explicit extensions this widget actually supports keeps the
+// picker on file-browsing only (no camera/video capture). No `capture`
+// attribute -- that is what triggers the on-device camera/mic UI, and
+// recording has its own dedicated Record button.
+const FILE_ACCEPT = ['audio/*', ...SUPPORTED_FORMATS.map((f) => `.${f.toLowerCase()}`)].join(',')
+
 // Purely decorative -- a small static waveform-shaped flourish inside the
 // dropzone, animated with the shared copper-bar keyframe and colored with
 // the loudness-ramp tokens (Waveform.jsx's audio-level palette) so it
@@ -96,7 +104,7 @@ function CapturePanel({ size = 'default', onSearchSubmit }) {
         ref={fileInputRef}
         className="visually-hidden"
         type="file"
-        accept="audio/*"
+        accept={FILE_ACCEPT}
         tabIndex={-1}
         onChange={handleFileChange}
       />

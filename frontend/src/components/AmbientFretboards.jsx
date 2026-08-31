@@ -1,7 +1,14 @@
+import { useEffect, useState } from 'react'
 import { useAccessibilityPrefs } from '../context/AccessibilityPrefsContext'
 import { getIntervalStyle } from '../lib/intervalColors'
 import { stringX, fretCellY, resolveBaseline } from '../lib/miniFretMath'
 import './AmbientFretboards.css'
+
+// Below this width the scatter system (HORIZONTAL_RANGE etc. below) has no
+// edge margin outside the hero column to work with and shapes land on real
+// text -- see the hook in AmbientFretboards() for why this is a JS check
+// rather than a CSS `@media { display: none }`.
+const HIDE_BELOW = '(max-width: 900px)'
 
 // Purely decorative, aria-hidden scattered fretboard-shaped sketches
 // behind Home's hero.
@@ -245,6 +252,27 @@ function AmbientFretboards() {
   // keep showing the standard palette after a toggle while everything
   // else on the page has switched.
   useAccessibilityPrefs()
+
+  // Hidden below HIDE_BELOW. Done here, not as a CSS `@media { .ambient-
+  // fretboards { display: none } }`: adding that rule -- even though it
+  // never matches at a desktop width -- measurably shifted sub-pixel text
+  // antialiasing across the whole Home page (~0.18% of pixels, no layout
+  // change), a Chromium style-recalc / compositing quirk around this
+  // z-index:-1 filtered decorative layer. Returning null from JS produces
+  // no such shift (verified: identical desktop render). The lazy
+  // initializer reads matchMedia on the first client render, so there's
+  // no desktop->hidden flash.
+  const [hidden, setHidden] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(HIDE_BELOW).matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(HIDE_BELOW)
+    const onChange = () => setHidden(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  if (hidden) return null
+
   return (
     <div className="ambient-fretboards" aria-hidden="true">
       {SHAPES.map((shape, i) => {

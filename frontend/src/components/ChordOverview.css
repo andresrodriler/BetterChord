@@ -170,3 +170,42 @@
   line-height: 1.5;
   color: var(--muted);
 }
+
+/* Phone: the card is stacked single-column below 780px; pull in the
+   inter-section spacing and shrink the note balls a touch so the whole
+   overview reads as one compact block rather than a tall desktop card.
+   Mobile-scoped -- desktop widths unaffected. */
+@media (max-width: 560px) {
+  .chord-overview {
+    margin-bottom: 16px;
+  }
+
+  .chord-overview__col {
+    padding-bottom: 14px;
+  }
+
+  .chord-overview__notes {
+    gap: 10px;
+  }
+
+  .chord-overview__note {
+    min-width: 44px;
+  }
+
+  .chord-overview__ball {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .chord-overview__formula {
+    font-size: 20px;
+  }
+
+  .chord-overview__grid + .chord-overview__explain,
+  .chord-overview__grid + .chord-overview__block,
+  .chord-overview__explain + .chord-overview__block {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+}

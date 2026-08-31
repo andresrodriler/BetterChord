@@ -12,11 +12,34 @@ BetterChord/
                                       quality description, root/bass/quality alt-spellings,
                                       quality synonyms -- Phase 5 Part 2/7), /songs/{chord}
   requirements-gpu.txt              -- local dev, CUDA GPU
-  requirements-cpu.txt              -- CPU-only / deployment
+  requirements-cpu.txt              -- CPU-only, training + ONNX export (has torch)
+  requirements-deploy.txt          -- Phase 7: runtime-only deps for the deployed
+                                      backend image -- requirements-cpu.txt minus
+                                      torch/torchaudio/torchvision and minus
+                                      matplotlib/pandas, plus onnxruntime (the
+                                      container runs CNN inference via ONNX)
   LICENSE                           -- MIT
   TODO.md
   README.md
   STRUCTURE.md                     -- this file
+  Dockerfile                       -- Phase 7: 2-stage backend image (stage 1 fetches
+                                      the private HF data files in isolation so
+                                      HF_TOKEN never lands in a layer; stage 2 is the
+                                      API runtime -- ffmpeg via apt, requirements-
+                                      deploy.txt, thread-cap ENV vars, uvicorn api:app
+                                      on $PORT). Render was abandoned (see CLAUDE.md
+                                      Phase 7); reusable for Cloud Run.
+  .dockerignore                     -- trims the build context; excludes the large
+                                      local data files so the container fetches fresh
+  DEPLOYMENT.md                     -- Phase 7: dashboard checklist + env vars for the
+                                      backend (was Render, now for Cloud Run) and the
+                                      Vercel frontend; retrain -> re-export -> re-upload
+                                      chord_cnn.onnx workflow
+  docker/
+    fetch_hf_data.py                -- Phase 7: build-time script the Dockerfile's
+                                      stage 1 runs -- downloads chord_cnn.onnx,
+                                      voicings.db, betterchord_songs.db from the
+                                      private HF dataset repo to their real paths
   betterchord/
     .env                           -- local secrets (gitignored, not committed)
     config/                        -- live-serving modules
@@ -26,6 +49,14 @@ BetterChord/
       the live inference path via main.py/api.py, not training-only)
     training_scripts/               -- CNN training pipeline, not used at runtime
       cnn_model.py, chord_to_notes.py, database.py, train.py, chord_cnn.pth
+      export_onnx.py                -- Phase 7: one-time-per-training-run export of
+                                      chord_cnn.pth -> chord_cnn.onnx (torch.onnx.export)
+                                      with a built-in numerical-equivalence check;
+                                      re-run after every retrain
+      chord_cnn.onnx                -- Phase 7: converted copy of chord_cnn.pth's
+                                      weights, run by onnxruntime with no torch dep;
+                                      what the deployed image uses. Gitignored (large
+                                      derived artifact, lives on the private HF repo)
     data_scripts/                   -- registry/maintenance pipeline, rerun when data changes
       registry_builder.py, guide_tone_grouping.py, build_normalized_columns.py
   data/
@@ -37,6 +68,10 @@ BetterChord/
     test_audio_file.py, test_chords.py
   frontend/                         -- React 19 + Vite SPA
     index.html, vite.config.js, package.json
+    .env.example                    -- Phase 7: documents VITE_API_URL (the deployed
+                                       backend origin, read at build time by
+                                       src/lib/api.js); real value set in the host's
+                                       dashboard, not committed
     CHORD_INFO_AUDIT.md              -- chord_info.py data-coverage audit that fed the
                                          Chord Overview card (Phase 5 Part 2/7)
     NOTE_STYLE_GUIDE.md              -- wording/terminology/ordering rules for every

@@ -257,12 +257,11 @@
 .voicing-list {
   display: grid;
   /* Same minmax(0, 1fr) reasoning as .results-grid -- keeps the two
-     columns genuinely equal. */
+     columns genuinely equal. Stays 2-up on phone too (the density pass
+     at the bottom of this file) -- each card ~150px is still legible,
+     and one giant diagram per row read as a squished desktop layout. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  @media (max-width: 560px) {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Just a layout wrapper -- FretboardDiagram supplies its own panel.
@@ -372,32 +371,56 @@
   min-width: 260px;
 }
 
-/* Phone. The lists keep their capped internal scroll (max-height: 590px
-   above) -- confirmed usable at 375px: a card + a partial next card =
-   the normal "scroll for more" affordance, and it keeps the Songs panel
-   reachable instead of pushing it past a ~40,000px page of voicing
-   cards. Stacked grid columns use minmax(0, 1fr) (plain 1fr respects a
-   wide child's min-content and lets it push past the viewport); panel
-   headers wrap their top-right control below the label; the chord title
-   shrinks so long names fit. */
+/* Tablet: the two big panels stack. minmax(0, 1fr) (plain 1fr respects a
+   wide child's min-content and lets it push past the viewport). */
 @media (max-width: 780px) {
   .results-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
+/* Phone density pass. Everything here is a mobile-specific override --
+   all desktop widths (>=1280px) are unaffected.
+   The Voicings panel is the main target: on desktop it's a 2-up grid of
+   vertical fretboard diagrams, but earlier mobile CSS forced it to ONE
+   column, so each ~360px-tall diagram filled the screen and only ~1.5
+   fit in the 590px scroll window -- it read as a squished desktop
+   layout, not a phone one. Keeping the 2-up grid on phone (each card
+   ~150px, still legible) plus a shorter scroll cap roughly triples how
+   many voicings are visible at once, and the panel stops dominating the
+   page. The chord title, hero row, overview card and grid gaps are all
+   pulled in to match. */
 @media (max-width: 560px) {
-  .voicing-list {
-    grid-template-columns: minmax(0, 1fr);
+  .results-header h1 {
+    font-size: 40px;
+  }
+
+  .results-hero-row {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .chord-overview {
+    margin-bottom: 16px;
+  }
+
+  .results-grid {
+    gap: 16px;
   }
 
   .panel-header {
     flex-wrap: wrap;
   }
-}
 
-@media (max-width: 480px) {
-  .results-header h1 {
-    font-size: 44px;
+  /* Stay 2-up (do NOT collapse to one column) -- this is the density
+     win. Section headers already span both columns. */
+  .voicing-list {
+    gap: 8px;
+    max-height: 460px;
+  }
+
+  .voicing-list,
+  .song-list {
+    margin-top: 12px;
   }
 }
