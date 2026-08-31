@@ -53,11 +53,29 @@ WORKDIR /app
 #   with these PyPI wheels (no MKL) but harmless. numba: NUMBA_NUM_THREADS
 #   caps its pool; workqueue is its lightest threading layer (no external
 #   libgomp/libtbb).
+#
+# NUMBA_CACHE_DIR + NUMBA_CPU_NAME: librosa's CQT/onset kernels are numba
+# @jit(cache=True). Compiling them live on the first /identify runs ~17 s
+# of LLVM and, under a 512 MB cap, pins the container at the ceiling with
+# hundreds of reclaim events + ~110 MiB more anon RSS -- the cold-start
+# transient Phase 7 saw OOM-kill on Render. `docker/warmup_numba.py` (RUN
+# below) pre-compiles those kernels into /opt/numba-cache during the
+# build; the first request then loads all 41 from disk (0 recompiles,
+# verified in-container), cold peak drops 512 -> ~448 MiB, wall ~17 s ->
+# ~3 s. NUMBA_CPU_NAME=generic drops host CPU features from the cache key
+# (numba forces CPU_FEATURES="" too), so the baked cache is valid on
+# whatever host runs the image; warmup_numba.py also pins the librosa
+# source mtimes so the cache survives the image-layer round-trip. If the
+# cache ever misses (version skew, key change) numba recompiles live --
+# same behaviour as today, no failure. numba/llvmlite are pinned in
+# requirements-deploy.txt for the same reason.
 ENV OMP_NUM_THREADS=1 \
     OPENBLAS_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
     NUMBA_NUM_THREADS=1 \
-    NUMBA_THREADING_LAYER=workqueue
+    NUMBA_THREADING_LAYER=workqueue \
+    NUMBA_CACHE_DIR=/opt/numba-cache \
+    NUMBA_CPU_NAME=generic
 
 # Runtime deps. NO torch here -- the container runs CNN inference through
 # chord_cnn.onnx via onnxruntime (requirements-deploy.txt). This is the
@@ -68,6 +86,13 @@ RUN pip install --no-cache-dir -r requirements-deploy.txt
 # App source. Large local data files, the frontend, venvs, personal test
 # data and test_scripts are excluded via .dockerignore.
 COPY . .
+
+# Pre-compile librosa's numba kernels into $NUMBA_CACHE_DIR (see the ENV
+# note above). Uses a synthetic clip -- numba caches per arg-type, not per
+# data, so this compiles the exact set the real /identify path loads.
+# Needs only librosa/numpy/soundfile + betterchord/config/, all present by
+# now; the model and DBs (COPY --from=data below) are not involved.
+RUN python docker/warmup_numba.py
 
 # The 3 private data files, placed at the exact paths main.py /
 # betterchord/config/voicings.py / betterchord/config/songs.py read from.

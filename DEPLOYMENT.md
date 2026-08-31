@@ -61,7 +61,7 @@ training produces directly. Any time the model is retrained:
 | Language / Runtime | **Docker** (not native Python — Render will otherwise try to autodetect pip) |
 | Root Directory | *(blank — repo root)* |
 | Dockerfile Path | `./Dockerfile` |
-| Instance type | **512 MB (free / Starter) works, but at the edge** — inference runs via ONNX Runtime, not PyTorch, and the image is dep-trimmed + ORT-tuned (arena off, single-thread). Verified in a local container under a hard `--memory=512m`, twice across two sessions: ~47 MiB baseline, **~385 MiB anonymous** / ~485–490 MiB `docker stats` under sustained 6-concurrent `/identify` (73–91 requests, all 200), **`oom_kill 0`, never OOM-killed**. Caveat, stated plainly: `cgroup.current` sits pinned at ~511.8 / 512 MiB, the kernel constantly evicts page cache to hold the limit, and warm `/identify` latency under the limit is ~0.45 s vs ~0.19 s unconstrained. It fits and won't OOM-kill, but there is ~125 MiB of real (anon) headroom and no more — Render's own platform overhead comes out of the same 512. **If it misbehaves in production, move to the 1 GB tier — further optimization would need architecture changes.** Cold first request is ~17 s either tier (numba JIT-compiling librosa's CQT kernels; one-time per container start). |
+| Instance type | **512 MB (free / Starter) works, but at the edge** — inference runs via ONNX Runtime, not PyTorch, and the image is dep-trimmed + ORT-tuned (arena off, single-thread). Verified in a local container under a hard `--memory=512m`, twice across two sessions: ~47 MiB baseline, **~385 MiB anonymous** / ~485–490 MiB `docker stats` under sustained 6-concurrent `/identify` (73–91 requests, all 200), **`oom_kill 0`, never OOM-killed**. Caveat, stated plainly: `cgroup.current` sits pinned at ~511.8 / 512 MiB, the kernel constantly evicts page cache to hold the limit, and warm `/identify` latency under the limit is ~0.45 s vs ~0.19 s unconstrained. It fits and won't OOM-kill, but there is ~125 MiB of real (anon) headroom and no more — Render's own platform overhead comes out of the same 512. **If it misbehaves in production, move to the 1 GB tier — further optimization would need architecture changes.** Cold first request: the image now bakes a numba compile cache (`docker/warmup_numba.py`), so the first `/identify` loads the CQT/onset kernels from disk instead of compiling them — verified in a `--memory=512m` container to take the cold request from ~17 s / 512 MiB-pegged / 644–834 reclaim events down to ~3 s / ~448 MiB / 0 reclaim events. (Render free itself is still abandoned per the "Final Render addendum" in CLAUDE.md — next target Cloud Run — but this cache helps any host.) |
 | Health Check Path | `/chords` |
 
 ### Environment variables (Render dashboard → Environment)
@@ -162,6 +162,25 @@ was only verified via Playwright device emulation.
 - `.dockerignore` (repo root) — trims the build context; excludes the
   large local data files so the container uses the freshly-fetched ones.
 - `docker/fetch_hf_data.py` — the HF download script the Dockerfile runs.
+- `docker/warmup_numba.py` (new) + `Dockerfile` `ENV NUMBA_CACHE_DIR` /
+  `NUMBA_CPU_NAME=generic` + a `RUN python docker/warmup_numba.py` step +
+  `numba`/`llvmlite` pins in `requirements-deploy.txt` — pre-compiles
+  librosa's `@jit(cache=True)` CQT/onset kernels into an image layer so
+  the first `/identify` loads all 41 from disk instead of a live LLVM
+  compile. `generic` keeps the cache key free of host-CPU features;
+  `warmup_numba.py` also pins the librosa source mtimes so the cache
+  survives the image-layer round-trip (without that, BuildKit truncates
+  sub-second mtimes at layer commit and every kernel recompiles anyway).
+  A miss falls back to live compile — no failure. **Verified in a real
+  container** (numba 0.67.0, `python:3.14-slim-bookworm`): fresh container
+  first `/identify` → 41/41 cache hits, 0 recompiles; under a hard
+  `--memory=512m --memory-swap=512m` the cold first request goes from
+  512 MiB peak / ~378 MiB anon / 644–834 reclaim events / ~17 s
+  **→ ~448 MiB peak / ~269 MiB anon / 0 reclaim events / ~3 s**; neither
+  variant OOM-killed locally, but the no-cache build sits pegged at the
+  512 ceiling while the cache build has ~64 MiB headroom and never
+  touches it. Chord bit-identical (`Cm9 @ 0.21478250584136332`) across
+  cache-hit / cold-recompile and a 50-file sweep.
 - `betterchord/training_scripts/export_onnx.py` — converts `chord_cnn.pth`
   → `chord_cnn.onnx` with a real numerical-equivalence check. Re-run
   after every retrain.

@@ -18,6 +18,15 @@ numpy==2.3.5
 soundfile==0.13.1
 scikit-learn==1.8.0
 audioread>=3.0.0
+
+# numba/llvmlite come in transitively via librosa, but the build-time
+# numba cache (docker/warmup_numba.py + Dockerfile) depends on numba's
+# cache-key and source-stamp semantics. Pin them to the versions the
+# baked cache was verified against so a later `docker build` can't
+# silently pick up a numba where those internals changed (which would
+# just make the bake a no-op -- safe, but the whole point lost).
+numba==0.67.0
+llvmlite==0.49.0
 fastapi
 uvicorn
 python-multipart
