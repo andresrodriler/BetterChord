@@ -443,6 +443,9 @@
     margin: 0 -18px 8px;
     padding: 8px 18px;
     background: var(--brown-950);
+    /* Matching top + bottom borders -- the row reads as a framed bar
+       between the capture card above and the section content below. */
+    border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
 

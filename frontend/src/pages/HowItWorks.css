@@ -944,6 +944,32 @@
      (or none); step 1 opens by default. */
   .hiw-pipeline {
     gap: 16px;
+    /* Clear band above the first / below the last header for the spine's
+       end dots to cap the rail. */
+    padding: 10px 0;
+  }
+
+  /* The spine + its end dots assume full-height stage blocks (desktop);
+     against the compact accordion headers they float and land at the
+     wrong x (dots inherit the desktop left: 50%). Pull both onto the
+     22px rail and shrink the vertical span to the header stack: the rail
+     shows through the 16px gaps between the opaque headers, capped top
+     and bottom by a dot in the new 10px padding band. */
+  .hiw-pipeline__spine {
+    top: 5px;
+    bottom: 5px;
+  }
+
+  .hiw-pipeline__spine-dot {
+    left: 22px;
+  }
+
+  .hiw-pipeline__spine-dot--top {
+    top: 5px;
+  }
+
+  .hiw-pipeline__spine-dot--bottom {
+    bottom: 5px;
   }
 
   .hiw-stage__acc-header {

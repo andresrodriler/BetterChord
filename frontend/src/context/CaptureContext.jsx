@@ -17,6 +17,104 @@ export const QUIET_PEAK_THRESHOLD = 0.05
 // just under full scale rather than exactly at it.
 export const CLIPPING_PEAK_THRESHOLD = 0.97
 
+// Peak/RMS over channel 0 -- the same one-channel analysis decodeAudioData
+// and the media-element fallback both feed into.
+function summarizeChannel(channel, { sampleRate, channelCount, format, deviceLabel }) {
+  let peak = 0
+  let sumSquares = 0
+  for (let i = 0; i < channel.length; i++) {
+    const abs = Math.abs(channel[i])
+    if (abs > peak) peak = abs
+    sumSquares += channel[i] * channel[i]
+  }
+  const rms = Math.sqrt(sumSquares / channel.length)
+  return {
+    peak,
+    rms,
+    quiet: peak < QUIET_PEAK_THRESHOLD,
+    clipping: peak >= CLIPPING_PEAK_THRESHOLD,
+    sampleRate,
+    channelCount,
+    format,
+    deviceLabel,
+  }
+}
+
+// decodeAudioData rejects many video containers -- notably iOS Safari on a
+// .mov/.mp4 from the file picker's "Take Video" option -- even though an
+// <audio>/<video> element plays them fine. Fallback: play the blob through
+// a real <video> element (which CAN demux the container) and tap its
+// output into PCM via a MediaElementAudioSourceNode, then run the same
+// analysis. Real-time (as long as the clip plays), so it's only reached
+// when decodeAudioData throws.
+async function decodeViaMediaElement(blob) {
+  const url = URL.createObjectURL(blob)
+  const el = document.createElement('video') // <video> accepts video MIME types that <audio> rejects outright
+  el.src = url
+  el.preload = 'auto'
+  el.playsInline = true
+  // NOT muted -- a muted element outputs silence through
+  // MediaElementAudioSourceNode; a GainNode at 0 keeps it inaudible while
+  // the graph still pulls real samples. Kept in the DOM so
+  // createMediaElementSource has a connected element to read.
+  el.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none'
+  document.body.appendChild(el)
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  let ctx
+  try {
+    await new Promise((resolve, reject) => {
+      el.onloadedmetadata = resolve
+      el.onerror = () => reject(new Error('media element could not load the file'))
+      setTimeout(() => reject(new Error('media element metadata timeout')), 8000)
+    })
+    ctx = new AudioContextClass()
+    if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
+
+    const source = ctx.createMediaElementSource(el)
+    const silent = ctx.createGain()
+    silent.gain.value = 0
+    const chunks = []
+    const processor = ctx.createScriptProcessor(4096, 1, 1)
+    processor.onaudioprocess = (e) => {
+      chunks.push(e.inputBuffer.getChannelData(0).slice())
+    }
+    source.connect(processor)
+    processor.connect(silent)
+    silent.connect(ctx.destination)
+
+    await el.play()
+    await new Promise((resolve, reject) => {
+      el.onended = resolve
+      el.onerror = () => reject(new Error('media element errored during playback'))
+      // hard cap so a looping/stalled element can't hang the analysis
+      setTimeout(resolve, Math.min(60000, (Number.isFinite(el.duration) ? el.duration : 30) * 1000 + 5000))
+    })
+
+    source.disconnect()
+    processor.disconnect()
+    silent.disconnect()
+
+    let total = 0
+    for (const c of chunks) total += c.length
+    if (total === 0) throw new Error('media element produced no audio samples')
+    const channel = new Float32Array(total)
+    let offset = 0
+    for (const c of chunks) {
+      channel.set(c, offset)
+      offset += c.length
+    }
+    return { channel, sampleRate: ctx.sampleRate }
+  } finally {
+    el.pause()
+    el.removeAttribute('src')
+    el.load()
+    el.remove()
+    URL.revokeObjectURL(url)
+    if (ctx) ctx.close().catch(() => {})
+  }
+}
+
 // All capture/record/upload/quality-check/identify state lives here instead
 // of on a /preview route, so the same in-progress capture can be triggered
 // from (and overlay on top of) any page -- Home, Results, wherever
@@ -82,34 +180,39 @@ export function CaptureProvider({ children }) {
     setWaveformData(null)
 
     async function analyze() {
+      const format = blob.type
       try {
-        const arrayBuffer = await blob.arrayBuffer()
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext
-        const ctx = new AudioContextClass()
-        const decoded = await ctx.decodeAudioData(arrayBuffer)
-        const channel = decoded.getChannelData(0)
-
-        let peak = 0
-        let sumSquares = 0
-        for (let i = 0; i < channel.length; i++) {
-          const abs = Math.abs(channel[i])
-          if (abs > peak) peak = abs
-          sumSquares += channel[i] * channel[i]
+        let channel
+        let sampleRate
+        let channelCount
+        try {
+          const arrayBuffer = await blob.arrayBuffer()
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext
+          const ctx = new AudioContextClass()
+          const decoded = await ctx.decodeAudioData(arrayBuffer)
+          ctx.close()
+          channel = decoded.getChannelData(0).slice()
+          sampleRate = decoded.sampleRate
+          channelCount = decoded.numberOfChannels
+        } catch {
+          // decodeAudioData can't demux this container -- route through a
+          // media element, which can. Only channel 0 is captured (same as
+          // the fast path's analysis).
+          const viaElement = await decodeViaMediaElement(blob)
+          channel = viaElement.channel
+          sampleRate = viaElement.sampleRate
+          channelCount = 1
         }
-        const rms = Math.sqrt(sumSquares / channel.length)
-        ctx.close()
 
         if (!cancelled) {
-          setQuality({
-            peak,
-            rms,
-            quiet: peak < QUIET_PEAK_THRESHOLD,
-            clipping: peak >= CLIPPING_PEAK_THRESHOLD,
-            sampleRate: decoded.sampleRate,
-            channelCount: decoded.numberOfChannels,
-            format: blob.type,
-            deviceLabel: deviceLabelRef.current,
-          })
+          setQuality(
+            summarizeChannel(channel, {
+              sampleRate,
+              channelCount,
+              format,
+              deviceLabel: deviceLabelRef.current,
+            })
+          )
           setWaveformData(channel.slice())
         }
       } catch {

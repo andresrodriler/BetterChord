@@ -16,6 +16,10 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
+  /* Self-center regardless of the parent card's own alignment. */
+  width: fit-content;
+  margin-inline: auto;
+  align-self: center;
 }
 
 .identifying-status__dot {
@@ -47,18 +51,21 @@
   }
 }
 
-/* Fact + manual-advance arrow share a row so the arrow sits beside the
-   text it advances. */
+/* Fact + manual-advance arrow. The row fills the card's inner width and
+   the fact text centers within it (aligned with the dots and the
+   "Identifying..." heading); the arrow is taken out of flow to the right
+   edge so it can't pull the text off-center -- a plain flex row did. */
 .identifying-status__fact-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  position: relative;
+  align-self: stretch;
+  text-align: center;
 }
 
 .identifying-status__fact {
-  max-width: 360px;
-  margin: 0;
+  /* Leave a right-side gutter so the absolutely-positioned arrow doesn't
+     sit on top of a full-width line; margin: 0 auto keeps it centered. */
+  max-width: calc(100% - 40px);
+  margin: 0 auto;
   font-size: 14px;
   color: var(--muted);
   opacity: 1;
@@ -70,7 +77,10 @@
 }
 
 .identifying-status__next {
-  flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 24px;
   height: 24px;
   display: flex;
