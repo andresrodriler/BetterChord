@@ -51,21 +51,23 @@
   }
 }
 
-/* Fact + manual-advance arrow. The row fills the card's inner width and
-   the fact text centers within it (aligned with the dots and the
-   "Identifying..." heading); the arrow is taken out of flow to the right
-   edge so it can't pull the text off-center -- a plain flex row did. */
+/* Fact text with the manual-advance arrow on its own line below it,
+   both centered on the card axis. The arrow sat beside the text before,
+   absolutely positioned and vertically centered on the whole card -- on
+   a long (5+ line) tip whichever line landed near the card's middle
+   crowded it regardless of the reserved gutter. Stacking removes that
+   coupling: the arrow never overlaps text at any tip length. */
 .identifying-status__fact-row {
-  position: relative;
-  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-align: center;
 }
 
 .identifying-status__fact {
-  /* Leave a right-side gutter so the absolutely-positioned arrow doesn't
-     sit on top of a full-width line; margin: 0 auto keeps it centered. */
-  max-width: calc(100% - 40px);
-  margin: 0 auto;
+  max-width: 360px;
+  margin: 0;
   font-size: 14px;
   color: var(--muted);
   opacity: 1;
@@ -77,10 +79,7 @@
 }
 
 .identifying-status__next {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
   width: 24px;
   height: 24px;
   display: flex;

@@ -1,6 +1,15 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { identifyAudio } from '../lib/api'
+import { decodeContainerAudio } from '../lib/decodeContainerAudio'
+
+// Hard ceiling on the whole container-fallback attempt (WebCodecs path +
+// the <video>-tap path). The <video> tap needs a live user gesture on
+// iOS; when the file-pick gesture has gone stale, <video>.play() can
+// never resolve -- without this cap the modal hangs on "checking
+// recording quality..." indefinitely. On timeout we fall through to the
+// same "Could not analyze" message that predates any of this fallback.
+const CONTAINER_FALLBACK_TIMEOUT_MS = 7000
 
 const CaptureContext = createContext(null)
 
@@ -40,34 +49,44 @@ function summarizeChannel(channel, { sampleRate, channelCount, format, deviceLab
   }
 }
 
-// decodeAudioData rejects many video containers -- notably iOS Safari on a
-// .mov/.mp4 from the file picker's "Take Video" option -- even though an
-// <audio>/<video> element plays them fine. Fallback: play the blob through
-// a real <video> element (which CAN demux the container) and tap its
-// output into PCM via a MediaElementAudioSourceNode, then run the same
-// analysis. Real-time (as long as the clip plays), so it's only reached
-// when decodeAudioData throws.
-async function decodeViaMediaElement(blob) {
+function abortRace(signal) {
+  return new Promise((_, reject) => {
+    if (signal?.aborted) return reject(new Error('aborted'))
+    signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+  })
+}
+
+// Last-resort container decode: play the blob through a real <video>
+// element (which CAN demux formats decodeAudioData rejects) and tap its
+// output into PCM via MediaElementAudioSourceNode. Real-time and
+// gesture-gated on iOS -- only reached after decodeContainerAudio()
+// declines, and always run under CONTAINER_FALLBACK_TIMEOUT_MS so a
+// never-resolving play() can't hang the modal. Every await races the
+// abort signal; the finally always tears the element down.
+async function decodeViaMediaElement(blob, signal) {
   const url = URL.createObjectURL(blob)
   const el = document.createElement('video') // <video> accepts video MIME types that <audio> rejects outright
   el.src = url
   el.preload = 'auto'
   el.playsInline = true
-  // NOT muted -- a muted element outputs silence through
-  // MediaElementAudioSourceNode; a GainNode at 0 keeps it inaudible while
-  // the graph still pulls real samples. Kept in the DOM so
-  // createMediaElementSource has a connected element to read.
+  el.playbackRate = 2 // halve the real-time cost; peak/RMS are rate-invariant and the waveform is a whole-clip downsample
+  // NOT muted -- a muted (or volume: 0) element outputs silence through
+  // MediaElementAudioSourceNode (verified); a GainNode at 0 keeps it
+  // inaudible while the graph still pulls real samples. Kept in the DOM
+  // so createMediaElementSource has a connected element to read.
   el.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none'
   document.body.appendChild(el)
 
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
   let ctx
   try {
-    await new Promise((resolve, reject) => {
-      el.onloadedmetadata = resolve
-      el.onerror = () => reject(new Error('media element could not load the file'))
-      setTimeout(() => reject(new Error('media element metadata timeout')), 8000)
-    })
+    await Promise.race([
+      new Promise((resolve, reject) => {
+        el.onloadedmetadata = resolve
+        el.onerror = () => reject(new Error('media element could not load the file'))
+      }),
+      abortRace(signal),
+    ])
     ctx = new AudioContextClass()
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
 
@@ -83,13 +102,14 @@ async function decodeViaMediaElement(blob) {
     processor.connect(silent)
     silent.connect(ctx.destination)
 
-    await el.play()
-    await new Promise((resolve, reject) => {
-      el.onended = resolve
-      el.onerror = () => reject(new Error('media element errored during playback'))
-      // hard cap so a looping/stalled element can't hang the analysis
-      setTimeout(resolve, Math.min(60000, (Number.isFinite(el.duration) ? el.duration : 30) * 1000 + 5000))
-    })
+    await Promise.race([el.play(), abortRace(signal)])
+    await Promise.race([
+      new Promise((resolve, reject) => {
+        el.onended = resolve
+        el.onerror = () => reject(new Error('media element errored during playback'))
+      }),
+      abortRace(signal),
+    ])
 
     source.disconnect()
     processor.disconnect()

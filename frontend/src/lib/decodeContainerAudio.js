@@ -1,0 +1,185 @@
+// Client-side audio extraction for video containers that decodeAudioData
+// rejects (iOS Safari on a .mov/.mp4 from "Take Video"). Demux with
+// mp4box.js, decode the AAC track with WebCodecs AudioDecoder -- no
+// <video> element, no user gesture, and it runs far faster than
+// real-time playback. mp4box is dynamically imported so its ~42 KB gzip
+// only loads for a user who actually hits this path.
+//
+// Requires WebCodecs AudioDecoder (Safari 16.4+ / Chrome 94+ / modern
+// Android). Returns null when unavailable, when the container isn't
+// ISOBMFF, or when the audio track isn't AAC -- the caller then falls
+// back to the <video>-tap path.
+
+// Sample-rate table for the synthesized AAC-LC AudioSpecificConfig used
+// when mp4box can't surface the real esds descriptor.
+const AAC_SAMPLE_RATES = [
+  96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350,
+]
+
+function synthAsc(sampleRate, channels) {
+  const freqIdx = AAC_SAMPLE_RATES.indexOf(sampleRate)
+  const idx = freqIdx === -1 ? 4 : freqIdx // default 44100
+  const chanCfg = Math.min(channels || 1, 7)
+  // 5 bits objectType (2 = AAC-LC), 4 bits freqIdx, 4 bits channelCfg
+  return new Uint8Array([(2 << 3) | (idx >> 1), ((idx & 1) << 7) | (chanCfg << 3)])
+}
+
+// DecoderSpecificInfo (AudioSpecificConfig) from mp4box's parsed esds
+// descriptor tree, whatever depth it sits at.
+function ascFromEsds(file, trackId) {
+  try {
+    const entry = file.getTrackById(trackId).mdia.minf.stbl.stsd.entries[0]
+    const esds = entry && entry.esds
+    if (!esds || !esds.esd) return null
+    const walk = (descs) => {
+      for (const d of descs || []) {
+        if (d.tag === 5 && d.data) return new Uint8Array(d.data)
+        const nested = walk(d.descs)
+        if (nested) return nested
+      }
+      return null
+    }
+    return walk(esds.esd.descs)
+  } catch {
+    return null
+  }
+}
+
+function isIsoBmff(head) {
+  // bytes 4..8 spell "ftyp" for mp4/mov/m4a
+  return head.length >= 8 && head[4] === 0x66 && head[5] === 0x74 && head[6] === 0x79 && head[7] === 0x70
+}
+
+function rejectOnAbort(signal) {
+  return new Promise((_, reject) => {
+    if (signal?.aborted) return reject(new Error('aborted'))
+    signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+  })
+}
+
+// -> { channel: Float32Array (channel 0), sampleRate } | null
+// Never throws -- any failure returns null so the caller can try the
+// next fallback.
+export async function decodeContainerAudio(blob, signal) {
+  try {
+    return await run(blob, signal)
+  } catch {
+    return null
+  }
+}
+
+async function run(blob, signal) {
+  if (typeof window.AudioDecoder === 'undefined' || typeof window.EncodedAudioChunk === 'undefined') return null
+
+  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+  if (!isIsoBmff(head)) return null
+
+  const MP4Box = await import('mp4box')
+  if (signal?.aborted) return null
+
+  const arrayBuffer = await blob.arrayBuffer()
+  const file = MP4Box.createFile()
+
+  // mp4box delivers samples only when extraction is configured in
+  // onReady, BEFORE the bytes that carry them are appended -- so set the
+  // handlers up first, then feed. onReady fires synchronously mid-append
+  // once the moov is in.
+  let audio = null
+  const collected = []
+  const samplesPromise = new Promise((resolve) => {
+    file.onError = () => resolve(null)
+    file.onReady = (info) => {
+      const track =
+        info.tracks.find((t) => t.type === 'audio') || info.tracks.find((t) => t.audio && !t.video)
+      if (!track || !String(track.codec || '').startsWith('mp4a')) return resolve(null) // only AAC handled here
+      audio = track
+      file.onSamples = (_id, _user, list) => {
+        for (const s of list) collected.push(s)
+        if (collected.length >= track.nb_samples) resolve(collected)
+      }
+      file.setExtractionOptions(track.id, null, { nbSamples: track.nb_samples })
+      file.start()
+    }
+    const CHUNK = 1 << 16
+    for (let off = 0; off < arrayBuffer.byteLength; off += CHUNK) {
+      const slice = arrayBuffer.slice(off, Math.min(off + CHUNK, arrayBuffer.byteLength))
+      slice.fileStart = off
+      file.appendBuffer(slice)
+    }
+    file.flush()
+    setTimeout(() => resolve(collected.length ? collected : null), 4000)
+  })
+
+  const encodedSamples = await Promise.race([samplesPromise, rejectOnAbort(signal)]).catch(() => null)
+  if (!encodedSamples || !encodedSamples.length || !audio) return null
+
+  const sampleRate = audio.audio.sample_rate
+  const channels = audio.audio.channel_count
+  const description = ascFromEsds(file, audio.id) || synthAsc(sampleRate, channels)
+  const config = { codec: audio.codec, sampleRate, numberOfChannels: channels, description }
+
+  const supported = await AudioDecoder.isConfigSupported(config)
+    .then((r) => r.supported)
+    .catch(() => false)
+  if (!supported) return null
+
+  const pcmParts = []
+  let decodeError = false
+  const decoder = new AudioDecoder({
+    output: (frame) => {
+      const frames = frame.numberOfFrames
+      const nc = frame.numberOfChannels
+      const mono = new Float32Array(frames)
+      try {
+        if ((frame.format || '').includes('planar')) {
+          frame.copyTo(mono, { planeIndex: 0 })
+        } else {
+          const interleaved = new Float32Array(frames * nc)
+          frame.copyTo(interleaved, { planeIndex: 0 })
+          for (let i = 0; i < frames; i++) mono[i] = interleaved[i * nc]
+        }
+      } catch {
+        decodeError = true
+      }
+      pcmParts.push(mono)
+      frame.close()
+    },
+    error: () => {
+      decodeError = true
+    },
+  })
+
+  try {
+    decoder.configure(config)
+    for (const s of encodedSamples) {
+      if (signal?.aborted) throw new Error('aborted')
+      decoder.decode(
+        new EncodedAudioChunk({
+          type: s.is_sync ? 'key' : 'delta',
+          timestamp: Math.round((s.cts / s.timescale) * 1e6),
+          duration: Math.round((s.duration / s.timescale) * 1e6),
+          data: s.data,
+        })
+      )
+    }
+    await Promise.race([decoder.flush(), rejectOnAbort(signal)])
+  } finally {
+    try {
+      decoder.close()
+    } catch {
+      // already closed
+    }
+  }
+
+  let total = 0
+  for (const part of pcmParts) total += part.length
+  if (decodeError || total < 1) return null
+
+  const channel = new Float32Array(total)
+  let offset = 0
+  for (const part of pcmParts) {
+    channel.set(part, offset)
+    offset += part.length
+  }
+  return { channel, sampleRate }
+}
