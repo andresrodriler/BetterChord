@@ -180,6 +180,13 @@
   margin: 0;
 }
 
+/* Mobile-only accordion header (styled in the <=900px block). Hidden on
+   desktop -- a display:none element takes no grid slot, so the timeline
+   layout is byte-for-byte unchanged. */
+.hiw-stage__acc-header {
+  display: none;
+}
+
 /* 34x2px connector line from the spine to every panel. Direction is by
    screen column (1 or 3), not semantic role -- column-1 panels get a
    right-pointing line, column-3 a left-pointing one. `.hiw-stage__text`
@@ -929,6 +936,67 @@
   .hiw-stage--reverse .hiw-stage__illustration .hiw-illustration::before,
   .hiw-stage--reverse .hiw-stage__text::after {
     content: none;
+  }
+
+  /* --- Exclusive accordion ----------------------------------------
+     Each stage collapses to its header (number + title, both already in
+     stage.title) plus a chevron. openStage state keeps exactly one open
+     (or none); step 1 opens by default. */
+  .hiw-pipeline {
+    gap: 16px;
+  }
+
+  .hiw-stage__acc-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--brown-800);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .hiw-stage__acc-header:active {
+    border-color: var(--brass);
+  }
+
+  .hiw-stage__acc-title {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--moss);
+  }
+
+  .hiw-stage__acc-chevron {
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    color: var(--brass);
+    transition: transform 0.2s ease;
+  }
+
+  .hiw-stage--open .hiw-stage__acc-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* The header now carries the number + title. */
+  .hiw-stage__number,
+  .hiw-stage__text h3 {
+    display: none;
+  }
+
+  .hiw-stage--collapsed .hiw-stage__illustration,
+  .hiw-stage--collapsed .hiw-stage__text {
+    display: none;
   }
 }
 

@@ -184,6 +184,18 @@
     padding-bottom: 14px;
   }
 
+  /* Once the columns stack, each divider is a full-width line directly
+     above the next column's label -- the desktop side-by-side spacing
+     reads too tight there. Add room below the divider before the label,
+     and below the label before the note circles / formula. */
+  .chord-overview__col:not(:first-child) {
+    padding-top: 18px;
+  }
+
+  .chord-overview__kicker {
+    margin-bottom: 14px;
+  }
+
   .chord-overview__notes {
     gap: 10px;
   }

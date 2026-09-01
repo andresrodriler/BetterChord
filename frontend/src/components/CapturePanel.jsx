@@ -5,13 +5,26 @@ import './CapturePanel.css'
 
 const SUPPORTED_FORMATS = ['MP3', 'WAV', 'WEBM', 'OGG', 'M4A']
 
-// `accept` for the file <input>. `audio/*` alone is loosely interpreted by
-// iOS Safari and can surface Photo Library / Take Video options; pairing it
-// with the explicit extensions this widget actually supports keeps the
-// picker on file-browsing only (no camera/video capture). No `capture`
-// attribute -- that is what triggers the on-device camera/mic UI, and
-// recording has its own dedicated Record button.
-const FILE_ACCEPT = ['audio/*', ...SUPPORTED_FORMATS.map((f) => `.${f.toLowerCase()}`)].join(',')
+// `accept` for the file <input>, kept free of any `*/*` wildcard. iOS
+// Safari decides whether to offer the "Photo Library / Take Photo or
+// Video" capture sheet from a media wildcard in `accept` -- `audio/*`
+// triggers it even with concrete extensions listed alongside -- so this
+// lists only concrete extensions and specific MIME types. selectFile()
+// does no type check, so narrowing this never rejects a supported
+// upload; it only tightens the picker's filter hint. No `capture`
+// attribute -- that opens the camera/mic directly, and recording has
+// its own Record button.
+const FILE_ACCEPT = [
+  ...SUPPORTED_FORMATS.map((f) => `.${f.toLowerCase()}`),
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/webm',
+  'audio/ogg',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/aac',
+].join(',')
 
 // Purely decorative -- a small static waveform-shaped flourish inside the
 // dropzone, animated with the shared copper-bar keyframe and colored with

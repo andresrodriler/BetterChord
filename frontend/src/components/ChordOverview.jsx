@@ -65,7 +65,7 @@ export function buildSimilarChords(chordInfoData, relatedNotes) {
 // null/loading/failed when this card renders (chord theory is never
 // gated on voicing availability); without `formula` a sus tone falls
 // back to the generic "ext" bucket.
-function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true, formula = null }) {
+function ChordOverview({ id, chordInfo, relatedNotes, showWhySpelling = true, formula = null }) {
   // See IntervalLegend.jsx's identical comment -- subscribes this
   // component to the colorblind toggle so it re-renders (and re-reads
   // getIntervalStyle's cleared cache) when the palette changes.
@@ -77,7 +77,7 @@ function ChordOverview({ chordInfo, relatedNotes, showWhySpelling = true, formul
   if (!info && similarChords.length === 0) return null
 
   return (
-    <div className="section panel chord-overview">
+    <div id={id} className="section panel chord-overview">
       <h2>Chord Overview</h2>
 
       {info && (

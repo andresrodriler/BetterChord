@@ -46,6 +46,26 @@ function FallbackBanner({ label, open, onToggle, children }) {
   )
 }
 
+// Mobile-only sticky wayfinding row (hidden on desktop via CSS). Pills
+// smooth-scroll to the Overview / Voicings / Songs sections; each target
+// carries a scroll-margin-top so it clears the sticky site header + this
+// row. Honors prefers-reduced-motion.
+function ResultsJumpNav() {
+  function jumpTo(id) {
+    const el = document.getElementById(id)
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }
+  return (
+    <nav className="results-jump" aria-label="Jump to section">
+      <button type="button" onClick={() => jumpTo('results-overview')}>Overview</button>
+      <button type="button" onClick={() => jumpTo('results-voicings')}>Voicings</button>
+      <button type="button" onClick={() => jumpTo('results-songs')}>Songs</button>
+    </nav>
+  )
+}
+
 function HandednessToggle() {
   const { leftHanded, toggleHandedness } = useFretboardPrefs()
   return (
@@ -290,6 +310,8 @@ function Results() {
         <CapturePanel key={chordName} size="header" />
       </div>
 
+      <ResultsJumpNav />
+
       {/* Above the Voicings/Songs grid -- facts about the resolved
           chord's identity read as context before the practical data.
           Path-independent (both data sources already are) and self-hides
@@ -299,6 +321,7 @@ function Results() {
           songs. `relatedNotes` via optional chaining -- `songs` may be
           null or a failed response. */}
       <ChordOverview
+        id="results-overview"
         chordInfo={chordInfo}
         relatedNotes={songs?.data?.related_notes}
         showWhySpelling={showWhySpelling}
@@ -306,7 +329,7 @@ function Results() {
       />
 
       <div className="results-grid">
-        <div className="section panel">
+        <div className="section panel" id="results-voicings">
           <div className="panel-header">
             {/* Element count next to the heading. Unlike Songs' count,
                 this is the true total -- every voicing is already in the
@@ -367,7 +390,7 @@ function Results() {
           )}
         </div>
 
-        <div className="section panel">
+        <div className="section panel" id="results-songs">
           {/* Filters' trigger lives in the panel header, top-right --
               mirroring HandednessToggle in the Voicings panel. Keeps it
               in one consistent spot regardless of how many fallback

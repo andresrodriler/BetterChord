@@ -605,6 +605,10 @@ function HowItWorks() {
   // Subscribes the whole page (and un-memoized children) to the
   // colorblind toggle -- see IntervalLegend.jsx.
   useAccessibilityPrefs()
+  // Drives the mobile-only accordion (<=900px, HowItWorks.css). Desktop
+  // ignores this -- every stage renders expanded there. `null` = all
+  // collapsed; starts with step 1 open.
+  const [openStage, setOpenStage] = useState(0)
   return (
     <div className="section how-it-works-page">
       <h1>How BetterChord Works</h1>
@@ -617,16 +621,38 @@ function HowItWorks() {
         <div className="hiw-pipeline__spine" aria-hidden="true" />
         <div className="hiw-pipeline__spine-dot hiw-pipeline__spine-dot--top" aria-hidden="true" />
         <div className="hiw-pipeline__spine-dot hiw-pipeline__spine-dot--bottom" aria-hidden="true" />
-        {STAGES.map((stage, i) => (
-          <div className={`hiw-stage${i % 2 === 1 ? ' hiw-stage--reverse' : ''}`} key={stage.title}>
-            <div className="hiw-stage__illustration">{stage.illustration}</div>
-            <div className="hiw-stage__number">{i + 1}</div>
-            <div className="panel hiw-stage__text">
-              <h3>{stage.title}</h3>
-              <p>{stage.body}</p>
+        {STAGES.map((stage, i) => {
+          const open = openStage === i
+          return (
+            <div
+              className={`hiw-stage${i % 2 === 1 ? ' hiw-stage--reverse' : ''} ${open ? 'hiw-stage--open' : 'hiw-stage--collapsed'}`}
+              key={stage.title}
+            >
+              {/* Accordion header -- display:none on desktop, so it takes
+                  no grid slot there and the timeline layout is unchanged.
+                  On mobile it's the whole tap target; the number is
+                  already in stage.title ("1 · ..."). */}
+              <button
+                type="button"
+                className="hiw-stage__acc-header"
+                aria-expanded={open}
+                aria-controls={`hiw-stage-illus-${i} hiw-stage-body-${i}`}
+                onClick={() => setOpenStage((c) => (c === i ? null : i))}
+              >
+                <span className="hiw-stage__acc-title">{stage.title}</span>
+                <svg className="hiw-stage__acc-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div className="hiw-stage__illustration" id={`hiw-stage-illus-${i}`}>{stage.illustration}</div>
+              <div className="hiw-stage__number">{i + 1}</div>
+              <div className="panel hiw-stage__text" id={`hiw-stage-body-${i}`}>
+                <h3>{stage.title}</h3>
+                <p>{stage.body}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <Footer />

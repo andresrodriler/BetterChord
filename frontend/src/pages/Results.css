@@ -371,6 +371,12 @@
   min-width: 260px;
 }
 
+/* Section wayfinding row -- mobile only (shown + made sticky in the
+   phone block below). */
+.results-jump {
+  display: none;
+}
+
 /* Tablet: the two big panels stack. minmax(0, 1fr) (plain 1fr respects a
    wide child's min-content and lets it push past the viewport). */
 @media (max-width: 780px) {
@@ -422,5 +428,48 @@
   .voicing-list,
   .song-list {
     margin-top: 12px;
+  }
+
+  /* Sticky section wayfinding. Rides directly under the sticky
+     .app-header (a stable 66px at every mobile width) through the whole
+     scroll. Full-bleed against .app-main's 18px mobile side padding so
+     it spans edge to edge. */
+  .results-jump {
+    display: flex;
+    gap: 8px;
+    position: sticky;
+    top: 66px;
+    z-index: 10;
+    margin: 0 -18px 8px;
+    padding: 8px 18px;
+    background: var(--brown-950);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .results-jump button {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--brown-800);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+
+  .results-jump button:active {
+    color: var(--brass);
+    border-color: var(--brass);
+  }
+
+  /* Clear the 66px header + this ~56px sticky row when a pill scrolls
+     a section to the top. */
+  #results-overview,
+  #results-voicings,
+  #results-songs {
+    scroll-margin-top: 132px;
   }
 }
