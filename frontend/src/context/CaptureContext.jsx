@@ -71,19 +71,39 @@ function abortRace(signal) {
 // declines. Every await races the abort signal, but the caller's blunt
 // wall-clock timer is what actually guarantees no hang. `report` is the
 // diagnostic step reporter (no-op unless CAPTURE_DIAGNOSTICS).
+//
+// iOS media-loading requirements this follows (see webkit.org/blog/6784):
+//   - element attached to the DOM BEFORE the source (a detached element
+//     may stop loading), off-screen + opacity 0, NOT display:none (which
+//     also suppresses loading)
+//   - preload / playsinline set BEFORE the source (iOS only honors
+//     preload set beforehand)
+//   - muted through load: iOS won't load or play un-muted media without a
+//     live user gesture. Unmuted right before the graph tap, because a
+//     muted element zeros its audio before Web Audio. On iOS with no live
+//     gesture the play() below is then rejected fast -- acceptable, it
+//     reaches the graceful message quickly instead of hanging.
+//   - blob presented as a MIME type iOS recognizes as loadable video
 async function decodeViaMediaElement(blob, signal, report = () => {}) {
-  const url = URL.createObjectURL(blob)
+  const cleanType =
+    /^audio\//.test(blob.type) || blob.type === 'video/mp4' ? blob.type : 'video/mp4'
+  const source = cleanType === blob.type ? blob : new Blob([blob], { type: cleanType })
+  const url = URL.createObjectURL(source)
+
   const el = document.createElement('video') // <video> accepts video MIME types that <audio> rejects outright
-  el.src = url
-  el.preload = 'auto'
+  el.setAttribute('playsinline', '')
+  el.setAttribute('webkit-playsinline', '')
   el.playsInline = true
-  el.playbackRate = 2 // halve the real-time cost; peak/RMS are rate-invariant and the waveform is a whole-clip downsample
-  // NOT muted -- a muted (or volume: 0) element outputs silence through
-  // MediaElementAudioSourceNode (verified); a GainNode at 0 keeps it
-  // inaudible while the graph still pulls real samples. Kept in the DOM
-  // so createMediaElementSource has a connected element to read.
+  el.preload = 'auto'
+  el.muted = true
   el.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none'
   document.body.appendChild(el)
+
+  const sourceEl = document.createElement('source')
+  sourceEl.type = cleanType
+  sourceEl.src = url
+  el.appendChild(sourceEl)
+  el.load() // iOS may not start loading a programmatically-built element on its own
 
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
   let ctx
@@ -92,6 +112,7 @@ async function decodeViaMediaElement(blob, signal, report = () => {}) {
     await Promise.race([
       new Promise((resolve, reject) => {
         el.onloadedmetadata = resolve
+        el.oncanplay = resolve
         el.onerror = () => reject(new Error('media element could not load the file'))
       }),
       abortRace(signal),
@@ -99,7 +120,8 @@ async function decodeViaMediaElement(blob, signal, report = () => {}) {
     ctx = new AudioContextClass()
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
 
-    const source = ctx.createMediaElementSource(el)
+    el.muted = false // right before the tap -- a muted element feeds silence into the graph
+    const srcNode = ctx.createMediaElementSource(el)
     const silent = ctx.createGain()
     silent.gain.value = 0
     const chunks = []
@@ -107,10 +129,11 @@ async function decodeViaMediaElement(blob, signal, report = () => {}) {
     processor.onaudioprocess = (e) => {
       chunks.push(e.inputBuffer.getChannelData(0).slice())
     }
-    source.connect(processor)
+    srcNode.connect(processor)
     processor.connect(silent)
     silent.connect(ctx.destination)
 
+    el.playbackRate = 2 // halve the real-time cost; set after load so it isn't reset
     report('video tap: starting playback...')
     await Promise.race([el.play(), abortRace(signal)])
     report('video tap: capturing audio (real time)...')
@@ -122,7 +145,7 @@ async function decodeViaMediaElement(blob, signal, report = () => {}) {
       abortRace(signal),
     ])
 
-    source.disconnect()
+    srcNode.disconnect()
     processor.disconnect()
     silent.disconnect()
 
@@ -139,6 +162,7 @@ async function decodeViaMediaElement(blob, signal, report = () => {}) {
     return { channel, sampleRate: ctx.sampleRate }
   } finally {
     el.pause()
+    el.textContent = '' // drop the <source> child
     el.removeAttribute('src')
     el.load()
     el.remove()
@@ -270,11 +294,17 @@ export function CaptureProvider({ children }) {
 
       // Fast, gesture-free WebCodecs path first (mp4box + AudioDecoder);
       // the real-time <video> tap only if that declines. Both channel-0
-      // only, same as the fast path's analysis.
-      let via = await decodeContainerAudio(blob, fallbackAbort.signal, report)
+      // only, same as the fast path's analysis. The reason WebCodecs
+      // bailed is threaded into the <video>-tap step messages so, if the
+      // tap then times out on a real device, the one frozen diag line
+      // says BOTH why WebCodecs declined and where the tap hung.
+      let webCodecsLast = 'WebCodecs: (not started)'
+      let via = await decodeContainerAudio(blob, fallbackAbort.signal, (m) => {
+        webCodecsLast = m
+        report(m)
+      })
       if (!via && !fallbackAbort.signal.aborted) {
-        report('WebCodecs path declined -- trying <video>-element tap...')
-        via = await decodeViaMediaElement(blob, fallbackAbort.signal, report)
+        via = await decodeViaMediaElement(blob, fallbackAbort.signal, (m) => report(`[${webCodecsLast}] ${m}`))
       }
       if (!via) throw new Error('all container fallbacks failed')
       return { channel: via.channel, sampleRate: via.sampleRate, channelCount: 1, format }

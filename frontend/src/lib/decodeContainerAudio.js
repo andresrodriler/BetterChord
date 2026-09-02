@@ -64,22 +64,42 @@ function rejectOnAbort(signal) {
 export async function decodeContainerAudio(blob, signal, report = () => {}) {
   try {
     return await run(blob, signal, report)
-  } catch {
+  } catch (e) {
+    report(`WebCodecs declined: threw ${(e && e.name) || 'error'}`)
     return null
   }
 }
 
 async function run(blob, signal, report) {
   report('WebCodecs: checking AudioDecoder support...')
-  if (typeof window.AudioDecoder === 'undefined' || typeof window.EncodedAudioChunk === 'undefined') return null
+  if (typeof window.AudioDecoder === 'undefined' || typeof window.EncodedAudioChunk === 'undefined') {
+    // Safari added VideoDecoder in 16.4 but AudioDecoder only in Safari
+    // 26 -- 16.4..18.x has no AudioDecoder at all, so this path never
+    // runs there and the <video> tap is the only fallback.
+    report('WebCodecs declined: no AudioDecoder (needs Safari/iOS 26+, Chrome 94+)')
+    return null
+  }
 
   report('WebCodecs: reading container header...')
   const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
-  if (!isIsoBmff(head)) return null
+  if (!isIsoBmff(head)) {
+    const hex = [...head.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join(' ')
+    report(`WebCodecs declined: not ISOBMFF (first 8 bytes ${hex})`)
+    return null
+  }
 
   report('WebCodecs: loading mp4box (~42 KB)...')
-  const MP4Box = await import('mp4box')
-  if (signal?.aborted) return null
+  let MP4Box
+  try {
+    MP4Box = await import('mp4box')
+  } catch {
+    report('WebCodecs declined: mp4box import/network failed')
+    return null
+  }
+  if (signal?.aborted) {
+    report('WebCodecs declined: aborted after mp4box import')
+    return null
+  }
 
   const arrayBuffer = await blob.arrayBuffer()
   const file = MP4Box.createFile()
@@ -96,7 +116,11 @@ async function run(blob, signal, report) {
     file.onReady = (info) => {
       const track =
         info.tracks.find((t) => t.type === 'audio') || info.tracks.find((t) => t.audio && !t.video)
-      if (!track || !String(track.codec || '').startsWith('mp4a')) return resolve(null) // only AAC handled here
+      if (!track || !String(track.codec || '').startsWith('mp4a')) {
+        // only AAC handled here
+        report(`WebCodecs declined: no AAC audio track (codec=${track ? track.codec : 'none'})`)
+        return resolve(null)
+      }
       audio = track
       report('WebCodecs: extracting audio samples...')
       file.onSamples = (_id, _user, list) => {
@@ -113,11 +137,17 @@ async function run(blob, signal, report) {
       file.appendBuffer(slice)
     }
     file.flush()
-    setTimeout(() => resolve(collected.length ? collected : null), 4000)
+    setTimeout(() => {
+      report('WebCodecs: mp4box sample extraction stalled (4s)...')
+      resolve(collected.length ? collected : null)
+    }, 4000)
   })
 
   const encodedSamples = await Promise.race([samplesPromise, rejectOnAbort(signal)]).catch(() => null)
-  if (!encodedSamples || !encodedSamples.length || !audio) return null
+  if (!encodedSamples || !encodedSamples.length || !audio) {
+    report(`WebCodecs declined: mp4box extracted ${encodedSamples ? encodedSamples.length : 0} samples`)
+    return null
+  }
 
   const sampleRate = audio.audio.sample_rate
   const channels = audio.audio.channel_count
@@ -128,7 +158,10 @@ async function run(blob, signal, report) {
   const supported = await AudioDecoder.isConfigSupported(config)
     .then((r) => r.supported)
     .catch(() => false)
-  if (!supported) return null
+  if (!supported) {
+    report(`WebCodecs declined: AudioDecoder rejected config (codec=${config.codec}, ${sampleRate}Hz/${channels}ch)`)
+    return null
+  }
 
   const pcmParts = []
   let decodeError = false
@@ -183,7 +216,10 @@ async function run(blob, signal, report) {
   report('WebCodecs: assembling PCM...')
   let total = 0
   for (const part of pcmParts) total += part.length
-  if (decodeError || total < 1) return null
+  if (decodeError || total < 1) {
+    report(`WebCodecs declined: decode produced no PCM${decodeError ? ' (decoder error)' : ''}`)
+    return null
+  }
 
   const channel = new Float32Array(total)
   let offset = 0
