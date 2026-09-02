@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useCapture } from '../context/CaptureContext'
+import { CAPTURE_DIAGNOSTICS, useCapture } from '../context/CaptureContext'
 import CapturePanel from './CapturePanel'
 import Waveform from './Waveform'
 import RecordingInfo from './RecordingInfo'
@@ -53,6 +53,7 @@ function CaptureModal() {
     waveformData,
     identifying,
     error,
+    diag,
     armRecording,
     beginRecording,
     stopRecording,
@@ -163,6 +164,11 @@ function CaptureModal() {
                 </p>
               )}
               {quality && quality !== 'error' && <RecordingInfo quality={quality} />}
+
+              {/* TEMPORARY on-device diagnostic -- see CAPTURE_DIAGNOSTICS
+                  in CaptureContext.jsx. Remove this block and the flag
+                  together. */}
+              {CAPTURE_DIAGNOSTICS && diag && <p className="capture-modal__diag">diag: {diag}</p>}
 
               <div className="button-row">
                 <button className="btn btn-primary" onClick={handleContinue} disabled={identifying}>
