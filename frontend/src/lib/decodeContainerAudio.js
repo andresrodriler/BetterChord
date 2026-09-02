@@ -45,7 +45,10 @@ function ascFromEsds(file, trackId) {
   }
 }
 
-function isIsoBmff(head) {
+// Exported so the <video>/<audio>-tap fallback can make the same
+// "is this an mp4/mov/m4a container" call without a second copy of the
+// byte check.
+export function isIsoBmff(head) {
   // bytes 4..8 spell "ftyp" for mp4/mov/m4a
   return head.length >= 8 && head[4] === 0x66 && head[5] === 0x74 && head[6] === 0x79 && head[7] === 0x70
 }
