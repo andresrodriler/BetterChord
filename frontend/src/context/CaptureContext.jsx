@@ -3,13 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { identifyAudio } from '../lib/api'
 import { decodeContainerAudio, isIsoBmff } from '../lib/decodeContainerAudio'
 
-// TEMPORARY on-device diagnostics. When true, the quality-check flow
-// reports its current step as visible text in the Preview modal (see
-// CaptureModal.jsx) so a hang on a real phone shows which step stalled,
-// with no remote debugger. Flip to false (or delete every reference) to
-// remove.
-export const CAPTURE_DIAGNOSTICS = true
-
 // Blunt, unconditional wall-clock ceiling on the ENTIRE quality check
 // (fast decode + WebCodecs demux + <video> tap). A plain timer at the
 // effect level forces the graceful failure regardless of whether any
@@ -90,11 +83,10 @@ function resetTapEl(el) {
 // `mimeType`), unmutes right before the graph tap, plays it through at 2x
 // and captures channel 0 into PCM. Throws on any failure so
 // decodeViaMediaElement can move on to the next element.
-async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
+async function tapMediaElement(holder, kind, mimeType, blob, signal) {
   const el = holder[`${kind}El`]
   const source = mimeType === blob.type ? blob : new Blob([blob], { type: mimeType })
   const url = URL.createObjectURL(source)
-  const label = `<${kind}> tap`
 
   resetTapEl(el)
   el.muted = true
@@ -105,7 +97,6 @@ async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
   el.appendChild(sourceEl)
 
   try {
-    report(`${label}: loading (persistent ${kind} element)...`)
     await Promise.race([
       new Promise((resolve, reject) => {
         el.onloadedmetadata = resolve
@@ -143,9 +134,7 @@ async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
 
     try {
       el.playbackRate = 2 // halve the real-time cost; set after load so it isn't reset
-      report(`${label}: starting playback...`)
       await Promise.race([el.play(), abortRace(signal)])
-      report(`${label}: capturing audio (real time)...`)
       await Promise.race([
         new Promise((resolve, reject) => {
           el.onended = resolve
@@ -172,7 +161,6 @@ async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
       }
     }
 
-    report(`${label}: assembling PCM...`)
     let total = 0
     for (const c of chunks) total += c.length
     if (total === 0) throw new Error('produced no audio samples')
@@ -194,8 +182,7 @@ async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
 // PCM via MediaElementAudioSourceNode. Real-time and gesture-gated on iOS
 // -- only reached after decodeContainerAudio() declines. Every await races
 // the abort signal, but the caller's blunt wall-clock timer is what
-// actually guarantees no hang. `report` is the diagnostic step reporter
-// (no-op unless CAPTURE_DIAGNOSTICS).
+// actually guarantees no hang.
 //
 // Two structural choices here, both aimed at iOS Safari (verified only in
 // Chromium locally -- real-device confirmation still owed):
@@ -219,7 +206,7 @@ async function tapMediaElement(holder, kind, mimeType, blob, signal, report) {
 // iOS media-loading requirements this still follows (webkit.org/blog/6784):
 // playsinline + preload set before the source, muted through load then
 // unmuted right before the tap, element in the DOM and not display:none.
-async function decodeViaMediaElement(blob, signal, report = () => {}, holder) {
+async function decodeViaMediaElement(blob, signal, holder) {
   if (!holder) throw new Error('persistent media elements not ready')
 
   let head
@@ -250,12 +237,9 @@ async function decodeViaMediaElement(blob, signal, report = () => {}, holder) {
     if (signal?.aborted) throw new Error('aborted')
     const [kind, mimeType] = plan[i]
     try {
-      return await tapMediaElement(holder, kind, mimeType, blob, signal, report)
+      return await tapMediaElement(holder, kind, mimeType, blob, signal)
     } catch (e) {
       lastErr = e
-      if (i < plan.length - 1) {
-        report(`<${kind}> tap failed (${e.message}) -- trying <${plan[i + 1][0]}>...`)
-      }
     }
   }
   throw lastErr || new Error('media-element tap failed')
@@ -282,7 +266,6 @@ export function CaptureProvider({ children }) {
   const [waveformData, setWaveformData] = useState(null) // decoded Float32Array (channel 0) | null
   const [identifying, setIdentifying] = useState(false)
   const [error, setError] = useState('')
-  const [diag, setDiag] = useState(null) // TEMPORARY -- current quality-check step, shown when CAPTURE_DIAGNOSTICS
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -357,25 +340,17 @@ export function CaptureProvider({ children }) {
     if (!blob) {
       setQuality(null)
       setWaveformData(null)
-      setDiag(null)
       return
     }
     let cancelled = false
     let settled = false
     setQuality(null)
     setWaveformData(null)
-    setDiag(null)
 
     // Best-effort inner-unwind signal for the fallback chain. The blunt
     // timer below calls .abort() too, but the UI outcome never depends
     // on this propagating.
     const fallbackAbort = new AbortController()
-
-    const report = CAPTURE_DIAGNOSTICS
-      ? (msg) => {
-          if (!cancelled && !settled) setDiag(msg)
-        }
-      : () => {}
 
     // The one thing that must always happen: whoever gets here first
     // (analyze resolving, analyze throwing, or the hard timer) settles
@@ -393,16 +368,12 @@ export function CaptureProvider({ children }) {
     }
 
     const hardTimer = setTimeout(() => {
-      finish(() => {
-        setDiag((prev) => `${prev || '(no step reported)'}  [TIMED OUT -- this step never completed]`)
-        setQuality('error')
-      })
+      finish(() => setQuality('error'))
     }, QUALITY_CHECK_HARD_TIMEOUT_MS)
 
     // -> { channel, sampleRate, channelCount, format } | throws
     async function analyze() {
       const format = blob.type
-      report('trying fast decode (decodeAudioData)...')
       try {
         const arrayBuffer = await blob.arrayBuffer()
         const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -416,27 +387,15 @@ export function CaptureProvider({ children }) {
           format,
         }
       } catch {
-        report('fast decode rejected -- trying WebCodecs demux...')
+        // fast decode rejected -- fall through to the container fallbacks
       }
 
       // Fast, gesture-free WebCodecs path first (mp4box + AudioDecoder);
-      // the real-time <video> tap only if that declines. Both channel-0
-      // only, same as the fast path's analysis. The reason WebCodecs
-      // bailed is threaded into the <video>-tap step messages so, if the
-      // tap then times out on a real device, the one frozen diag line
-      // says BOTH why WebCodecs declined and where the tap hung.
-      let webCodecsLast = 'WebCodecs: (not started)'
-      let via = await decodeContainerAudio(blob, fallbackAbort.signal, (m) => {
-        webCodecsLast = m
-        report(m)
-      })
+      // the real-time media-element tap only if that declines. Both
+      // channel-0 only, same as the fast path's analysis.
+      let via = await decodeContainerAudio(blob, fallbackAbort.signal)
       if (!via && !fallbackAbort.signal.aborted) {
-        via = await decodeViaMediaElement(
-          blob,
-          fallbackAbort.signal,
-          (m) => report(`[${webCodecsLast}] ${m}`),
-          tapMediaRef.current
-        )
+        via = await decodeViaMediaElement(blob, fallbackAbort.signal, tapMediaRef.current)
       }
       if (!via) throw new Error('all container fallbacks failed')
       return { channel: via.channel, sampleRate: via.sampleRate, channelCount: 1, format }
@@ -445,7 +404,6 @@ export function CaptureProvider({ children }) {
     analyze()
       .then((result) =>
         finish(() => {
-          report('analyzing levels...')
           setQuality(
             summarizeChannel(result.channel, {
               sampleRate: result.sampleRate,
@@ -455,7 +413,6 @@ export function CaptureProvider({ children }) {
             })
           )
           setWaveformData(result.channel.slice())
-          setDiag(null)
         })
       )
       .catch(() => finish(() => setQuality('error')))
@@ -611,7 +568,6 @@ export function CaptureProvider({ children }) {
     waveformData,
     identifying,
     error,
-    diag,
     armRecording,
     beginRecording,
     stopRecording,

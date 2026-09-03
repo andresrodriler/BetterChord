@@ -155,18 +155,3 @@
     padding: 18px;
   }
 }
-
-/* TEMPORARY on-device diagnostic line (CAPTURE_DIAGNOSTICS in
-   CaptureContext.jsx). A small mono readout of the quality-check's
-   current step, so a hang on a real phone shows which step stalled.
-   Remove with the flag. */
-.capture-modal__diag {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--muted);
-  opacity: 0.75;
-  text-align: left;
-  word-break: break-word;
-}

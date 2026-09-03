@@ -62,51 +62,40 @@ function rejectOnAbort(signal) {
 
 // -> { channel: Float32Array (channel 0), sampleRate } | null
 // Never throws -- any failure returns null so the caller can try the
-// next fallback. `report` is the diagnostic step reporter (no-op unless
-// CAPTURE_DIAGNOSTICS).
-export async function decodeContainerAudio(blob, signal, report = () => {}) {
+// next fallback.
+export async function decodeContainerAudio(blob, signal) {
   try {
-    return await run(blob, signal, report)
-  } catch (e) {
-    report(`WebCodecs declined: threw ${(e && e.name) || 'error'}`)
+    return await run(blob, signal)
+  } catch {
     return null
   }
 }
 
-async function run(blob, signal, report) {
-  report('WebCodecs: checking AudioDecoder support...')
+async function run(blob, signal) {
   if (typeof window.AudioDecoder === 'undefined' || typeof window.EncodedAudioChunk === 'undefined') {
     // Safari added VideoDecoder in 16.4 but AudioDecoder only in Safari
     // 26 -- 16.4..18.x has no AudioDecoder at all, so this path never
     // runs there and the <video> tap is the only fallback.
-    report('WebCodecs declined: no AudioDecoder (needs Safari/iOS 26+, Chrome 94+)')
     return null
   }
 
-  report('WebCodecs: reading container header...')
   const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
   if (!isIsoBmff(head)) {
-    const hex = [...head.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join(' ')
-    report(`WebCodecs declined: not ISOBMFF (first 8 bytes ${hex})`)
     return null
   }
 
-  report('WebCodecs: loading mp4box (~42 KB)...')
   let MP4Box
   try {
     MP4Box = await import('mp4box')
   } catch {
-    report('WebCodecs declined: mp4box import/network failed')
     return null
   }
   if (signal?.aborted) {
-    report('WebCodecs declined: aborted after mp4box import')
     return null
   }
 
   const arrayBuffer = await blob.arrayBuffer()
   const file = MP4Box.createFile()
-  report('WebCodecs: demuxing container (mp4box)...')
 
   // mp4box delivers samples only when extraction is configured in
   // onReady, BEFORE the bytes that carry them are appended -- so set the
@@ -121,11 +110,9 @@ async function run(blob, signal, report) {
         info.tracks.find((t) => t.type === 'audio') || info.tracks.find((t) => t.audio && !t.video)
       if (!track || !String(track.codec || '').startsWith('mp4a')) {
         // only AAC handled here
-        report(`WebCodecs declined: no AAC audio track (codec=${track ? track.codec : 'none'})`)
         return resolve(null)
       }
       audio = track
-      report('WebCodecs: extracting audio samples...')
       file.onSamples = (_id, _user, list) => {
         for (const s of list) collected.push(s)
         if (collected.length >= track.nb_samples) resolve(collected)
@@ -141,14 +128,12 @@ async function run(blob, signal, report) {
     }
     file.flush()
     setTimeout(() => {
-      report('WebCodecs: mp4box sample extraction stalled (4s)...')
       resolve(collected.length ? collected : null)
     }, 4000)
   })
 
   const encodedSamples = await Promise.race([samplesPromise, rejectOnAbort(signal)]).catch(() => null)
   if (!encodedSamples || !encodedSamples.length || !audio) {
-    report(`WebCodecs declined: mp4box extracted ${encodedSamples ? encodedSamples.length : 0} samples`)
     return null
   }
 
@@ -157,12 +142,10 @@ async function run(blob, signal, report) {
   const description = ascFromEsds(file, audio.id) || synthAsc(sampleRate, channels)
   const config = { codec: audio.codec, sampleRate, numberOfChannels: channels, description }
 
-  report('WebCodecs: checking AudioDecoder config...')
   const supported = await AudioDecoder.isConfigSupported(config)
     .then((r) => r.supported)
     .catch(() => false)
   if (!supported) {
-    report(`WebCodecs declined: AudioDecoder rejected config (codec=${config.codec}, ${sampleRate}Hz/${channels}ch)`)
     return null
   }
 
@@ -193,7 +176,6 @@ async function run(blob, signal, report) {
   })
 
   try {
-    report(`WebCodecs: decoding AAC (${encodedSamples.length} chunks)...`)
     decoder.configure(config)
     for (const s of encodedSamples) {
       if (signal?.aborted) throw new Error('aborted')
@@ -206,7 +188,6 @@ async function run(blob, signal, report) {
         })
       )
     }
-    report('WebCodecs: waiting on AudioDecoder.flush()...')
     await Promise.race([decoder.flush(), rejectOnAbort(signal)])
   } finally {
     try {
@@ -216,11 +197,9 @@ async function run(blob, signal, report) {
     }
   }
 
-  report('WebCodecs: assembling PCM...')
   let total = 0
   for (const part of pcmParts) total += part.length
   if (decodeError || total < 1) {
-    report(`WebCodecs declined: decode produced no PCM${decodeError ? ' (decoder error)' : ''}`)
     return null
   }
 
