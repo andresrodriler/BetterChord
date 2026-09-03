@@ -5,13 +5,16 @@ Record or upload a single strum, and BetterChord identifies the chord,
 shows you real fretboard voicings, breaks down the theory behind it, and
 finds real songs that use it.
 
+**Live: [better-chord.vercel.app](https://better-chord.vercel.app)**
+
 ## Status
 
-This is an active passion project, not a finished product. The core
-pipeline (audio → chord → voicings/theory/songs) works end to end and is
-verified against real audio. There's no live web app yet. Right now
-everything runs via the command line. A FastAPI backend + React frontend
-are actively in progress. See [TODO.md](TODO.md) for the current roadmap.
+This is an active passion project, not a finished product, but it's now
+live on the web. The core pipeline (audio → chord → voicings/theory/songs)
+works end to end and is verified against real audio; a React frontend
+([Vercel](https://better-chord.vercel.app)) and a FastAPI backend (Render)
+wrap it, and it still runs from the command line too. See
+[TODO.md](TODO.md) for the current roadmap.
 
 ## Features
 
@@ -50,11 +53,13 @@ are actively in progress. See [TODO.md](TODO.md) for the current roadmap.
 
 ## Tech stack
 
-- **PyTorch** — CNN for note/root/bass prediction
+- **PyTorch** — CNN for note/root/bass prediction (converted to **ONNX
+  Runtime** for the deployed backend — no torch at serve time)
 - **Librosa** — audio analysis and spectrogram generation
 - **NumPy / pandas** — numerical processing
 - **SQLite** — chord voicing and song databases
-- *(In progress)* **FastAPI** + **React** — web backend/frontend
+- **FastAPI** + **React** — web backend/frontend, deployed on **Render**
+  (Docker) + **Vercel**
 
 ## Project structure
 ```
@@ -142,7 +147,8 @@ available separately.
 
 ## Usage
 
-There's no live app yet — for now, run the full pipeline directly:
+Use the live app at [better-chord.vercel.app](https://better-chord.vercel.app),
+or run the full pipeline directly from the command line:
 
 ```bash
 python main.py <filename>
@@ -154,10 +160,10 @@ and a few real songs that use it.
 
 ## Roadmap
 
-See [TODO.md](TODO.md) for the full, up-to-date list. Short version:
-wrapping the pipeline in a FastAPI backend, building a React frontend for
-in-browser recording, and deploying both so this is usable as an actual
-website rather than a CLI tool.
+See [TODO.md](TODO.md) for the full, up-to-date list. The FastAPI backend,
+React frontend, and deployment are done and live; what's left is ongoing
+UI polish plus deciding what training/model data (if any) to publish so
+others can reproduce the model.
 
 ## License
 

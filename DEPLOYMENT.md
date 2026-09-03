@@ -1,11 +1,21 @@
-# BetterChord — Deployment reference (Phase 7)
+# BetterChord — Deployment reference
 
 Frontend → **Vercel** (static Vite build). Backend → **Render** (Docker
-web service). This doc is the checklist for setting those two services up
-in their dashboards. The code changes that make it deployable are already
-in the repo (see "What changed in the repo" at the bottom).
+web service, free tier). **Both are live and deployed** — frontend at
+<https://better-chord.vercel.app>, backend at
+<https://betterchord.onrender.com>, both auto-deploying from the `Anders`
+branch. Render's free 512 MB tier is viable now that the image bakes a
+numba compile-cache (see the instance-type row below and "What changed in
+the repo"); the earlier "move to Cloud Run" plan is **dropped** — the
+numba fix resolved the cold-start OOM that motivated it. Full technical
+story: `CLAUDE.md`'s Phase 9 entry.
 
-Nothing here creates the services for you — it's the values to plug in.
+This doc stays the **setup / reference** checklist — the values to plug
+into each dashboard, and what every deploy-related file does. For
+**day-to-day upkeep** of the running app (what to check after a deploy,
+the Render Events tab, when env vars need updating), see
+[`OPERATIONS.md`](OPERATIONS.md). Nothing here creates the services for
+you.
 
 ---
 
@@ -61,7 +71,7 @@ training produces directly. Any time the model is retrained:
 | Language / Runtime | **Docker** (not native Python — Render will otherwise try to autodetect pip) |
 | Root Directory | *(blank — repo root)* |
 | Dockerfile Path | `./Dockerfile` |
-| Instance type | **512 MB (free / Starter) works, but at the edge** — inference runs via ONNX Runtime, not PyTorch, and the image is dep-trimmed + ORT-tuned (arena off, single-thread). Verified in a local container under a hard `--memory=512m`, twice across two sessions: ~47 MiB baseline, **~385 MiB anonymous** / ~485–490 MiB `docker stats` under sustained 6-concurrent `/identify` (73–91 requests, all 200), **`oom_kill 0`, never OOM-killed**. Caveat, stated plainly: `cgroup.current` sits pinned at ~511.8 / 512 MiB, the kernel constantly evicts page cache to hold the limit, and warm `/identify` latency under the limit is ~0.45 s vs ~0.19 s unconstrained. It fits and won't OOM-kill, but there is ~125 MiB of real (anon) headroom and no more — Render's own platform overhead comes out of the same 512. **If it misbehaves in production, move to the 1 GB tier — further optimization would need architecture changes.** Cold first request: the image now bakes a numba compile cache (`docker/warmup_numba.py`), so the first `/identify` loads the CQT/onset kernels from disk instead of compiling them — verified in a `--memory=512m` container to take the cold request from ~17 s / 512 MiB-pegged / 644–834 reclaim events down to ~3 s / ~448 MiB / 0 reclaim events. (Render free itself is still abandoned per the "Final Render addendum" in CLAUDE.md — next target Cloud Run — but this cache helps any host.) |
+| Instance type | **512 MB (free / Starter) — this is the live config.** Inference runs via ONNX Runtime, not PyTorch; the image is dep-trimmed + ORT-tuned (arena off, single-thread) and bakes a numba compile-cache (`docker/warmup_numba.py`), so the first `/identify` loads librosa's CQT/onset kernels from disk instead of compiling them live. Verified **on the real Render deploy** (Phase 9): cold start ~3 s and clear of the 512 MiB ceiling with **zero reclaim events / zero OOM kills** (before the cache: ~17 s, pinned at 512 MiB, 644–834 reclaim events, OOM-killing 1 of 2 cold starts). Warm `/identify` ~0.2 s. Headroom is real but not large (~125 MiB anon) — Render's own platform overhead comes out of the same 512 — so if it ever misbehaves under load, the 1 GB tier is the next step; further optimization would need architecture changes. Full story: `CLAUDE.md` Phase 9. |
 | Health Check Path | `/chords` |
 
 ### Environment variables (Render dashboard → Environment)
@@ -70,7 +80,7 @@ training produces directly. Any time the model is retrained:
 |---|---|---|---|
 | `HF_TOKEN` | your HF Read token (`hf_...`) | **Build** | Render passes dashboard vars as `--build-arg` for matching `ARG` names. Make sure it is available at build time (not "runtime only"). Consumed only in the isolated `data` build stage — never lands in the final image. |
 | `HF_DATASET_REPO` | e.g. `your-user/betterchord-data` | **Build** | The private dataset repo id. |
-| `ALLOWED_ORIGINS` | your Vercel URL, e.g. `https://betterchord.vercel.app` | **Runtime** | Comma-separated for multiple (e.g. add a stable preview domain). Controls the API's CORS `allow_origins`. Without it the browser frontend's requests are blocked. |
+| `ALLOWED_ORIGINS` | the Vercel origin — currently `https://better-chord.vercel.app` | **Runtime** | Comma-separated for multiple (e.g. add a stable preview domain, or a custom domain if one is ever added). Controls the API's CORS `allow_origins`. Without it the browser frontend's requests are blocked. |
 | `PORT` | **do not set** | — | Render injects this automatically; the container binds `0.0.0.0:$PORT`. |
 
 First deploy will fail CORS-wise until you know the Vercel URL — that's
@@ -93,7 +103,7 @@ fine, set `ALLOWED_ORIGINS` and redeploy once step 3 is done.
 
 | Name | Value | Notes |
 |---|---|---|
-| `VITE_API_URL` | the Render backend origin, e.g. `https://betterchord-api.onrender.com` | **No trailing slash, no path.** Read at build time by `frontend/src/lib/api.js`; a trailing slash is trimmed defensively anyway. Set it for **Production** (and Preview if you want previews to hit the live API). If unset, the build falls back to `http://127.0.0.1:8000` — fine for local, useless in prod. |
+| `VITE_API_URL` | the Render backend origin — currently `https://betterchord.onrender.com` | **No trailing slash, no path.** Read at build time by `frontend/src/lib/api.js`; a trailing slash is trimmed defensively anyway. Set it for **Production** (and Preview if you want previews to hit the live API). If unset, the build falls back to `http://127.0.0.1:8000` — fine for local, useless in prod. |
 
 Wiring order:
 1. Deploy the Render backend, note its URL.
@@ -139,16 +149,22 @@ curl -s -F file=@frontend/public/assets/Gminor_3_5_5_3_3_3.wav localhost:8000/id
 
 ---
 
-## 6. After the first real deploy
+## 6. After any deploy
 
-Do a genuine **real-phone check** of the Phase 6 mobile work — open the
-live Vercel URL in actual mobile Chrome/Safari on a phone and exercise
-record, upload, manual search, the modals, and the Results page. Phase 6
-was only verified via Playwright device emulation.
+Real-device checks matter more here than most projects — Playwright /
+device-emulation has repeatedly passed while real iOS Safari failed. The
+Phase 6 mobile work went through a full real-phone pass on the live
+deploy across Phase 9's mobile-fixes rounds; keep doing a quick real-phone
+run (record, upload, manual search, the modals, Results) after any deploy
+that touches the frontend. Ongoing operational routine: [`OPERATIONS.md`](OPERATIONS.md)
+§6.
 
 ---
 
-## What changed in the repo for Phase 7
+## What changed in the repo to make it deployable
+
+(All landed in Phase 7; the numba-cache line was confirmed on the real
+Render deploy in Phase 9 — see `CLAUDE.md`.)
 
 - `frontend/src/lib/api.js` — `API_BASE` now `import.meta.env.VITE_API_URL`
   with the `http://127.0.0.1:8000` fallback (trailing slash trimmed).
@@ -167,20 +183,17 @@ was only verified via Playwright device emulation.
   `numba`/`llvmlite` pins in `requirements-deploy.txt` — pre-compiles
   librosa's `@jit(cache=True)` CQT/onset kernels into an image layer so
   the first `/identify` loads all 41 from disk instead of a live LLVM
-  compile. `generic` keeps the cache key free of host-CPU features;
-  `warmup_numba.py` also pins the librosa source mtimes so the cache
-  survives the image-layer round-trip (without that, BuildKit truncates
-  sub-second mtimes at layer commit and every kernel recompiles anyway).
-  A miss falls back to live compile — no failure. **Verified in a real
-  container** (numba 0.67.0, `python:3.14-slim-bookworm`): fresh container
-  first `/identify` → 41/41 cache hits, 0 recompiles; under a hard
-  `--memory=512m --memory-swap=512m` the cold first request goes from
-  512 MiB peak / ~378 MiB anon / 644–834 reclaim events / ~17 s
-  **→ ~448 MiB peak / ~269 MiB anon / 0 reclaim events / ~3 s**; neither
-  variant OOM-killed locally, but the no-cache build sits pegged at the
-  512 ceiling while the cache build has ~64 MiB headroom and never
-  touches it. Chord bit-identical (`Cm9 @ 0.21478250584136332`) across
-  cache-hit / cold-recompile and a 50-file sweep.
+  compile (the cold-start cost that OOM-killed the free tier). Two
+  non-obvious pieces: `NUMBA_CPU_NAME=generic` keeps the cache key free
+  of host-CPU features so the baked cache is valid on whatever host runs
+  the image, and `warmup_numba.py` pins the librosa source-file mtimes to
+  a fixed value so the cache survives BuildKit's whole-second mtime
+  truncation at layer commit. A cache miss falls back to live compile —
+  no failure. Confirmed on the real Render deploy (Phase 9): cold start
+  ~17 s / 512 MiB-pinned / 644–834 reclaim events → ~3 s / ~448 MiB / 0
+  reclaim events, zero OOM kills; chord output bit-identical to a live
+  recompile across a 50-file sweep. Full investigation: `CLAUDE.md`
+  Phase 9.
 - `betterchord/training_scripts/export_onnx.py` — converts `chord_cnn.pth`
   → `chord_cnn.onnx` with a real numerical-equivalence check. Re-run
   after every retrain.

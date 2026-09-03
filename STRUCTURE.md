@@ -22,19 +22,24 @@ BetterChord/
   TODO.md
   README.md
   STRUCTURE.md                     -- this file
-  Dockerfile                       -- Phase 7: 2-stage backend image (stage 1 fetches
+  Dockerfile                       -- Phase 7/9: 2-stage backend image (stage 1 fetches
                                       the private HF data files in isolation so
                                       HF_TOKEN never lands in a layer; stage 2 is the
                                       API runtime -- ffmpeg via apt, requirements-
-                                      deploy.txt, thread-cap ENV vars, uvicorn api:app
-                                      on $PORT). Render was abandoned (see CLAUDE.md
-                                      Phase 7); reusable for Cloud Run.
+                                      deploy.txt, thread-cap ENV vars, a baked numba
+                                      compile-cache, uvicorn api:app on $PORT). Live on
+                                      Render's free tier (CLAUDE.md Phase 9).
   .dockerignore                     -- trims the build context; excludes the large
                                       local data files so the container fetches fresh
-  DEPLOYMENT.md                     -- Phase 7: dashboard checklist + env vars for the
-                                      backend (was Render, now for Cloud Run) and the
-                                      Vercel frontend; retrain -> re-export -> re-upload
-                                      chord_cnn.onnx workflow
+  DEPLOYMENT.md                     -- Phase 7/9: dashboard checklist + env vars for the
+                                      Render backend and Vercel frontend (both live);
+                                      retrain -> re-export -> re-upload chord_cnn.onnx
+                                      workflow
+  OPERATIONS.md                     -- ongoing upkeep of the deployed app (what to check
+                                      after a deploy, Render Events tab, CORS/env-var
+                                      triggers, known limitations, cost check, monthly
+                                      real-device pass); complements DEPLOYMENT.md's
+                                      one-time setup
   docker/
     fetch_hf_data.py                -- Phase 7: build-time script the Dockerfile's
                                       stage 1 runs -- downloads chord_cnn.onnx,
